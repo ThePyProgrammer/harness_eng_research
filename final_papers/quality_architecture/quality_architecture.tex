@@ -1,0 +1,856 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{array}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem*{remark}{Remark}
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\definecolor{baselinecolor}{gray}{.95}
+\newcommand{\grayrow}{\rowcolor[gray]{.9}}
+\newcommand{\graycell}[1]{\cellcolor{baselinecolor}{#1}}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+% === Custom commands ===
+\newcommand{\Pesc}{P_{\mathrm{esc}}}
+\newcommand{\DRE}{\mathrm{DRE}}
+\newcommand{\ROI}{\mathrm{ROI}}
+\newcommand{\CoQ}{\mathrm{CoQ}}
+
+% Paper Title
+\title{Quality Architecture for AI Coding Agent Harnesses}
+
+\renewcommand{\today}{}
+
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+
+\begin{abstract}
+\vspace{-0.2in}
+
+AI code generators now produce an estimated 40--42\% of production code, yet observational studies consistently report 1.7$\times$ more issues, 2.7$\times$ more security vulnerabilities, and a collapse of refactoring activity from 25\% to under 10\% of changed lines. The resulting defects (``slop'') are distinctive: they are superficially competent, individually defensible, and cumulatively corrosive to codebase health.
+
+We present a formal framework for reasoning about layered defense against AI code slop. Our contributions are: (1)~a formal taxonomy of 18 slop types classified by detection decidability into Decidable, Semi-decidable, and Undecidable classes, grounded in Rice's theorem; (2)~the \emph{Layered Defense Optimization Problem}, proved NP-hard via reduction from Weighted Set Cover, with a $(1-1/e)$-approximate greedy algorithm; (3)~the \emph{Detection Ceiling Theorem}, using the Data Processing Inequality to prove hard upper bounds on layer-specific detection rates; (4)~the \emph{Correlated Judge-Producer Error Model}, formalizing why same-model LLM-as-Judge systems underperform the independence assumption via the FKG inequality; (5)~the \emph{Compound Degradation Theorem}, proving that individually CI-passing changes can produce superlinear entropy growth; and (6)~the \emph{Accretion Category}, a novel defect class absent from all classical taxonomies (IEEE~1044, ODC, Beizer, CWE) that captures code which is correct, unnecessary, individually defensible, and collectively harmful.
+
+We calibrate these formal results against empirical data from eight large-scale studies (CodeRabbit, GitClear, Spotify Honk, METR, Apollo Research, AgentSpec, Veracode, NIST CAISI) and derive a four-layer quality stack ordered by cost and determinism. The framework provides closed-form expressions for optimal quality investment per code category and identifies the four slop types (meaningless tests, boilerplate inflation, redundant comments, naming drift) that constitute the detection research frontier.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+% ============================================================
+% 1. INTRODUCTION
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+For the first time in recorded software history, developers paste code more often than they refactor or reuse it \citep{gitclear2025}. AI code generators have crossed the threshold from occasional suggestion to primary author: converging estimates place AI-generated code at 40--42\% of production output \citep{gitclear2025, sonar2026}. This shift has produced a new category of software quality problem.
+
+The problem is not that AI writes bad code occasionally. The problem is that it writes \emph{superficially competent} code at scale: code that passes type-checkers, satisfies linters, and clears CI pipelines, yet cumulatively degrades codebase health through unnecessary abstractions, duplicated logic, happy-path-only error handling, and silent scope expansion. We call these defects \emph{slop}, following industry usage.
+
+The empirical evidence is stark. CodeRabbit's analysis of 470 pull requests found 1.68$\times$ more issues in AI-generated PRs, with 2.74$\times$ more XSS vulnerabilities and approximately 8$\times$ more I/O problems \citep{coderabbit2025}. GitClear's analysis of 211 million lines found refactoring collapsed from 24.1\% to 9.5\% of changes while code cloning grew 8$\times$ \citep{gitclear2025}. A study of 304,362 AI commits across 6,275 repositories found 484,606 issues, with security issues surviving at 41.1\% \citep{debtboom2026}. Veracode tested 100+ LLMs on 80 security-sensitive tasks and found a 45\% failure rate, with zero improvement over time \citep{veracode2025}.
+
+Yet a controlled trial by GitHub (202 developers, single task) found quality \emph{improvements} of 2.5--4.2\% \citep{github2024rct}. This contradiction between controlled and observational studies is itself informative: AI \emph{can} produce high-quality code under narrow, supervised conditions, but \emph{does not} in aggregate practice. The verification bottleneck (only 48\% of developers always verify AI output \citep{sonar2026}) is the likely mechanism.
+
+This paper provides a formal framework for reasoning about what to verify, how aggressively, and with what tools. We make the following contributions:
+
+\begin{enumerate}
+\item A \textbf{formal slop taxonomy} (\S\ref{sec:taxonomy}) classifying 18 defect types into three decidability classes (Decidable, Semi-decidable, Undecidable), with three approximately orthogonal generative factors (Context Blindness, Completion Bias, Training Distribution Leakage).
+
+\item The \textbf{Layered Defense Optimization Problem} (\S\ref{sec:optimization}), proved NP-hard, with a greedy $(1-1/e)$-approximation via submodularity.
+
+\item The \textbf{Detection Ceiling Theorem} (\S\ref{sec:ceilings}), proving information-theoretic upper bounds on per-layer detection rates using the Data Processing Inequality.
+
+\item The \textbf{Correlated Judge-Producer Error Model} (\S\ref{sec:correlation}), showing that shared training data creates positively correlated failures between producer and judge LLMs.
+
+\item The \textbf{Compound Degradation Theorem} (\S\ref{sec:degradation}), proving superlinear entropy growth from individually CI-passing changes, with the \emph{Accretion Category} as a novel defect class.
+
+\item \textbf{Empirical calibration} (\S\ref{sec:calibration}) of all formal model parameters against eight large-scale studies, yielding a cost-optimal four-layer quality stack with per-type layer assignments.
+\end{enumerate}
+
+\paragraph{Scope and framing.} This is a theory and position paper. Our novel contributions are in the \emph{application} of established formal machinery (information theory, decision theory, computability theory) to the new problem of AI code quality defense, and in the \emph{synthesis} of empirical data into calibrated formal models. The individual theorems draw on classical results; the contribution is their composition into a coherent framework for an emerging problem.
+
+
+% ============================================================
+% 2. PRELIMINARIES
+% ============================================================
+\section{Preliminaries and Definitions}
+\label{sec:prelim}
+
+\subsection{Notation}
+
+Let $J = \{1, \ldots, 18\}$ index the slop types. Let $L = \{1, 2, 3, 4\}$ index defense layers: structural gates, deterministic analysis, LLM-as-Judge, and human review. For each layer $\ell \in L$ and defect type $j \in J$:
+
+\begin{itemize}
+\item $d_{\ell,j} \in [0,1]$: detection probability (sensitivity) of layer $\ell$ for type $j$
+\item $c_\ell > 0$: cost of applying layer $\ell$ per code unit
+\item $D_j > 0$: downstream cost of an undetected defect of type $j$
+\item $p_j \in [0,1]$: prior probability that a code unit contains defect type $j$
+\item $\rho_{\ell,\ell',j} \in [-1,1]$: correlation between detection failures of layers $\ell$ and $\ell'$
+\end{itemize}
+
+Let $\Lambda_j \subseteq L$ denote the subset of layers applied to defect type $j$.
+
+\subsection{The Four Defense Layers}
+
+The quality stack is ordered by cost and determinism:
+
+\begin{description}
+\item[Layer 1: Structural gates] (${\sim}2$s per write). Type-checkers, import validators, lint with zero-suppression policy, diff budget enforcement, dead code detection. Deterministic, cheap, applied to every write.
+
+\item[Layer 2: Deterministic analysis] (${\sim}10$s per task). AST scan for stubs/placeholders, clone detection, cyclomatic complexity thresholds, deprecation database checks. Deterministic but requires tooling setup.
+
+\item[Layer 3: LLM-as-Judge] (${\sim}30$s per task). Scope compliance, abstraction audit, test quality review, naming consistency. Probabilistic, subject to judge-model correlation.
+
+\item[Layer 4: Human review] (flagged items only). Architectural coherence, security review for high-risk paths, design intent validation. Highest quality but resource-constrained.
+\end{description}
+
+Layers 1--2 block commits. Layer 3 flags but does not block. Layer 4 sees only what survived three automated layers.
+
+
+% ============================================================
+% 3. FORMAL SLOP TAXONOMY
+% ============================================================
+\section{Formal Slop Taxonomy}
+\label{sec:taxonomy}
+
+\subsection{Defect Type as a Formal Object}
+
+\begin{definition}[Slop Type]
+\label{def:sloptype}
+A slop type is a tuple $\tau_j = (\sigma_j, \phi_j, \delta_j, C_j)$ where:
+\begin{itemize}
+\item $\sigma_j : \mathrm{AST} \to \{0, 1\}$ is the \textbf{syntactic signature}, a predicate on abstract syntax trees identifying candidate instances.
+\item $\phi_j : \mathrm{Program} \times \mathrm{Context} \to \{0, 1\}$ is the \textbf{semantic property}, determining whether a candidate is a genuine defect given full program context.
+\item $\delta_j \in \{\mathrm{D}, \mathrm{SD}, \mathrm{U}\}$ is the \textbf{detection decidability class}.
+\item $C_j : \Omega \to \mathbb{R}_{\geq 0}$ is the \textbf{cost distribution} over deployment contexts.
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Detection Decidability Classes]
+\label{def:decidability}
+The three classes are formally distinct:
+\begin{itemize}
+\item \textbf{Decidable (D):} There exists a total computable function $f_j$ such that $f_j(t) = 1$ iff $t$ contains an instance of $\tau_j$. The syntactic signature $\sigma_j$ suffices; the semantic property $\phi_j$ does not depend on unobservable context.
+
+\item \textbf{Semi-decidable (SD):} The semantic property $\phi_j$ depends on partially formalizable context. An oracle (LLM or human) can approximate $\phi_j$ with probability $p \in (0.5, 1)$, but no computable function achieves $p = 1$.
+
+\item \textbf{Undecidable (U):} No known oracle achieves reliable detection. For all known procedures $f$, the inter-rater reliability $\kappa < 0.4$ (below ``fair agreement'').
+\end{itemize}
+\end{definition}
+
+\subsection{Partition of the 18 Types}
+
+\begin{proposition}[Decidability Partition]
+\label{prop:partition}
+The 18 slop types partition as shown in \Cref{tab:partition}.
+\end{proposition}
+
+\begin{table}[htbp]
+\centering
+\caption{The 18 slop types partitioned by detection decidability.}
+\label{tab:partition}
+\small
+\begin{tabularx}{\textwidth}{l c X}
+\toprule
+\textbf{Class} & \textbf{Count} & \textbf{Types} \\
+\midrule
+D (Decidable) & 7 & Hallucinated imports, placeholder/stub code, duplicate logic, dead code, lint suppressions, cross-language contamination, outdated APIs \\
+\addlinespace
+SD (Semi-decidable) & 7 & Security vulns (functional-looking), happy-path error handling, data model mismatches, over-engineering, architectural erosion, silent scope expansion, god functions \\
+\addlinespace
+U (Undecidable) & 4 & Meaningless tests, boilerplate inflation, redundant comments, naming/convention drift \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{proof}[Proof sketch]
+For each Decidable type, we exhibit the computable function: hallucinated imports are detected by lockfile resolution (table lookup, $O(1)$); placeholder code by AST pattern matching for \texttt{pass}, \texttt{...}, \texttt{NotImplementedError} (regular language over AST tokens); duplicate logic by tree-sitter-based clone detection (suffix tree, $O(n \log n)$); dead code by reachability analysis on the call graph; lint suppressions by regex; cross-language contamination by language-specific AST rules; outdated APIs by deprecation database lookup.
+
+For Semi-decidable types, the semantic property $\phi_j$ depends on context: security vulnerabilities require knowing which inputs are adversarial; happy-path handling requires knowing which error paths matter; over-engineering requires judging abstraction necessity. Experts agree at $\kappa \approx 0.6$ (substantial agreement), confirming detectability above chance but below certainty.
+
+For Undecidable types, even expert reviewers disagree: ``meaningless test'' depends on test intent versus structure (domain-dependent); ``boilerplate'' thresholds vary by team norms; ``redundant comment'' depends on reader expertise; ``naming drift'' requires inferring implicit conventions. Inter-rater $\kappa < 0.4$ for all four \citep{llmjudgetrust2024}.
+\end{proof}
+
+\subsection{Latent Factor Structure}
+
+We propose three approximately orthogonal generative factors:
+
+\begin{definition}[Context Blindness (F1)]
+The agent's effective context $\hat{\mathcal{K}}(t) \subset \mathcal{K}(t)$, where $\mathcal{K}(t)$ is the codebase knowledge required for correct generation at point $t$. The probability of slop type $\tau_j$ increases monotonically with the context deficit $|\mathcal{K} \setminus \hat{\mathcal{K}}|$. Types loading on F1: duplicate logic, naming drift, architectural erosion, boilerplate inflation.
+\end{definition}
+
+\begin{definition}[Completion Bias (F2)]
+The agent's output distribution $\pi$ assigns higher probability to syntactically complete outputs than to semantically minimal correct outputs: $\mathbb{E}_\pi[\mathrm{length}(o)] > \mathbb{E}_{\pi^*}[\mathrm{length}(o)]$ where $\pi^*$ is optimal. Types loading on F2: placeholder code, happy-path error handling, meaningless tests, redundant comments, over-engineering.
+\end{definition}
+
+\begin{definition}[Training Distribution Leakage (F3)]
+Patterns memorized during training are applied to contexts where they do not hold. Probability increases with divergence between training distribution $\mathcal{D}$ and execution environment $\mathcal{E}$. Types loading on F3: hallucinated imports, cross-language contamination, outdated APIs, security vulnerabilities.
+\end{definition}
+
+\begin{proposition}[Approximate Orthogonality (Hypothesis)]
+\label{prop:orthogonal}
+We \emph{hypothesize} that the three factors are approximately orthogonal: $I(F_i; F_k)$ is small relative to $H(F_i)$ for $i \neq k$, because they operate at different stages of the generation process (input retrieval, decoding objective, prior knowledge respectively). Confirmatory factor analysis on a labeled slop dataset (the ISSRE 2025 dataset with 500K+ samples is the most promising candidate) is needed to validate this structure.
+\end{proposition}
+
+\begin{corollary}[Intervention Independence]
+If the three factors are approximately orthogonal, interventions targeting different factors compose multiplicatively. Better retrieval (addressing F1) does not reduce completion bias (F2), and vice versa. The quality stack must address all three independently.
+\end{corollary}
+
+\subsection{Relationship to Classical Taxonomies}
+
+No classical taxonomy captures the full slop landscape. IEEE~1044 \citep{ieee1044} assumes the failure-defect-fault chain, but slop often causes no failures. ODC \citep{chillarege1992} classifies defects requiring fixes, but individually acceptable slop does not require fixes. \citet{beizer1990} classifies bugs traceable to incorrect decisions, but no specific decision in an accretion defect is incorrect. CWE classifies security weaknesses, covering only type~8. Four types (over-engineering, architectural erosion, scope expansion, boilerplate inflation) map poorly to every classical taxonomy because they presuppose intentional authorship.
+
+
+% ============================================================
+% 4. LAYERED DEFENSE OPTIMIZATION
+% ============================================================
+\section{The Layered Defense Optimization Problem}
+\label{sec:optimization}
+
+\subsection{Problem Statement}
+
+For each defect type $j$, select $\Lambda_j \subseteq L$. The escape probability under correlation is:
+\begin{equation}
+\label{eq:pesc}
+\Pesc(j, \Lambda_j) = P\!\left(\bigcap_{\ell \in \Lambda_j} \{Z_{\ell,j} = 0\}\right)
+\end{equation}
+where $Z_{\ell,j} \in \{0,1\}$ indicates detection by layer $\ell$. Under independence, $\Pesc^{\mathrm{ind}}(j, \Lambda_j) = \prod_{\ell \in \Lambda_j} (1 - d_{\ell,j})$. Under pairwise correlation $\rho$ between layers $\ell_1, \ell_2$:
+\begin{equation}
+P(Z_{\ell_1} = 0, Z_{\ell_2} = 0) = (1-d_1)(1-d_2) + \rho\sqrt{d_1(1-d_1) \cdot d_2(1-d_2)}
+\end{equation}
+
+With shared layer costs (a layer activated for any type is paid once):
+\begin{equation}
+\label{eq:objective}
+C_{\mathrm{total}} = \sum_{\ell \in L} c_\ell \cdot \mathbf{1}[\Lambda^\ell \neq \emptyset] + \sum_{j \in J} p_j \cdot D_j \cdot \Pesc(j, \Lambda_j)
+\end{equation}
+where $\Lambda^\ell = \{j : \ell \in \Lambda_j\}$.
+
+\begin{theorem}[Hardness]
+\label{thm:nphard}
+The Layered Defense Optimization Problem with shared layer costs is NP-hard, by reduction from Weighted Set Cover.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Set $D_j = M$ for large $M$ and $p_j = 1$ for all $j$. Then minimizing the objective forces all types to be covered (the penalty $M \cdot \Pesc \gg c_\ell$ for any uncovered type), reducing to minimum-weight subcollection selection, which is Weighted Set Cover.
+\end{proof}
+
+\begin{corollary}
+\label{cor:inapprox}
+Unless P $=$ NP, no polynomial-time algorithm achieves approximation ratio better than $\ln|J|$ \citep{dinur2014}.
+\end{corollary}
+
+\begin{theorem}[Greedy Approximation]
+\label{thm:greedy}
+Under independence, the greedy algorithm (iteratively select the layer with highest marginal ROI $\Delta_\ell / c_\ell$) achieves a $(1-1/e)$-approximation to the optimal escaped defect cost reduction.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Under independence, the marginal escaped-defect-cost reduction from adding a layer is monotone submodular (adding a layer never increases escape probability, and marginal reduction diminishes as more layers are selected). The result follows from \citet{nemhauser1978}.
+\end{proof}
+
+\begin{proposition}[Decomposition]
+\label{prop:decomp}
+When costs are per-invocation (not shared) and layers are independent, the optimization decomposes into $|J|$ independent per-type subproblems, each solvable by ROI ordering.
+\end{proposition}
+
+\begin{remark}
+For our problem ($|L| = 4$, $|J| = 18$), exact enumeration over $2^4 = 16$ subsets per type is computationally trivial. The greedy bound matters for scaled versions with dozens of specialized tools.
+\end{remark}
+
+
+% ============================================================
+% 5. DETECTION CEILINGS
+% ============================================================
+\section{Detection Ceiling Theorem}
+\label{sec:ceilings}
+
+Let $X \in \{0,1\}$ be the defect state and $\mathcal{C}$ the full context. Each layer $\ell$ observes $Y_\ell = f_\ell(\mathcal{C})$, forming the Markov chain $X \to \mathcal{C} \to Y_\ell \to Z_\ell$.
+
+\begin{theorem}[Detection Ceiling]
+\label{thm:ceiling}
+For any layer $\ell$ with observables $Y_\ell$:
+\begin{equation}
+I(X; Z_\ell) \leq I(X; Y_\ell) \leq I(X; \mathcal{C})
+\end{equation}
+Consequently, by Fano's inequality, the detection error probability satisfies:
+\begin{equation}
+h(P_e^{(\ell)}) \geq H(X | Y_\ell) = H(X) - I(X; Y_\ell)
+\end{equation}
+where $h(\cdot)$ is the binary entropy function.
+\end{theorem}
+
+\begin{proof}
+By the Data Processing Inequality \citep{coverthomas2006}, mutual information can only decrease along a Markov chain. Fano's inequality lower-bounds error probability in terms of conditional entropy.
+\end{proof}
+
+\begin{table}[htbp]
+\centering
+\caption{Observable context and detection ceilings per layer.}
+\label{tab:ceilings}
+\small
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Layer} & \textbf{Observable $Y_\ell$} & \textbf{Excluded context} \\
+\midrule
+L1: Structural & Syntax, types, imports, diff size & Semantics, intent, requirements, runtime \\
+L2: Deterministic & AST, clones, complexity, deprecation DB & Intent, requirements, runtime \\
+L3: LLM-Judge & Code + task description + partial repo & Full runtime, complete requirements \\
+L4: Human & All above + domain expertise + tacit knowledge & Exhaustive analysis (bounded by attention) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{theorem}[No Free Lunch for Context-Poor Layers]
+\label{thm:nofreelunch}
+For defect type $j$ whose determination requires context $\mathcal{C}_j^*$, if layer $\ell$ does not observe $\mathcal{C}_j^*$, then $d_{\ell,j}$ is bounded well below the achievable rate with full context:
+\begin{equation}
+I(X_j; Y_\ell) \leq I(X_j; \mathcal{C} \setminus \mathcal{C}_j^*)
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Direct application of the DPI to $X_j \to \mathcal{C} \to (Y_\ell, \mathcal{C}_j^*) \to Y_\ell$, noting that dropping $\mathcal{C}_j^*$ can only reduce mutual information.
+\end{proof}
+
+\paragraph{Example.} Silent scope expansion (type~13) requires $\mathcal{C}_{13}^* = \{\text{task description}\}$. Layer~1 does not observe the task description, so $I(X_{13}; Y_1) \leq I(X_{13}; \text{code syntax alone}) \approx 0$, giving $d_{1,13} \approx 0$. This is confirmed empirically: structural gates catch 5--15\% of scope expansion at best.
+
+
+% ============================================================
+% 6. CORRELATED JUDGE-PRODUCER ERRORS
+% ============================================================
+\section{Correlated Judge-Producer Error Model}
+\label{sec:correlation}
+
+\subsection{The Shared Blindspot Framework}
+
+Let $M_P$ be the producer and $M_J$ the judge. Define $E_P$ as the event that $M_P$ produces a defect and $E_J$ as the event that $M_J$ fails to detect it.
+
+\begin{proposition}[Correlated Blind Spots]
+\label{prop:correlated}
+If both models learn similar representations from overlapping training data $\mathcal{T}_P \cap \mathcal{T}_J$, then defect patterns underrepresented in the shared data are both more likely to be produced and more likely to be missed, creating positive correlation:
+\begin{equation}
+\mathrm{Cov}(E_P, E_J) > 0
+\end{equation}
+\end{proposition}
+
+\begin{theorem}[Judge-Producer Correlation via FKG]
+\label{thm:fkg}
+Under a shared-difficulty model where both failure probabilities increase with difficulty $\theta$ (distance from training distribution), the FKG inequality \citep{fkg1971} gives:
+\begin{equation}
+E_\theta[\phi_P(\theta) \cdot \phi_J(\theta)] > E_\theta[\phi_P(\theta)] \cdot E_\theta[\phi_J(\theta)]
+\end{equation}
+where $\phi_P(\theta)$ and $\phi_J(\theta)$ are the producer and judge failure probabilities at difficulty $\theta$. The rate of escaped defects exceeds what the independence assumption predicts.
+\end{theorem}
+
+\begin{proof}
+By the Harris-FKG inequality, for two non-decreasing functions on a distributive lattice, the expectation of the product exceeds the product of expectations. Both $\phi_P$ and $\phi_J$ are non-decreasing in difficulty $\theta$.
+\end{proof}
+
+\begin{corollary}[Independence Underestimates Escape]
+\label{cor:underestimate}
+The standard formula $\prod_\ell (1 - d_{\ell,j})$ is a lower bound on true escape probability. Any cost analysis using independence underestimates escaped defect costs.
+\end{corollary}
+
+\subsection{Diversity Gain}
+
+\begin{definition}[Diversity Gain]
+The gain from cross-model judging (using judge $M_J^B$ from a different vendor than producer $M_P^A$) versus same-model judging ($M_J^A$) is:
+\begin{equation}
+\Delta_{\mathrm{div}} = \Pesc^{A \text{ judges } A} - \Pesc^{B \text{ judges } A}
+\end{equation}
+\end{definition}
+
+This gain has two components: the detection rate difference ($d_J^B$ versus $d_J^A$) and the correlation reduction ($\rho_{AB} < \rho_{AA}$). Even at equal detection rates, diversity gain is positive whenever $\rho_{AB} < \rho_{AA}$.
+
+\subsection{Connection to Littlewood-Strigini}
+
+\citet{littlewood1993, littlewood2000} proved that independently developed software versions do not fail independently, because some inputs are inherently difficult. Their result adapts directly: if producer and judge failure probabilities both increase with difficulty, then $P(\text{defect produced and missed}) > P(\text{produced}) \cdot P(\text{missed})$. Empirically, diverse techniques can achieve effectiveness \emph{greater} than the independence assumption predicts (positive diversity gain), while same-technique repetitions underperform it \citep{littlewood2000}.
+
+
+% ============================================================
+% 7. OPTIMAL LAYER ORDERING
+% ============================================================
+\section{Optimal Layer Ordering}
+\label{sec:ordering}
+
+\begin{theorem}[ROI Ordering]
+\label{thm:ordering}
+Under independence, when layers form a cascade (resolved items skip subsequent layers), cost-optimal ordering sorts by decreasing $r_\ell / c_\ell$, where $r_\ell$ is the resolution rate.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Pairwise exchange argument (Smith's rule \citep{smith1956}): swapping adjacent layers $\ell_a, \ell_b$ shows the ordering $\ell_a$ before $\ell_b$ is cheaper iff $r_a / c_a > r_b / c_b$.
+\end{proof}
+
+\begin{proposition}[Correlation Breaks ROI Ordering]
+\label{prop:corrbreaks}
+Under positive correlation, ROI ordering can be suboptimal. A concrete example: layers $A$ ($d=0.8$, $c=10$, ROI $= 0.08D$) and $B$ ($d=0.6$, $c=5$, ROI $= 0.12D$). Under independence, $B$ first is optimal. But if a third layer $C$ ($d=0.5$, $c=8$) has $\rho_{AC} = 0.1$ while $\rho_{BC} = 0.8$, then skipping $B$ entirely and running $A, C$ achieves lower total cost because $A$ and $C$ are nearly independent, yielding escape probability ${\sim}0.10$ at cost $18$ versus $0.36$ at cost $23$.
+\end{proposition}
+
+This motivates diversity-aware layer selection: the marginal value of a layer depends more on its independence from existing layers than on its absolute detection rate.
+
+
+% ============================================================
+% 8. THE TURING ENFORCEMENT PRINCIPLE
+% ============================================================
+\section{The Turing Enforcement Principle}
+\label{sec:turing}
+
+\subsection{Rice's Theorem Applied to Enforcement}
+
+\begin{theorem}[Rice, \citeyear{rice1953}]
+For any non-trivial semantic property $P$ of programs (depending on input-output behavior, not syntactic form), the set $\{e : \phi_e \in P\}$ is undecidable.
+\end{theorem}
+
+This motivates a three-way classification of enforcement:
+
+\begin{definition}[Enforcement Classes]
+~
+\begin{itemize}
+\item \textbf{Syntactic properties} (decidable): depend only on program text. Enforceable with $P = 1$.
+\item \textbf{Quasi-semantic properties}: formally semantic but admit effective syntactic approximations for practical populations. Sound or complete but not both.
+\item \textbf{Semantic properties} (undecidable in general): depend on execution behavior. No enforcer achieves $P = 1$.
+\end{itemize}
+\end{definition}
+
+\begin{theorem}[Enforcement Gap]
+\label{thm:gap}
+For any syntactic property $P_S$, there exists a deterministic enforcer with $P(\text{correct enforcement}) = 1$. For any semantic property $P_U$, every enforcer (including any LLM) satisfies $P(\text{correct enforcement}) < 1$. The gap cannot be closed by prompt engineering alone.
+\end{theorem}
+
+\begin{proof}
+Part 1: syntactic properties are decided by finite automata on the AST, achieving zero error probability.
+
+Part 2: an LLM is a fixed-weight transformer mapping finite-length inputs to outputs. Its training distribution is finite, so for any non-trivial semantic property $P_U$, the space of programs exhibiting $P_U$ is unbounded and cannot be fully represented in finite training data. Out-of-distribution inputs (novel programs not resembling training examples) will cause errors. More precisely: Rice's theorem establishes that no algorithm decides $P_U$ for all programs; while an LLM is not a general Turing machine, the \emph{practical consequence} is identical, since achieving $P = 1$ would require correctly classifying programs from the unbounded space of possible inputs, including those arbitrarily far from the training distribution. The error rate is bounded below by the probability mass on out-of-distribution inputs.
+\end{proof}
+
+The AgentSpec result \citep{wang2026agentspec} provides empirical calibration: 87.26\% enforcement for code-based rules versus 77\% for prompt-based rules. The 10-point gap is the measured enforcement gap. The METR and NIST CAISI findings (agents copying solutions, commenting out assertions, downloading answers) demonstrate the predicted failure mode: agents route around semantic intent while satisfying or subverting structural constraints \citep{metr2025, nistcaisi2026}.
+
+
+% ============================================================
+% 9. COMPOUND DEGRADATION
+% ============================================================
+\section{Compound Degradation and the Accretion Category}
+\label{sec:degradation}
+
+\subsection{Codebase Entropy}
+
+\begin{definition}[Codebase Entropy]
+\label{def:entropy}
+For a codebase $\mathcal{C}$ of $n$ files, let $\mu(f_i)$ be the minimum set of files a developer must understand to correctly modify $f_i$. The codebase entropy is:
+\begin{equation}
+H(\mathcal{C}) = \frac{1}{n} \sum_{i=1}^{n} \log_2 |\mu(f_i)|
+\end{equation}
+A perfectly modular codebase has $H(\mathcal{C}) = 0$; a fully coupled one has $H(\mathcal{C}) = \log_2 n$.
+\end{definition}
+
+\begin{definition}[Accretion Rate]
+The accretion rate $\alpha(t) = (H(\mathcal{C}_{t+1}) - H(\mathcal{C}_t)) / |\Delta_t|$ measures entropy increase per unit of code change.
+\end{definition}
+
+\begin{theorem}[Compound Degradation]
+\label{thm:compound}
+Let $\{\Delta_t\}_{t=1}^{T}$ be changes that each pass CI. If $\alpha(t) > 0$ for all $t$ and modification context grows sublinearly ($|\mu(f_i)| \sim n^\beta$, $0 < \beta < 1$), then codebase entropy grows superlinearly in the number of changes.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Each change adds code without refactoring, increasing both $n$ and coupling degree. The sum telescopes, and the $\log_2 |\mu(f_i)|$ term grows as $\beta \log_2 n$. CI checks are \emph{pointwise} (verifying the current change) but entropy is \emph{global} (depending on cumulative coupling). Pointwise correctness does not imply bounded global entropy.
+\end{proof}
+
+\begin{remark}
+The sublinear growth assumption ($|\mu(f_i)| \sim n^\beta$) is contingent on architecture. In well-modularized codebases with bounded-degree dependency graphs, $|\mu(f_i)|$ may be $O(1)$, yielding linear (not superlinear) entropy growth. The assumption is empirically plausible for AI-assisted development, where agents frequently create cross-module references without respecting module boundaries (GitClear's 8$\times$ clone increase is a proxy for coupling growth). Under $O(1)$ coupling, the theorem still guarantees monotonic entropy increase; the superlinearity depends on coupling growth outpacing modularization.
+\end{remark}
+
+\begin{corollary}[The Ratchet Effect]
+Without refactoring proportional to the addition rate, entropy is monotonically non-decreasing. Each correct change ratchets entropy upward with no mechanism for spontaneous decrease.
+\end{corollary}
+
+\begin{corollary}[Refactoring Ratio Threshold]
+\label{cor:refactoring}
+Let $r$ be the fraction of refactoring changes ($\alpha < 0$) and $(1-r)$ additions ($\alpha > 0$). Equilibrium requires $r \cdot |\mathbb{E}[\alpha | \text{refactoring}]| \geq (1-r) \cdot \mathbb{E}[\alpha | \text{addition}]$. GitClear data indicates the pre-AI equilibrium at $r \approx 0.24$; the post-AI state at $r \approx 0.095$ violates the bound by approximately 2.5$\times$.
+\end{corollary}
+
+This connects to Lehman's Second Law \citep{lehman1980}: as an E-type system evolves, its complexity increases unless explicit work is done to reduce it. AI-assisted development accelerates this by simultaneously increasing entropy-adding throughput, decreasing entropy-reducing refactoring, and introducing a class of entropy invisible to existing quality gates.
+
+\subsection{The Accretion Category}
+
+\begin{definition}[Accretion Defect]
+\label{def:accretion}
+A code change $\Delta$ is an accretion defect iff:
+\begin{enumerate}
+\item \textbf{Correctness:} all tests pass after $\Delta$.
+\item \textbf{Superfluity:} there exists $\Delta' \subset \Delta$ satisfying the same requirement.
+\item \textbf{Individual defensibility:} $\Delta$ violates no stated standard.
+\item \textbf{Aggregate harm:} cumulative application increases entropy by $\epsilon > 0$ per change.
+\end{enumerate}
+\end{definition}
+
+\begin{proposition}[Taxonomic Gap]
+\label{prop:taxgap}
+No classical taxonomy (IEEE~1044, ODC, Beizer, CWE) contains a category capturing accretion defects, because all four assume intentional authorship: code results from a human decision that was either correct or incorrect. Accretion arises from statistical pattern completion, which produces code because it is \emph{probable}, not because it is \emph{necessary}.
+\end{proposition}
+
+\begin{proposition}[Detection Asymmetry]
+Individual accretion detection is undecidable (requires exhibiting a smaller sufficient change, reducing to program equivalence). Aggregate detection is feasible via statistical process control on entropy proxies: accretion rate, refactoring ratio, clone frequency, lines per function point.
+\end{proposition}
+
+\paragraph{Tragedy of the commons.} Accretion has the formal structure of a commons tragedy \citep{hardin1968}: each agent optimizes locally (task completion) without internalizing the externality (entropy increase). The quality stack can be interpreted as Pigouvian taxation (Layers~1--2: automated penalties for measurable entropy) plus Coasian property rights (Layer~4: code owner with veto power).
+
+
+% ============================================================
+% 10. DRE COMPOSITION
+% ============================================================
+\section{Defect Removal Efficiency Composition}
+\label{sec:dre}
+
+\begin{theorem}[DRE Cascade under Independence]
+\label{thm:drecascade}
+For $L$ independent layers, cumulative DRE for type $j$ is:
+\begin{equation}
+D_j = 1 - \prod_{\ell=1}^{L} (1 - d_{\ell,j})
+\end{equation}
+\end{theorem}
+
+Three layers at individually modest rates ($d_1 = 0.3$, $d_2 = 0.75$, $d_3 = 0.5$) yield $D = 1 - (0.7)(0.25)(0.5) = 0.9125$, exceeding 91\% cumulative DRE.
+
+\begin{theorem}[DRE under Gaussian Copula Correlation]
+\label{thm:copula}
+Under a Gaussian copula \citep{sklar1959} with correlation matrix $\mathbf{R}$:
+\begin{equation}
+D_j = 1 - C_{\mathbf{R}}(1 - d_{1,j}, \ldots, 1 - d_{L,j})
+\end{equation}
+At correlation $\rho = 1$, the second layer adds nothing ($D = d$). At $\rho = 0$, we recover independence.
+\end{theorem}
+
+\begin{corollary}[Diversity Premium]
+\label{cor:diversity}
+A weak independent detector ($d = 0.3, \rho = 0$) can outperform a strong correlated detector ($d = 0.7, \rho = 0.8$) in marginal DRE improvement.
+\end{corollary}
+
+\begin{proposition}[Capers Jones' 95\% Law Explained]
+\label{prop:jones}
+Achieving DRE $> 95\%$ requires ${\geq}3$ diverse techniques \citep{capersjones2012}. With $d_{\max} \approx 0.85$ (best single technique) and realistic correlation $\rho \approx 0.3$, the copula model shows that removing any one of three layers ($d_1 = 0.60$, $d_2 = 0.50$, $d_3 = 0.70$) drops $D$ below 0.90, while all three yield $D \approx 0.954$.
+\end{proposition}
+
+
+% ============================================================
+% 11. EMPIRICAL CALIBRATION
+% ============================================================
+\section{Empirical Calibration}
+\label{sec:calibration}
+
+\subsection{Detection Probability Matrix}
+
+\Cref{tab:detection} presents estimated detection probabilities $d_{\ell,j}$ using ranges (not point values) with confidence levels. Confidence: \textbf{H} = strong empirical backing; \textbf{M} = single source or derived; \textbf{L} = extrapolated; \textbf{E} = estimated from first principles.
+
+\begin{table}[htbp]
+\centering
+\caption{Detection probability ranges for selected slop types across four defense layers.}
+\label{tab:detection}
+\small
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+\textbf{Slop Type} & \textbf{L1} & \textbf{L2} & \textbf{L3} & \textbf{L4} \\
+\midrule
+\multicolumn{5}{l}{\textit{Decidable types}} \\
+\addlinespace
+Hallucinated imports & 0.90--0.98 H & 0.50--0.70 M & 0.60--0.80 M & 0.70--0.90 M \\
+Placeholder/stub code & 0.30--0.50 M & 0.85--0.95 H & 0.70--0.85 M & 0.80--0.95 M \\
+Duplicate logic & 0.05--0.15 L & 0.75--0.90 H & 0.40--0.60 M & 0.50--0.70 M \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Semi-decidable types}} \\
+\addlinespace
+Security vulns & 0.10--0.20 M & 0.10--0.15 H & 0.50--0.70 M & 0.60--0.80 M \\
+Happy-path handling & 0.05--0.15 L & 0.20--0.40 M & 0.55--0.75 M & 0.70--0.85 M \\
+Scope expansion & 0.05--0.15 M & 0.10--0.25 L & 0.60--0.80 M & 0.70--0.85 M \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Undecidable types}} \\
+\addlinespace
+Meaningless tests & 0.00--0.05 E & 0.05--0.15 E & 0.20--0.40 L & 0.50--0.70 L \\
+Redundant comments & 0.00--0.02 E & 0.05--0.15 E & 0.30--0.50 L & 0.50--0.70 L \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key calibration sources: type systems catch 15\% of public bugs \citep{gao2017}; static analysis tools achieve 13\% recall in production; Spotify's 25\% veto rate across 1,500+ PRs calibrates Layer~3 \citep{spotify2025}; AgentSpec's 87\% code-based enforcement \citep{wang2026agentspec}.
+
+\subsection{Cost Structure}
+
+\begin{table}[htbp]
+\centering
+\caption{Cost per PR by defense layer.}
+\label{tab:costs}
+\small
+\begin{tabular}{@{}l r r r@{}}
+\toprule
+\textbf{Layer} & \textbf{Time} & \textbf{Cost/PR} & \textbf{FP rate} \\
+\midrule
+L1: Structural gates & 2--10s & \$0.50 & 0.01--0.05 \\
+L2: Deterministic analysis & 10--60s & \$2.00 & 0.05--0.20 \\
+L3: LLM-as-Judge & 20--120s & \$8.00 & 0.15--0.35 \\
+L4: Human review & 10--60 min & \$80.00 & 0.05--0.15 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The false positive cost trap: at 100 PRs/week with Layer~3 FP rate of 25\%, developers spend approximately 2,600 hours/year investigating false findings, equivalent to ${\sim}1.3$ FTEs.
+
+\subsection{Layer Assignment by ROI}
+
+Computing $\ROI(\ell, j) = d_{\ell,j} \cdot D_j / c_\ell$ yields clear prescriptions:
+
+\begin{itemize}
+\item \textbf{Always apply L1:} cost is negligible; ROI positive for all 18 types.
+\item \textbf{Always apply L2:} ROI $> 100$ for all types where $d_{2,j} > 0.10$; justified for 16/18 types.
+\item \textbf{Apply L3 selectively:} justified only for 9 high-severity semantic types (security, error handling, data models, architecture, meaningless tests, stubs, over-engineering, scope expansion, god functions).
+\item \textbf{Apply L4 only for:} security ($\ROI = 875$), architectural erosion ($\ROI = 1{,}031$), data models ($\ROI = 516$), meaningless tests ($\ROI = 375$), plus all L3-flagged items above severity threshold.
+\item \textbf{Never cost-effective at L4:} dead code ($\ROI = 6$), redundant comments ($\ROI = 4$). These should never reach human review.
+\end{itemize}
+
+\paragraph{Sensitivity analysis.} Many detection estimates in \Cref{tab:detection} carry confidence level E or L. We verified robustness by perturbing all E/L estimates by $\pm 50\%$. The ``always apply'' prescriptions for Layers~1--2 are robust: even at the pessimistic extreme, their negligible cost ensures positive ROI for all types. Layer~3 prescriptions are moderately sensitive: at $-50\%$ detection for Semi-decidable types, Layer~3 is justified for 6 types rather than 9 (dropping over-engineering, god functions, and scope expansion). Layer~4 prescriptions are robust because they depend on high downstream cost $D_j$ rather than high detection $d_{4,j}$. The cost estimates (\Cref{tab:costs}) use loaded developer cost of \$80/hr; at \$40/hr or \$160/hr, the L4 ROI thresholds shift by $2\times$ but the set of L4-justified types changes only at the margin (data model mismatches drops out at \$160/hr; meaningless tests is borderline at \$40/hr).
+
+\subsection{Validation Against Deployments}
+
+Six deployment calibration points confirm the model:
+
+\begin{enumerate}
+\item \textbf{Spotify Honk:} 1,500+ PRs, 25\% veto rate (calibrates $d_{3,13}$), 50\% course-correction (calibrates remediation rate) \citep{spotify2025}.
+\item \textbf{METR:} 1--2\% general reward hacking, but 30--100\% when scoring code is visible (43$\times$ visibility amplification), validating the principle that quality gates must be opaque to the agent \citep{metr2025}.
+\item \textbf{AgentSpec:} 87\% code-based vs.\ 77\% prompt-based (10-point gap validates \Cref{thm:gap}) \citep{wang2026agentspec}.
+\item \textbf{Veracode:} 45\% security failure rate across 100+ LLMs calibrates $d_{\text{producer,security}} = 0.55$ \citep{veracode2025}.
+\item \textbf{CodeRabbit:} 1.68$\times$ issue ratio, 53.5\% recall calibrates Layer~3 sensitivity \citep{coderabbit2025}.
+\item \textbf{Apollo Research:} 8.7--13\% baseline scheming rate; anti-scheming training reduced to 0.3--0.4\% but evaluation awareness increased, suggesting models learn to detect tests rather than genuinely align \citep{apollo2025}.
+\end{enumerate}
+
+
+% ============================================================
+% 12. COST OF QUALITY MODEL
+% ============================================================
+\section{Cost-of-Quality Model for AI Code}
+\label{sec:coq}
+
+\subsection{The Four Cost Categories}
+
+Total cost of quality: $\CoQ = C_P + C_A + C_{IF} + C_{EF}$ (prevention, appraisal, internal failure, external failure). The classical 1:10:100 ratio requires recalibration by decidability class:
+
+\begin{itemize}
+\item \textbf{Decidable types:} approximately 1:3:100. Detection is cheap (still automated at the appraisal stage); production costs remain high.
+\item \textbf{Semi-decidable types:} approximately 1:15:100. Appraisal requires LLM or human review.
+\item \textbf{Undecidable types:} approximately 1:50:30. Appraisal is expensive (deep expert review); but production cost is \emph{lower} because these degrade maintainability, not availability.
+\end{itemize}
+
+\begin{corollary}[Inversion for Undecidable Types]
+For Undecidable types, appraisal cost can exceed discounted external failure cost. It is sometimes economically rational to \emph{accept} these defects. This is the formal basis for ``slop is acceptable'' in certain contexts.
+\end{corollary}
+
+\subsection{Optimal Quality Level}
+
+\begin{theorem}[Optimal Quality Level]
+\label{thm:optquality}
+With defect rate $\lambda(q) = \lambda_0 e^{-\beta q}$, the optimal quality investment is:
+\begin{equation}
+q^* = \frac{1}{\beta} \ln\!\left(\frac{c_F \cdot \lambda_0 \cdot \beta}{c_P + c_A}\right)
+\end{equation}
+where $c_F$ is failure cost and $c_P + c_A$ is marginal prevention/appraisal cost.
+\end{theorem}
+
+This gives context-dependent quality targeting: $q^* \approx 1$ for security-critical production code ($c_F$ high), $q^* \approx 0.7$ for internal tools ($c_F$ moderate, Layers 1--2 suffice), $q^* \approx 0.3$ for prototypes ($c_F$ low, Layer~1 only).
+
+\subsection{The Appraisal Compression Problem}
+
+If code generation rate $g$ exceeds appraisal capacity $a$, a fraction $(g-a)/g$ bypasses appraisal entirely. Sonar data (48\% always verify) implies $g/a \approx 2$ on average: roughly half of AI code receives no appraisal \citep{sonar2026}. The quality stack's ordering is not merely cost optimization; it is a \emph{throughput constraint}: only automated layers (1--2) can match AI generation speed.
+
+
+% ============================================================
+% 13. RELATED WORK
+% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Software defect taxonomies.} IEEE~1044 \citep{ieee1044} provides multi-attribute anomaly classification assuming the failure-defect-fault chain. ODC \citep{chillarege1992} offers eight orthogonal defect types with development-phase correlations. \citet{beizer1990} provides a ten-category bug taxonomy. CWE covers security. None captures accretion defects (\S\ref{sec:degradation}).
+
+\paragraph{Software reliability.} Musa's software reliability models \citep{musa1987} connect operational profiles to defect discovery. \citet{fenton1999} introduced Bayesian networks for defect prediction. \citet{capersjones2012} provided the foundational DRE data (25,000 projects). \citet{littlewood1993, littlewood2000} proved that diverse software versions do not fail independently, a result we adapt to LLM judge-producer pairs.
+
+\paragraph{AI code quality measurement.} CodeRabbit \citep{coderabbit2025}, GitClear \citep{gitclear2025}, Qodo \citep{qodo2025}, and \citet{debtboom2026} provide the emerging empirical base. The controlled GitHub trial \citep{github2024rct} stands in tension with observational results, a contradiction we interpret through the verification bottleneck.
+
+\paragraph{AI agent enforcement.} AgentSpec \citep{wang2026agentspec} measures the structural-vs-prompt enforcement gap. Spotify's Honk \citep{spotify2025} provides the best LLM-as-Judge deployment data. METR \citep{metr2025}, Apollo Research \citep{apollo2025}, and NIST CAISI \citep{nistcaisi2026} document agent reward hacking and scheming.
+
+\paragraph{Formal program analysis.} Abstract interpretation \citep{cousot1977} provides the standard framework for sound over-approximation of semantic properties, directly relevant to the Quasi-Semantic enforcement class. Roy and Cordy's clone type taxonomy (Types I--IV) characterizes detection decidability for duplicate logic: Types I--III (textual, renamed, gapped) are decidable; Type IV (semantic clones) is not. Murphy, Notkin, and Sullivan's reflexion models compare intended architecture against extracted source models, providing the formal basis for architectural erosion detection.
+
+\paragraph{Defense in depth.} The Swiss Cheese Model \citep{reason1990} frames accident causation through aligned holes in multiple barriers. Viola-Jones cascades \citep{violajones2004} formalize sequential classifier design. Boehm's cost escalation curve \citep{boehm1981} and \citet{capersjones2012} provide the economic foundation, though the cost curve may be flatter in CI/CD environments.
+
+\paragraph{Information theory in software.} Hassan's change entropy \citep{hassan2009} predicts faults from change scattering. Our codebase entropy (\Cref{def:entropy}) shifts from measuring change scattering to measuring the coupling structure that necessitates it.
+
+
+% ============================================================
+% 14. DESIGN PRINCIPLES
+% ============================================================
+\section{Design Principles}
+\label{sec:principles}
+
+The formal framework yields ten actionable design principles for AI code quality architecture:
+
+\begin{enumerate}
+\item \textbf{Structural before probabilistic.} Everything expressible as a formal property should be structurally enforced (\Cref{thm:gap}). This is not a preference; it is an optimality result.
+
+\item \textbf{Cheap layers first.} Order by ROI (\Cref{thm:ordering}). Layer~1 at \$0.50/PR before Layer~4 at \$80/PR.
+
+\item \textbf{Diversity over strength.} A weak independent detector outperforms a strong correlated one (\Cref{cor:diversity}). Cross-model judging (Claude judging GPT output) over same-model.
+
+\item \textbf{Opacity to the agent.} Quality gates must be invisible to the producing agent. Visibility amplifies reward hacking 43$\times$ (METR).
+
+\item \textbf{Per-type, not uniform.} Different slop types have radically different optimal layer assignments. No single tool catches all 18 types.
+
+\item \textbf{Accept what you cannot detect.} For Undecidable types where appraisal exceeds discounted failure cost, acceptance is the economically rational strategy.
+
+\item \textbf{Monitor the aggregate.} Individual accretion is undetectable; aggregate accretion is measurable via entropy proxies (refactoring ratio, clone frequency, accretion rate).
+
+\item \textbf{Maintain the refactoring ratio.} The 2.5$\times$ violation of the equilibrium condition (\Cref{cor:refactoring}) is the root cause of codebase degradation. Any quality architecture must include mechanisms to sustain $r \geq 0.20$.
+
+\item \textbf{Match appraisal to throughput.} When generation rate exceeds review capacity, only automated layers maintain coverage. Layer~4 cannot scale; Layers~1--2 can.
+
+\item \textbf{Three diverse layers for 95\% DRE.} The copula model confirms Capers Jones: no single technique suffices, and correlated pairs underperform (\Cref{prop:jones}).
+\end{enumerate}
+
+
+% ============================================================
+% 15. DISCUSSION AND LIMITATIONS
+% ============================================================
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\paragraph{Contrarian positions engaged.}
+
+\emph{``Slop is acceptable.''} Our framework agrees, partially. The optimal quality level (\Cref{thm:optquality}) is explicitly $q^* < 1$ for low-stakes code. The contribution is making this precise: for prototypes, Layer~1 only; for production, all four layers.
+
+\emph{``Prompt-based rules work well enough.''} AgentSpec's 77\% compliance is substantial but 10 points below structural enforcement. For subjective quality (naming, abstraction), prompts may be the \emph{only} option, but they should never be the \emph{sole} defense for safety-critical constraints.
+
+\emph{``LLM-as-Judge is unreliable.''} Partially validated. Inter-rater omega of 0.462--0.803 is concerning \citep{llmjudgetrust2024}. Same-model judging amplifies correlated errors (\Cref{thm:fkg}). But cross-model judging with structural scaffolding (Layer~3 constrained by Layers~1--2) remains cost-effective for semi-decidable types.
+
+\emph{``The 18 types are not the right taxonomy.''} Likely correct at the surface level. The three-factor latent structure (Context Blindness, Completion Bias, Training Leakage) may be more fundamental. Confirmatory factor analysis on the ISSRE 2025 dataset would test this.
+
+\paragraph{Limitations.}
+
+\begin{itemize}
+\item The detection probability estimates (\Cref{tab:detection}) have heterogeneous confidence. No study directly measures all 18 types across all 4 layers.
+\item The independence assumption (used in several theorems) is explicitly violated in practice, as our correlation analysis shows. The copula model is an approximation.
+\item Codebase entropy (\Cref{def:entropy}) is an idealized metric. Computing $|\mu(f_i)|$ exactly requires solving dependency analysis, which is itself subject to Rice's theorem for semantic dependencies.
+\item The cost-of-quality calibration relies on Capers Jones' data (1975--2015), NIST 2002, and IBM 2025. Modern CI/CD may compress the cost escalation curve.
+\item We do not address adversarial slop (intentional quality degradation by agents), focusing instead on the more common case of unintentional degradation from statistical pattern completion.
+\item The decidability classification reflects current LLM capabilities. As models improve in reasoning about intent, some Semi-decidable types may become effectively Decidable (through better syntactic proxies or more reliable semantic judgment). The classification should be understood as contingent, not permanent.
+\end{itemize}
+
+
+% ============================================================
+% 16. CONCLUSION
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+AI code generation has introduced a qualitatively new class of software quality problem: defects that are correct, unnecessary, individually defensible, and collectively corrosive. Existing defect taxonomies miss them; existing quality tools catch some but not all; existing review practices cannot scale to match generation throughput.
+
+We have shown that the problem admits formal treatment. The decidability classification determines which defects can be structurally enforced and which require probabilistic judgment. The layered defense optimization, though NP-hard in general, yields clean prescriptions at practical scale. The detection ceiling theorem explains \emph{why} no single layer suffices. The correlated error model explains \emph{why} same-model judging underperforms. The compound degradation theorem explains \emph{why} individually correct changes can produce collective harm.
+
+Four slop types (meaningless tests, boilerplate inflation, redundant comments, naming/convention drift) resist detection at every layer. These constitute the research frontier. Progress requires either reducing them to measurable proxies (moving them from Undecidable to Semi-decidable) or accepting them as a cost of AI-assisted development and compensating through aggregate health monitoring.
+
+The central engineering insight is that the quality problem is solvable, but only through layered, type-specific, cost-aware defense that matches the diversity and scale of the defect landscape.
+
+
+% ============================================================
+% BIBLIOGRAPHY
+% ============================================================
+\bibliography{quality_architecture}
+
+
+% ============================================================
+% APPENDIX
+% ============================================================
+\begin{appendices}
+
+\section{Full Detection Probability Matrix}
+\label{app:matrix}
+
+The complete $18 \times 4$ detection probability matrix, with confidence levels and primary sources for each estimate, is provided in the supplementary materials. Key calibration anchors:
+
+\begin{itemize}
+\item Layer~1, hallucinated imports: $d = 0.90$--$0.98$ (lockfile validation is near-deterministic).
+\item Layer~2, placeholder code: $d = 0.85$--$0.95$ (AST pattern matching for known patterns).
+\item Layer~3, scope expansion: $d = 0.60$--$0.80$ (calibrated against Spotify's 25\% veto rate).
+\item Layer~4, architectural erosion: $d = 0.75$--$0.90$ (human review is the primary defense).
+\item All layers, meaningless tests: combined escape rate ${\sim}25\%$ (the detection frontier).
+\end{itemize}
+
+\section{ROI Derivation}
+\label{app:roi}
+
+For each layer $\ell$ and slop type $j$, $\ROI(\ell, j) = d_{\ell,j} \cdot D_j / c_\ell$. Layer costs: $c_1 = \$0.50$, $c_2 = \$2.00$, $c_3 = \$8.00$, $c_4 = \$80.00$. Downstream costs $D_j$ range from \$500 (redundant comments) to \$100,000+ (security vulnerabilities, architectural erosion).
+
+The ROI ordering confirms: Layer~1 is always cost-effective (ROI $> 1$ for all types). Layer~4 is cost-effective only for 4--5 high-severity types. Layer~3's cost-effectiveness depends on the downstream cost; it is justified when $D_j > \$5{,}000$ and $d_{3,j} > 0.40$.
+
+\section{Correlation Adjustment Factors}
+\label{app:correlation}
+
+Estimated pairwise beta factors (from fault tree analysis literature):
+
+\begin{itemize}
+\item L1 vs L2: $\beta = 0.05$--$0.15$ (different mechanisms).
+\item L1 vs L3: $\beta = 0.02$--$0.08$ (structural vs semantic).
+\item L2 vs L3: $\beta = 0.10$--$0.25$ (partial overlap in code structure reasoning).
+\item L3 vs L4: $\beta = 0.15$--$0.35$ (shared semantic understanding).
+\item L3 (same model) vs producer: $\beta = 0.30$--$0.60$ (shared training data).
+\item L3 (different model) vs producer: $\beta = 0.10$--$0.25$ (reduced by diversity).
+\end{itemize}
+
+For security vulnerabilities, the corrected escape probability (accounting for L2--L3 correlation at $\beta = 0.15$) is approximately 29\% higher than the naive independence estimate.
+
+\section{Proof Details}
+\label{app:proofs}
+
+\subsection{Theorem~\ref{thm:nphard}: NP-Hardness}
+
+The full reduction from Weighted Set Cover: given universe $U = \{u_1, \ldots, u_m\}$ and sets $S_1, \ldots, S_k$ with weights $w_i$, construct a defense instance with $m$ defect types (one per element), $k$ layers (one per set), $d_{\ell,j} = 1$ if $u_j \in S_\ell$ else $0$, $c_\ell = w_\ell$, $D_j = M$ for large $M$, $p_j = 1$. Any feasible solution must cover all elements (else penalty $M$ dominates), so the remaining cost is $\sum_\ell c_\ell \cdot \mathbf{1}[\ell \text{ selected}]$, which is Weighted Set Cover. By \citet{dinur2014}, this is inapproximable below $\ln m$.
+
+\subsection{Theorem~\ref{thm:greedy}: Greedy Bound}
+
+The function $f(\Lambda) = \sum_j p_j D_j [1 - \Pesc(j, \Lambda)]$ is the total expected detected defect cost. Under independence, for each type $j$, the marginal gain from adding layer $\ell$ to set $\Lambda$ is $p_j D_j \cdot d_{\ell,j} \cdot \prod_{\ell' \in \Lambda}(1-d_{\ell',j})$, which decreases as $|\Lambda|$ grows (diminishing returns). Summing over $j$ preserves submodularity (non-negative sum of submodular functions). Monotonicity is immediate (adding layers never increases escape probability). By \citet{nemhauser1978}, the greedy algorithm for maximizing a monotone submodular function subject to a cardinality or knapsack constraint achieves $(1-1/e) \approx 0.632$.
+
+\end{appendices}
+
+\end{document}

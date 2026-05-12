@@ -1,0 +1,1225 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{siunitx}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem*{remark}{Remark}
+\newtheorem{conjecture}[theorem]{Conjecture}
+
+% === Epistemic status markers ===
+\newcommand{\established}{\textsc{[Established]}}
+\newcommand{\synthesis}{\textsc{[Synthesis]}}
+\newcommand{\conjectured}{\textsc{[Conjecture]}}
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+
+% Paper Title
+\title{Coordination Architecture for AI Coding Agent Harnesses}
+
+\renewcommand{\today}{}
+
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\begin{abstract}
+Multi-agent systems for software engineering promise throughput gains through parallelism, but naive scaling amplifies errors by up to 17.2$\times$ and can produce net-negative quality outcomes.
+This paper develops a formal framework for reasoning about coordination architecture in multi-agent code generation.
+We make four principal contributions:
+(1)~an error amplification model showing that the standard independence assumption predicts amplification approaching $k$ from below, dramatically underestimating the empirical $17.2\times$ observed by \citet{Kim2025}, implying that agent errors are correlated and cascading;
+(2)~a formulation of task decomposition as balanced min-cut on file-coupling hypergraphs, connecting partition quality to merge conflict rate via a Cut-Conflict Bridge lemma;
+(3)~a five-level merge conflict taxonomy with a probabilistic graphical model showing $O(k^2)$ growth in uncoordinated systems and $O(k)$ reduction under file-ownership contracts;
+(4)~a Quality-Adjusted Speedup (QAS) metric demonstrating that parallelism can yield QAS $< 1$ (worse than sequential execution) when coordination quality is insufficient.
+We ground these results in empirical data from Kim et al.'s 180-configuration scaling study, DORA 2025 telemetry from 10,000+ developers, and Cursor's production experience with hundreds of concurrent agents.
+We formalize coordination as concurrency control, map database isolation levels to agent mechanisms, develop assume-guarantee contracts for compositional correctness, and express Conway's Law as a communication-graph containment theorem.
+Six design principles and five verification experiments are proposed.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+%% ============================================================
+%% 1. INTRODUCTION
+%% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+The deployment of large language models (LLMs) as autonomous software engineering agents has progressed from single-agent assistants to multi-agent systems where multiple LLM instances work concurrently on a shared codebase.
+This parallelization promises dramatic throughput improvements: Cursor's production system ran hundreds of agents simultaneously for weeks, producing over one million lines of code for a web browser implementation \citep{Cursor2026}.
+Amazon Q Developer deploys coordinated agent teams for parallel development \citep{Osmani2025}.
+
+Yet the empirical evidence paints a more nuanced picture.
+\citet{Kim2025} conducted the most comprehensive evaluation to date (180 configurations across 5 architectures, 3 LLM families, and 4 benchmarks), finding that independent agents amplify errors by 17.2$\times$ relative to a single agent, while even centralized coordination still amplifies errors 4.4$\times$.
+Google's DORA 2025 report \citep{DORA2025}, drawing on telemetry from over 10,000 developers, found that AI adoption increased merged pull requests by 98\% but also increased code review time by 91\%, PR size by 154\%, and bug rates by 9\%, with organizational delivery metrics remaining flat.
+\citet{Cursor2026} reported (in a practitioner blog post, not a peer-reviewed study) that a flat coordination model with 20 agents collapsed to effective throughput of 2 to 3 agents due to lock contention.
+
+These findings reveal a fundamental tension: parallelism increases throughput but also increases error rate, and the two effects work against each other.
+The question is not whether to parallelize, but how to parallelize safely, and when not to parallelize at all.
+
+This paper develops a formal framework for reasoning about these tradeoffs.
+Our contributions are:
+
+\begin{enumerate}[label=(\arabic*)]
+  \item An \textbf{error amplification analysis} (Section~\ref{sec:error}) showing that the standard independence model predicts amplification of at most $k$, dramatically underestimating the empirical $17.2\times$ from \citet{Kim2025}. The $\approx 6\times$ discrepancy quantifies the ``correlation multiplier'' from inter-agent error propagation. We extend Amdahl's Law with a reliability factor and derive the optimal agent count $n^* \approx 1/\sqrt{\delta}$.
+
+  \item A \textbf{task decomposition framework} (Section~\ref{sec:decomp}) formulating the problem as balanced min-cut on file-coupling hypergraphs, connecting partition quality to merge conflict rate via a Cut-Conflict Bridge lemma, and surveying the algorithmic landscape (spectral methods, METIS, FM) with their approximation guarantees.
+
+  \item A \textbf{five-level merge conflict taxonomy} (Section~\ref{sec:merge}) with a probabilistic graphical model showing $O(k^2)$ conflict growth without contracts and $O(k)$ growth with file-ownership contracts, grounded in empirical conflict rates from studies spanning thousands of open-source projects.
+
+  \item A \textbf{Quality-Adjusted Speedup} metric (Section~\ref{sec:qas}) that accounts for both throughput gains and quality costs, demonstrating regimes where QAS $< 1$ (parallelism is net-negative), calibrated against DORA and Kim et al.\ data.
+\end{enumerate}
+
+Additionally, we formalize coordination as concurrency control (Section~\ref{sec:concurrency}), develop a topology selection framework with dominance conditions (Section~\ref{sec:topology}), express Conway's Law as a graph containment theorem (Section~\ref{sec:topology}), and derive six actionable design principles (Section~\ref{sec:empirical}).
+
+This is a theory and position paper.
+We develop formal models grounded in existing empirical data, but we do not present new experimental results.
+We are explicit throughout about which claims are established theory, which are novel synthesis, and which are conjectures awaiting verification.
+Five calibration experiments are proposed in Section~\ref{sec:conclusion}.
+
+
+%% ============================================================
+%% 2. PRELIMINARIES AND DEFINITIONS
+%% ============================================================
+\section{Preliminaries and Definitions}
+\label{sec:prelim}
+
+We establish the core definitions used throughout the paper.
+
+\begin{definition}[Coupling Graph] \established{}
+\label{def:coupling-graph}
+Given a codebase with file set $\mathcal{F} = \{f_1, \ldots, f_n\}$, the \textbf{coupling graph} is an undirected weighted graph $G = (F, E, w)$ where $F = \mathcal{F}$, the edge set $E$ encodes coupling relationships (structural imports, co-change frequency from version history, semantic similarity), and the weight function $w: E \to \mathbb{R}_+$ encodes coupling strength as a composite metric.
+\end{definition}
+
+The composite weight combines three empirically validated coupling dimensions \citep{Martin1994, KasiSarma2013, Accioly2018}: structural coupling (import/call-graph edges), co-change coupling (files frequently committed together in version history), and semantic coupling (identifier and comment similarity).
+Co-change coupling is the strongest single predictor of merge conflicts; code associated with merge conflicts is $2\times$ more likely to contain bugs, rising to $26\times$ when conflicts require manual resolution \citep{Accioly2018}.
+
+\begin{definition}[Error Amplification Factor] \synthesis{}
+\label{def:error-amp}
+For coordination topology $t \in \mathcal{T}$ with $k$ agents, each having per-agent error rate $\epsilon = 1 - p_{\mathrm{single}}$, the \textbf{error amplification factor} is:
+\begin{equation}
+  A_e(t, k) = \frac{P(\text{system error} \mid t, k)}{P(\text{single-agent error})} = \frac{1 - R_{\mathrm{sys}}(t, k)}{\epsilon}
+\end{equation}
+where $R_{\mathrm{sys}}(t, k)$ is the system reliability (probability that all agent outputs are jointly correct).
+\end{definition}
+
+\begin{definition}[Topology Space] \synthesis{}
+\label{def:topology}
+The set of coordination topologies is $\mathcal{T} = \{\mathrm{indep}, \mathrm{central}, \mathrm{hier}, \mathrm{iso\text{-}merge}\}$, representing independent (no coordination), centralized (hub-and-spoke), hierarchical (tree), and isolated-then-merge (worktree isolation with deferred integration) architectures.
+\end{definition}
+
+\begin{definition}[Coordination Contract] \synthesis{}
+\label{def:contract}
+A \textbf{coordination contract} for $k$ agents on codebase $\mathcal{F}$ is a tuple $\mathcal{C} = (\{F_i\}_{i=1}^k, \{I_j\}_{j=1}^m, \sigma)$ where:
+\begin{itemize}[nosep]
+  \item $F_i \subseteq \mathcal{F}$ is the owned file set of agent $A_i$, with $F_i \cap F_j = \emptyset$ for $i \neq j$;
+  \item $\{I_j\}_{j=1}^m$ is a set of interface specifications, each $I_j = (\mathrm{name}_j, \mathrm{sig}_j, \mathrm{module}_j)$;
+  \item $\sigma: \mathcal{F} \to 2^{\{I_1,\ldots,I_m\}}$ maps each file to its exported interfaces.
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Isolation Levels for Agents] \synthesis{}
+\label{def:isolation}
+We define four isolation levels for multi-agent code generation, each corresponding to a database isolation level \citep{Berenson1995}:
+\begin{itemize}[nosep]
+  \item $\mathsf{ReadUncommitted}$: shared workspace, no branches; all anomalies permitted.
+  \item $\mathsf{ReadCommitted}$: git branches with periodic pulls; prevents dirty reads.
+  \item $\mathsf{Snapshot}$: git worktrees frozen at dispatch; prevents dirty reads, non-repeatable reads, and phantoms; permits write skew.
+  \item $\mathsf{Serializable}$: sequential execution; prevents all anomalies.
+\end{itemize}
+\end{definition}
+
+
+%% ============================================================
+%% 3. ERROR AMPLIFICATION AND SCALING LIMITS
+%% ============================================================
+\section{Error Amplification and Scaling Limits}
+\label{sec:error}
+
+\subsection{Error Amplification under Independence}
+
+The simplest model assumes agents produce errors independently with probability $\epsilon$, and the system requires all $k$ outputs to be jointly correct (the ``series reliability'' model).
+
+\begin{theorem}[Error Amplification under Independence] \established{} + \synthesis{}
+\label{thm:error-amp}
+For $k$ independent agents in serial composition, the system reliability is $R_{\mathrm{sys}}(\mathrm{indep}, k) = (1 - \epsilon)^k$ and the error amplification factor is:
+\begin{equation}
+\label{eq:ae-exact}
+  A_e(\mathrm{indep}, k) = \frac{1 - (1-\epsilon)^k}{\epsilon}
+\end{equation}
+This quantity is strictly increasing in $k$, satisfies $A_e(\mathrm{indep}, 1) = 1$, and admits the expansion:
+\begin{equation}
+\label{eq:ae-expansion}
+  A_e(\mathrm{indep}, k) = k - \binom{k}{2}\epsilon + O(\epsilon^2)
+\end{equation}
+Thus $A_e$ approaches $k$ from below as $\epsilon \to 0$, with deficit $\binom{k}{2}\epsilon$.
+Note that the two-term expansion is accurate only for small $\epsilon$; at practical error rates ($\epsilon \approx 0.2$-$0.3$), higher-order terms are not negligible and the exact formula (\ref{eq:ae-exact}) should be used.
+\end{theorem}
+
+\begin{proof}
+The system error probability is $1 - (1-\epsilon)^k$, giving $A_e = (1 - (1-\epsilon)^k)/\epsilon$.
+Expanding $(1-\epsilon)^k$ via the binomial series:
+$(1-\epsilon)^k = 1 - k\epsilon + \binom{k}{2}\epsilon^2 - \cdots$,
+so $1 - (1-\epsilon)^k = k\epsilon - \binom{k}{2}\epsilon^2 + O(\epsilon^3)$,
+and dividing by $\epsilon$ yields $A_e = k - \binom{k}{2}\epsilon + O(\epsilon^2)$.
+Monotonicity in $k$ follows from the derivative: $\partial A_e / \partial k = -(1-\epsilon)^k \ln(1-\epsilon)/\epsilon > 0$ for $\epsilon \in (0,1)$.
+\end{proof}
+
+\begin{remark}
+\label{rem:discrepancy}
+\citet{Kim2025} measured $A_e(\mathrm{indep}) = 17.2$ with 95\% CI $[14.3, 20.1]$.
+For $k = 5$ agents at $\epsilon = 0.3$, the independence model gives $A_e = (1 - 0.7^5)/0.3 \approx 2.77$, far below the empirical value.
+This discrepancy implies that agent errors are correlated and cascading: an error by one agent propagates to others through shared assumptions, producing compounding failures that the independence model cannot capture.
+The factor of $\approx 6\times$ between the model and observation quantifies the ``correlation multiplier'' attributable to inter-agent error propagation.
+\end{remark}
+
+\subsection{Information-Sharing Reduction Factor}
+
+\begin{definition}[Coordination Benefit Function] \synthesis{}
+\label{def:coord-benefit}
+For topology $t$ with information-sharing capacity $I(t)$ bits per coordination round, define the effective per-agent error rate under coordination:
+\begin{equation}
+  \epsilon_t = \epsilon \cdot g(I(t))
+\end{equation}
+where $g: \mathbb{R}_+ \to (0, 1]$ is monotonically decreasing with $g(0) = 1$ and $\lim_{I \to \infty} g(I) = g_{\min} > 0$ (coordination cannot eliminate intrinsic errors).
+\end{definition}
+
+A natural choice is $g(I) = e^{-\alpha I}$ for topology-dependent rate $\alpha > 0$.
+Under this model, the ratio of centralized to independent error amplification calibrates $\alpha$: from \citet{Kim2025}, $4.4/17.2 \approx 0.256$, giving $\alpha \cdot I(\mathrm{central}) \approx 1.36$ nats.
+
+\subsection{Capability Saturation Crossover}
+
+\begin{definition}[Saturation Threshold] \synthesis{}
+\label{def:saturation}
+The \textbf{capability saturation threshold} $P^*$ is the single-agent accuracy at which the marginal value of an additional agent transitions from positive to negative:
+\begin{equation}
+  P^* = \inf \left\{ P_{\mathrm{SA}} \in [0,1] : \frac{\partial}{\partial k} S_{\mathrm{eff}}(k, P_{\mathrm{SA}}) \Big|_{k=1} \leq 0 \right\}
+\end{equation}
+\end{definition}
+
+\begin{conjecture}[Saturation Crossover] \conjectured{}
+\label{conj:phase}
+For fixed topology $t$ and error model, there exists $P^*(t) \in (0,1)$ such that for $P_{\mathrm{SA}} < P^*$, the optimal agent count $k^* > 1$, and for $P_{\mathrm{SA}} > P^*$, $k^* = 1$.
+We term this a crossover rather than a phase transition: the regression model of \citet{Kim2025} yields a smooth interaction coefficient ($\beta = -0.408$), indicating a gradual shift rather than a sharp discontinuity in the physics sense. The crossover may sharpen as coordination overhead increases, but we lack evidence for a true singularity.
+\end{conjecture}
+
+\citet{Kim2025} report $P^* \approx 0.45$ from their regression model ($\beta_{P_{\mathrm{SA}} \times \log(1+n_a)} = -0.408$, $p < 0.001$).
+Above this threshold, $\partial P / \partial n_a < 0$; adding agents actively degrades performance.
+This threshold was derived from general benchmarks (web navigation, quantitative reasoning, planning, tool use), not from code-generation tasks specifically, and may shift for software engineering where coupling is tighter and correctness requirements stricter.
+
+\subsection{Extended Amdahl's Law with Reliability Factor}
+
+\begin{theorem}[Extended Amdahl's Law] \synthesis{}
+\label{thm:amdahl}
+For a task with serial fraction $s$, $n$ agents, effective per-agent error rate $\delta = \epsilon / f(t)$ (where $f(t) \geq 1$ is the coordination benefit factor), the effective speedup is:
+\begin{equation}
+\label{eq:seff}
+  S_{\mathrm{eff}}(n) = \frac{1}{s + \frac{1-s}{n}} \cdot (1 - \delta)^n
+\end{equation}
+The first factor is classical Amdahl speedup \citep{Amdahl1967}; the second is the reliability factor.
+\end{theorem}
+
+\begin{theorem}[Optimal Agent Count] \synthesis{}
+\label{thm:nstar}
+For $S_{\mathrm{eff}}(n)$ as in (\ref{eq:seff}) with $\delta \in (0,1)$, there exists a unique $n^* \geq 1$ maximizing $S_{\mathrm{eff}}$.
+For small serial fraction $s$:
+\begin{equation}
+\label{eq:nstar}
+  n^* \approx \frac{1}{\sqrt{\delta}}
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Write $\ln S_{\mathrm{eff}} = -\ln(s + (1-s)/n) + n \ln(1-\delta)$.
+Differentiating and setting to zero: $(1-s)/(n^2 s + n(1-s)) = -\ln(1-\delta) \approx \delta$.
+For small $s$, this simplifies to $1/n^2 \approx \delta$, giving $n^* \approx 1/\sqrt{\delta}$.
+The maximum is unique because $\ln S_{\mathrm{eff}}$ is strictly concave (the sum of a concave function and a linear function with negative slope).
+\end{proof}
+
+\begin{corollary} \synthesis{}
+For independent agents ($\delta = \epsilon$) with $\epsilon = 0.2$: $n^* \approx 2.2$.
+For centralized coordination ($\delta = \epsilon / f(\mathrm{central})$) with $f \approx 3.9$ (from Kim et al.): $n^* \approx 4.4$.
+Coordination roughly doubles the optimal team size.
+\end{corollary}
+
+\subsection{Incorporating the Universal Scalability Law}
+
+Combining Gunther's Universal Scalability Law \citep{Gunther2008} with the reliability factor:
+\begin{equation}
+\label{eq:usl-extended}
+  S_{\mathrm{eff}}(n) = \frac{n}{1 + \sigma(n-1) + \kappa \, n(n-1)} \cdot (1-\delta)^n
+\end{equation}
+where $\sigma$ is the serialization coefficient and $\kappa$ is the coherency (crosstalk) penalty.
+The USL's $\kappa$ term is quadratic in $n$, producing a characteristic ``retrograde'' curve where throughput decreases beyond an optimal point.
+With the additional exponential decay from $(1-\delta)^n$, the optimal $n^*$ is pushed even lower.
+The three penalties (serialization, crosstalk, unreliability) explain why empirical optimal team sizes are small: 3 to 5 agents per practitioner consensus \citep{Osmani2025}, consistent with $n^* \approx 3$-$4$ from the model at typical parameter values.
+
+
+%% ============================================================
+%% 4. TASK DECOMPOSITION AS BALANCED MIN-CUT
+%% ============================================================
+\section{Task Decomposition as Balanced Min-Cut}
+\label{sec:decomp}
+
+\subsection{Formal Problem}
+
+\begin{definition}[Task Decomposition] \established{} + \synthesis{}
+\label{def:decomp}
+A task decomposition for $k$ agents on coupling graph $G = (F, E, w)$ is a partition $\pi = \{T_1, \ldots, T_k\}$ of $F$ solving:
+\begin{equation}
+\label{eq:mincut}
+  \min_\pi \sum_{\substack{(u,v) \in E \\ u \in T_i, v \in T_j \\ i \neq j}} w(u,v) \qquad \text{subject to} \qquad |T_i| \leq (1+\varepsilon) \cdot \frac{|F|}{k} \;\; \forall i
+\end{equation}
+where $\varepsilon > 0$ is the allowed imbalance.
+\end{definition}
+
+This is the balanced min-cut problem.
+
+\subsection{NP-Hardness and Approximation}
+
+\begin{theorem}[NP-Hardness] \established{}
+\label{thm:nphard}
+The $(k, 1)$-balanced partition problem (exactly equal parts) admits no polynomial-time approximation with any finite factor unless $P = NP$.
+Even for planar graphs and grids, balanced partitioning is NP-hard to approximate within any satisfactory ratio.
+\end{theorem}
+
+This is proven by reduction from 3-partition, which is NP-hard in the strong sense.
+
+When the balance constraint is relaxed ($\varepsilon > 0$), approximation becomes possible:
+
+\begin{itemize}[nosep]
+  \item \citet{AndreevRacke2006}: for any constant $\nu > 1$, $O(\log^{1.5} n)$ approximation ratio with $(k, \nu)$-balanced partition.
+  \item \citet{AroraRaoVazirani2009}: $O(\sqrt{\log n})$ approximation for sparsest cut via semidefinite programming.
+\end{itemize}
+
+For a codebase of 10,000 files, the $O(\log^{1.5} n)$ bound gives an approximation factor of roughly 46; the $O(\sqrt{\log n})$ bound gives roughly 3.2.
+These worst-case bounds motivate the use of heuristic methods that empirically perform much better.
+
+\subsection{Cheeger Inequality and Spectral Methods}
+
+\begin{theorem}[Discrete Cheeger Inequality] \established{}
+\label{thm:cheeger}
+For graph $G$ with normalized Laplacian eigenvalues $0 = \lambda_1 \leq \lambda_2 \leq \cdots \leq \lambda_n$, the minimum conductance $\phi(G)$ satisfies:
+\begin{equation}
+\label{eq:cheeger}
+  \frac{\lambda_2}{2} \leq \phi(G) \leq \sqrt{2\lambda_2}
+\end{equation}
+The spectral bisection algorithm (partition by sign of the Fiedler vector $v_2$ \citep{Fiedler1973}) achieves a cut with conductance at most $\sqrt{2\lambda_2}$.
+\end{theorem}
+
+For $k$-way partitioning, \citet{Lee2012cheeger} proved higher-order Cheeger inequalities: $\phi_k(G) = O(k) \cdot \lambda_2 / \sqrt{\lambda_k}$, giving constant-factor approximations when there are few well-separated clusters.
+
+\subsection{Practical Algorithms}
+
+The Kernighan-Lin (KL) algorithm \citep{KernighanLin1970} is an iterative improvement heuristic for graph bisection running in $O(n^2 \log n)$ per pass, with no approximation guarantees but empirically within 5 to 15\% of optimal.
+The Fiduccia-Mattheyses (FM) algorithm \citep{FiducciaMattheyses1982} improves on KL in two ways: $O(p)$ per pass (where $p$ is total pins) via bucket priority queues, and native hypergraph support, which is the natural model for software systems where a shared interface creates a hyperedge connecting all consumers.
+
+METIS \citep{KarypisKumar1998} uses a three-phase multilevel approach (coarsening, initial partitioning, uncoarsening with refinement) achieving $O(|E|)$ runtime.
+It produces edge cuts consistently 10 to 50\% better than spectral partitioning and is the practical tool of choice for large software dependency graphs.
+
+\subsection{Hypergraph Model for Software}
+
+In a standard graph model, if file $X$ is used by files $A, B, C, D$, this creates four separate edges.
+In a hypergraph model, $\{X, A, B, C, D\}$ form a single hyperedge whose cut cost reflects that modifying $X$ affects all consumers simultaneously.
+This distinction matters for agent coordination: if one agent modifies a shared interface, all agents consuming that interface must reconcile, regardless of how many individual edges are cut.
+The FM algorithm and hMETIS handle hypergraphs natively.
+
+\subsection{Cut-Conflict Bridge}
+
+\begin{lemma}[Cut-Conflict Bridge (Modeling Assumption)] \synthesis{}
+\label{lem:bridge}
+Under the assumption that the composite coupling metric $w$ is calibrated against historical conflict data (so that conflict probability is approximately proportional to coupling weight), the pairwise conflict probability between agents $i$ and $j$ is bounded by:
+\begin{equation}
+  P(C_{ij}^{\mathrm{dep}} \cup C_{ij}^{\mathrm{sem}}) \leq \alpha \cdot \sum_{\substack{(u,v) \in E \\ u \in T_i, v \in T_j}} w(u,v)
+\end{equation}
+for some constant $\alpha > 0$ that depends on the coupling-to-conflict conversion rate.
+Therefore, the total expected conflict count is bounded by:
+\begin{equation}
+  \mathbb{E}[N_{\mathrm{conflicts}}] \leq \alpha \cdot W_{\mathrm{cut}}(\pi)
+\end{equation}
+where $W_{\mathrm{cut}}(\pi)$ is the total cut weight of partition $\pi$.
+\end{lemma}
+
+\begin{proof}[Proof sketch]
+Each cross-partition edge $(u,v)$ with weight $w(u,v)$ represents coupling that may cause a conflict.
+The probability of a conflict arising from this edge is at most proportional to the coupling weight, by construction of the composite coupling metric (which is calibrated against historical conflict data \citep{KasiSarma2013}).
+Summing over all cut edges yields the bound.
+We emphasize that this lemma is a modeling assumption, not a deep theorem: it states that conflicts are bounded by a metric designed to predict conflicts. Its value lies in connecting the graph-partitioning literature (which minimizes cut weight) to the coordination problem (which minimizes conflicts). The constant $\alpha$ is not universal; it depends on the calibration of $w$ and is empirically in the range 0.01 to 0.1 for human-authored code, though this has not been validated for agent-generated code specifically (see Section~\ref{sec:conclusion}). Without a calibrated $\alpha$, Theorem~\ref{thm:decomp-quality} provides a relative bound (better partitions yield proportionally fewer conflicts) rather than an absolute one.
+\end{proof}
+
+\begin{theorem}[Decomposition Quality Bounds Conflict Rate] \synthesis{}
+\label{thm:decomp-quality}
+Let $\pi^*$ be the optimal balanced $k$-partition and $\hat{\pi}$ be the partition from a spectral or METIS-based algorithm with approximation ratio $\beta$.
+Then:
+\begin{equation}
+  \mathbb{E}[N_{\mathrm{conflicts}}(\hat{\pi})] \leq \beta \cdot \mathbb{E}[N_{\mathrm{conflicts}}(\pi^*)]
+\end{equation}
+For spectral bisection, $\beta = O(\sqrt{\log n})$.
+For METIS, $\beta$ has no worst-case guarantee but empirically $\beta \approx 1.1$-$1.5$.
+\end{theorem}
+
+This closes the loop: partition quality directly determines merge conflict rate, and approximation guarantees translate into conflict rate guarantees.
+
+
+%% ============================================================
+%% 5. MERGE CONFLICT PROBABILITY MODEL
+%% ============================================================
+\section{Merge Conflict Probability Model}
+\label{sec:merge}
+
+\subsection{Five-Level Taxonomy}
+
+We adopt a five-level conflict taxonomy, synthesized from the software merging literature \citep{Accioly2018, Sousa2018, Falleri2014, Apel2012}:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Textual}: overlapping line-level changes in the same file. Detected by standard three-way merge (git).
+  \item \textbf{Structural}: AST-level conflicts (e.g., one agent moves a method while another modifies its body). Detected by structured merge tools such as JDime \citep{Apel2012}, which reduce reported conflicts by 39\% compared to textual merge.
+  \item \textbf{Dependency}: conflicting package additions or import changes. Detected by build-level analysis.
+  \item \textbf{API}: signature changes that break callers (one agent changes a function signature while another adds calls to the old signature). Detected by refactoring-aware tools such as IntelliMerge \citep{Shen2019}, achieving 88.48\% precision and 90.22\% recall.
+  \item \textbf{Semantic}: behaviorally incompatible changes that merge cleanly at all syntactic levels. Verified by compositional analysis such as SafeMerge \citep{Sousa2018}, which verified correctness in 75\% of benchmarks.
+\end{enumerate}
+
+\subsection{Probabilistic Graphical Model}
+
+\begin{definition}[Multi-Level Conflict Model] \synthesis{}
+\label{def:conflict-pgm}
+Let $k$ agents produce diffs $\Delta_1, \ldots, \Delta_k$.
+The conflict event at level $\ell \in \mathcal{L} = \{\mathrm{text}, \mathrm{struct}, \mathrm{dep}, \mathrm{API}, \mathrm{sem}\}$ between agents $i$ and $j$ is $C_{ij}^\ell$.
+The joint probability factors as:
+\begin{equation}
+  P(C \mid \Delta_1, \ldots, \Delta_k) = \prod_{i < j} P(C_{ij} \mid \Delta_i, \Delta_j)
+\end{equation}
+assuming pairwise conditional independence given the diffs.
+Each pairwise conflict probability decomposes across levels:
+\begin{equation}
+  P(C_{ij} \mid \Delta_i, \Delta_j) = 1 - \prod_{\ell \in \mathcal{L}} \left(1 - P(C_{ij}^\ell \mid \Delta_i, \Delta_j)\right)
+\end{equation}
+\end{definition}
+
+The per-level probabilities depend on overlap structure:
+\begin{align}
+  P(C_{ij}^{\mathrm{text}}) &= 1 - (1 - \rho_{ij}^{\mathrm{file}})^{m} & \text{(file overlap)} \\
+  P(C_{ij}^{\mathrm{struct}}) &= P(C_{ij}^{\mathrm{text}}) \cdot p_{\mathrm{struct}} & \text{(conditional on textual overlap)} \\
+  P(C_{ij}^{\mathrm{dep}}) &= \rho_{ij}^{\mathrm{dep}} \cdot p_{\mathrm{break}} & \text{(dependency coupling)} \\
+  P(C_{ij}^{\mathrm{API}}) &= \rho_{ij}^{\mathrm{API}} \cdot p_{\mathrm{sig}} & \text{(API coupling)} \\
+  P(C_{ij}^{\mathrm{sem}}) &= \rho_{ij}^{\mathrm{sem}} \cdot p_{\mathrm{behav}} & \text{(semantic coupling)}
+\end{align}
+
+\subsection{Quadratic Growth}
+
+\begin{lemma}[Quadratic Scaling] \established{} + \synthesis{}
+\label{lem:quadratic}
+The expected number of pairwise conflicts grows as $O(k^2)$:
+\begin{equation}
+  \mathbb{E}\!\left[\sum_{i<j} \mathbf{1}[C_{ij}]\right] = \binom{k}{2} \cdot \bar{p}_{\mathrm{conflict}}
+\end{equation}
+where $\bar{p}_{\mathrm{conflict}}$ is the average pairwise conflict probability.
+\end{lemma}
+
+\begin{proof}
+By linearity of expectation.
+Each of $\binom{k}{2}$ pairs has conflict probability $P(C_{ij})$.
+Averaging gives the result.
+\end{proof}
+
+For $k=5$ agents and $\bar{p}_{\mathrm{conflict}} = 0.15$ (consistent with the 7.6\% to 19.3\% range reported by \citealt{KasiSarma2013}), the expected conflict count is $10 \times 0.15 = 1.5$.
+For $k=10$: $45 \times 0.15 = 6.75$.
+The quadratic growth makes naive scaling prohibitive.
+
+\subsection{Contract Reduction to $O(k)$}
+
+\begin{theorem}[Ownership Reduces Conflict Order] \synthesis{}
+\label{thm:contract-reduction}
+Under exclusive file ownership contracts (Definition~\ref{def:contract}), the textual, structural, and API conflict probabilities drop to zero for all pairs.
+The total conflict probability reduces from $O(k^2)$ to:
+\begin{equation}
+  P(\mathrm{conflict}) = O(k \cdot w_{\mathrm{cut}})
+\end{equation}
+where $w_{\mathrm{cut}}$ is the inter-partition coupling from the task decomposition.
+For well-separated partitions ($w_{\mathrm{cut}} \to 0$), this approaches $O(1)$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Exclusive file ownership ensures $\rho_{ij}^{\mathrm{file}} = 0$ for all $i \neq j$, zeroing textual, structural, and API conflict probabilities.
+Remaining conflicts (dependency and semantic) occur only across partition boundaries, where coupling is bounded by $w_{\mathrm{cut}}$.
+If the coupling graph has bounded degree $d$ at partition boundaries, the number of conflict-prone pairs is $O(k \cdot d)$ rather than $O(k^2)$.
+\end{proof}
+
+\begin{corollary}[Contract Value] \synthesis{}
+The reduction from $O(k^2)$ to $O(k)$ pairwise conflicts is the formal justification for file ownership contracts.
+The $26\times$ bug multiplier for manually-resolved conflicts makes each prevented conflict extremely high-value.
+\end{corollary}
+
+
+%% ============================================================
+%% 6. COORDINATION AS CONCURRENCY CONTROL
+%% ============================================================
+\section{Coordination as Concurrency Control}
+\label{sec:concurrency}
+
+\subsection{The Database Analogy}
+
+The analogy between multi-agent code generation and database concurrency control is remarkably direct \citep{BernsteinHadzilacos1987}. The observation that git worktrees provide a form of snapshot isolation is well-known in the version control community; our contribution is the formal analysis of which anomalies remain and how contracts close the gap.
+Under pessimistic coordination (analogous to two-phase locking), agents acquire exclusive ownership of files before beginning work; no two agents concurrently modify overlapping resources.
+Under optimistic coordination (analogous to optimistic concurrency control), agents work in isolated environments (git worktrees as private workspaces), then attempt to merge; if conflicts are detected, the agent's work is rejected and must be retried.
+
+The key difference is cost: database transactions are millisecond-scale; agent tasks are minute-scale.
+The retry cost of an aborted agent task (discarding expensive LLM inference) shifts the calculus: even rare conflicts make optimistic approaches less attractive unless conflict detection happens before expensive computation.
+
+\subsection{Write Skew as the Critical Anomaly}
+
+\begin{theorem}[Write Skew under Snapshot Isolation] \synthesis{}
+\label{thm:write-skew}
+Under $\mathsf{Snapshot}$ isolation (git worktrees), write skew is the only permitted anomaly class, and it corresponds exactly to semantic merge conflicts.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Worktrees provide each agent a frozen, consistent snapshot at dispatch time, preventing dirty reads and non-repeatable reads.
+The snapshot is a complete copy, preventing phantoms.
+Write-write conflicts on the same file regions are detected by git's merge mechanism (textual conflict detection).
+The remaining anomaly is write skew: agent $A_i$ modifies $f_a \in F_i$ based on reading $f_b \in F_j$, while $A_j$ modifies $f_b$ based on reading $f_a$.
+Both commits succeed (disjoint file sets), but the combined state is inconsistent.
+This is precisely a semantic conflict.
+\end{proof}
+
+\begin{corollary} \synthesis{}
+Contracts eliminate write skew for covered interfaces.
+If both $f_a$'s dependence on $f_b$ and $f_b$'s dependence on $f_a$ are captured as interface specifications in $\mathcal{C}$, then the guarantee of interface preservation (G2 in Definition~\ref{def:contract}) prevents the inconsistency.
+\end{corollary}
+
+\subsection{Assume-Guarantee Contracts}
+
+Each agent $A_i$ operates under a contract $(Asm_i, Guar_i)$ following the assume-guarantee paradigm \citep{Meyer1992, Henzinger2002, Benveniste2018}:
+
+\medskip
+\noindent\textbf{Assumptions} $Asm_i$:
+\begin{enumerate}[nosep, label=(A\arabic*)]
+  \item No other agent modifies any file in $F_i$: $\forall j \neq i, \; \mathrm{WriteSet}(A_j) \cap F_i = \emptyset$.
+  \item All interfaces referenced by $A_i$ but owned by other agents remain stable.
+  \item The snapshot $S_i$ provided to $A_i$ at dispatch time is consistent (compiles, passes tests).
+\end{enumerate}
+
+\noindent\textbf{Guarantees} $Guar_i$:
+\begin{enumerate}[nosep, label=(G\arabic*)]
+  \item Agent $A_i$ modifies only files in $F_i$: $\mathrm{WriteSet}(A_i) \subseteq F_i$.
+  \item For every interface $I_j$ in files owned by $A_i$, the post-modification signature matches $\mathrm{sig}_j$.
+  \item The modifications, applied to $S_i$, compile and pass all tests scoped to $F_i$.
+\end{enumerate}
+
+\subsection{Composition Theorem}
+
+\begin{theorem}[Contract Composition] \synthesis{}
+\label{thm:composition}
+If every agent $A_i$ satisfies its contract (assuming $Asm_i$ holds, $A_i$ establishes $Guar_i$), then the composed system satisfies:
+\begin{enumerate}[nosep]
+  \item No write-write conflicts (from disjointness and G1).
+  \item All specified interfaces are preserved (from G2).
+  \item For languages with sound separate compilation (e.g., Java, Rust, Go), the merged codebase compiles (from G3 and interface preservation). For dynamically-typed languages (Python, JavaScript), the guarantee weakens to: the merged codebase compiles at all statically checkable call sites.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch, rely-guarantee reasoning following \citet{Jones1983}]
+\textit{Step 1.}
+By disjointness of $F_i$ and guarantee G1, each agent's write set is disjoint from every other agent's.
+This establishes the rely condition: the environment does not modify $A_i$'s files, satisfying A1.
+
+\textit{Step 2.}
+By G2, each agent preserves all interfaces in its owned files.
+Since A2 requires that interfaces outside $F_i$ remain stable, and G2 ensures this for every $F_j$, the circular rely-guarantee discharge holds: $Guar_j$ for $j \neq i$ collectively implies $Asm_i$.
+
+\textit{Step 3.}
+Each agent's modifications compile in isolation (G3) with all consumed interfaces preserved (A2, now discharged).
+Since the merged codebase preserves all interfaces, every call site remains type-consistent.
+By compositionality of type checking, the merged result type-checks.
+\end{proof}
+
+\begin{remark}
+This proof is modular: adding agent $A_{k+1}$ with a fresh disjoint $F_{k+1}$ requires only verifying $A_{k+1}$'s contract, not re-verifying existing agents.
+This is the key advantage of assume-guarantee reasoning over monolithic verification.
+\end{remark}
+
+\subsection{Correctness Conditions}
+
+\begin{definition}[Strong Correctness] \synthesis{}
+A multi-agent execution producing diffs $\Delta_1, \ldots, \Delta_k$ is \textbf{strongly correct} (serializable) if there exists a sequential ordering $\pi$ such that applying $\Delta_{\pi(1)}, \ldots, \Delta_{\pi(k)}$ in sequence produces the same final state as the merged result.
+\end{definition}
+
+\begin{definition}[Weak Correctness] \synthesis{}
+A multi-agent execution is \textbf{weakly correct} if the merged result: (W1) compiles without errors; (W2) passes all pre-existing tests plus new tests added by agents; (W3) preserves all interface specifications in $\mathcal{C}$.
+\end{definition}
+
+\begin{theorem}[Correctness Hierarchy] \synthesis{}
+\label{thm:correctness}
+Strong correctness implies weak correctness, but not conversely.
+\end{theorem}
+
+\begin{proof}
+Forward: any serializable execution compiles, passes tests, and preserves interfaces.
+Converse counterexample: two agents both add a utility function with the same name but different implementations; after conflict resolution (renaming one), the result compiles and passes tests but corresponds to no sequential execution.
+\end{proof}
+
+\begin{theorem}[Achievability under Snapshot + Contracts] \synthesis{}
+\label{thm:achievability}
+Under $\mathsf{Snapshot}$ isolation with contract coverage $\gamma$ and 5-level merge detection with semantic detection rate $d_5$, weak correctness holds with probability at least:
+\begin{equation}
+  P(\mathrm{weak\;correct}) \geq 1 - (1-\gamma) \cdot \rho \cdot \binom{k}{2} \cdot (1 - d_5)
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Snapshot isolation eliminates dirty reads, non-repeatable reads, and phantoms (Theorem~\ref{thm:write-skew}).
+Contract coverage $\gamma$ eliminates write skew for covered interfaces.
+For uncovered interfaces, each cross-boundary pair has coupling probability $\rho$ and undetected-conflict probability $(1 - d_5)$.
+Union bound over $\binom{k}{2}$ pairs yields the result.
+\end{proof}
+
+\textbf{Calibration.}
+Using $\rho \approx 0.15$ \citep{KasiSarma2013}, $d_5 \approx 0.75$ \citep{Sousa2018}, $k = 5$, $\gamma = 0.8$:
+$P(\mathrm{weak\;correct}) \geq 1 - 0.2 \cdot 0.15 \cdot 10 \cdot 0.25 = 0.925$.
+A 92.5\% probability of weak correctness, improvable by increasing $\gamma$ or $d_5$.
+
+
+%% ============================================================
+%% 7. TOPOLOGY SELECTION
+%% ============================================================
+\section{Topology Selection}
+\label{sec:topology}
+
+\subsection{Formal Objective}
+
+\begin{definition}[Topology Selection Problem] \synthesis{}
+Given task parameters $(k, \rho, p_{\mathrm{single}}, \tau)$, select:
+\begin{equation}
+\label{eq:topology-obj}
+  t^* = \arg\max_{t \in \mathcal{T}} \frac{P(\mathrm{success} \mid t)}{T(t) \cdot C(t)}
+\end{equation}
+where $P(\mathrm{success})$ is the probability of correct output, $T(t)$ is wall-clock time, and $C(t)$ is total compute cost.
+\end{definition}
+
+\subsection{Per-Topology Expressions}
+
+For each topology, with $\epsilon = 1 - p_{\mathrm{single}}$:
+
+\medskip
+\noindent\textbf{Independent.}
+$P_{\mathrm{indep}} = (1-\epsilon)^k \cdot (1-\rho)^{\binom{k}{2}}$;
+$T_{\mathrm{indep}} = \tau_{\mathrm{single}} + \tau_{\mathrm{merge}}(k)$;
+$C_{\mathrm{indep}} = k \cdot c_{\mathrm{single}}$.
+
+\medskip
+\noindent\textbf{Centralized.}
+$P_{\mathrm{central}} = (1-\epsilon_{\mathrm{coord}})^{k+1} \cdot (1-\rho/f_c)^{\binom{k}{2}}$;
+$T_{\mathrm{central}} = \tau_{\mathrm{plan}} + \tau_{\mathrm{single}} + \tau_{\mathrm{integrate}}$;
+$C_{\mathrm{central}} = (k+1) \cdot c_{\mathrm{single}} + k \cdot c_{\mathrm{coord}}$.
+
+\medskip
+\noindent\textbf{Hierarchical.}
+$P_{\mathrm{hier}} = (1-\epsilon)^k \cdot (1-\epsilon_{\mathrm{mgr}})^{\lceil k/b \rceil} \cdot (1-\rho/f_h)^{k \cdot d_{\mathrm{avg}}}$;
+$T_{\mathrm{hier}} = d \cdot \tau_{\mathrm{coord}} + \tau_{\mathrm{single}}$ where $d = \lceil \log_b k \rceil$;
+$C_{\mathrm{hier}} = k \cdot c_{\mathrm{single}} + \lceil k/b \rceil \cdot c_{\mathrm{mgr}}$.
+
+\medskip
+\noindent\textbf{Isolated-then-Merge.}
+$P_{\mathrm{iso}} = (1-\epsilon)^k \cdot (1-\rho)^{\binom{k}{2}} \cdot p_{\mathrm{resolve}}^{N_{\mathrm{conflicts}}}$;
+$T_{\mathrm{iso}} = \tau_{\mathrm{single}} + \tau_{\mathrm{merge}}(k)$;
+$C_{\mathrm{iso}} = k \cdot c_{\mathrm{single}} + c_{\mathrm{merge}}(k)$.
+
+\subsection{Dominance Conditions}
+
+\begin{proposition}[Topology Dominance] \synthesis{}
+\label{prop:dominance}
+Under the above model:
+\begin{enumerate}[nosep]
+  \item Independent dominates when $\rho \approx 0$ and $\epsilon$ is small.
+  \item Centralized dominates when $\rho$ is moderate-to-high and $\epsilon$ is moderate: the benefit $f_c$ on conflict reduction outweighs overhead.
+  \item Hierarchical dominates when $k > 8$ and $\rho$ is moderate: the centralized coordinator becomes a bottleneck.
+  \item Isolated-then-merge dominates when $\rho$ is low, $\epsilon$ is high, and automated resolution rate $p_{\mathrm{resolve}}$ is high.
+\end{enumerate}
+
+More precisely, centralized beats independent when:
+\begin{equation}
+  f_c \cdot \binom{k}{2} \cdot \rho > c_{\mathrm{coord}} / c_{\mathrm{single}} + \epsilon_{\mathrm{coord}}
+\end{equation}
+\end{proposition}
+
+\subsection{Conway's Law as Communication Graph Containment}
+
+\begin{definition}[Communication and Required Graphs] \synthesis{}
+The \textbf{communication graph} $G_T = (\mathcal{A}, E_T)$ has an edge $(A_i, A_j) \in E_T$ iff agents $A_i, A_j$ can exchange messages under topology $T$.
+The \textbf{required communication graph} $G_R = (\mathcal{A}, E_R)$ has $(A_i, A_j) \in E_R$ iff agents $A_i, A_j$ manage modules with inter-module dependencies.
+\end{definition}
+
+\begin{theorem}[Conway's Law, Graph-Theoretic Form] \synthesis{}
+\label{thm:conway}
+If the required communication graph is not a subgraph of the topology communication graph ($E_R \not\subseteq E_T$), then for every edge $(A_i, A_j) \in E_R \setminus E_T$, the agents managing the dependent modules cannot coordinate, producing a semantic conflict with probability proportional to the coupling strength of the underlying module dependency.
+\end{theorem}
+
+\begin{definition}[Topology-Module Mismatch Cost] \synthesis{}
+\begin{equation}
+  \mathrm{Mismatch}(\alpha, T, G_M) = \sum_{(A_i, A_j) \in E_R \setminus E_T} \sum_{\substack{(M_a, M_b) \in E_M \\ \alpha(M_a)=A_i, \alpha(M_b)=A_j}} w(M_a, M_b)
+\end{equation}
+where $\alpha: \mathcal{M} \to \mathcal{A}$ is the module-to-agent assignment.
+Mismatch $= 0$ when $E_R \subseteq E_T$ (Conway-aligned).
+\end{definition}
+
+\begin{theorem}[Inverse Conway for Agents] \synthesis{}
+\label{thm:inverse-conway}
+The assignment $\alpha^*$ minimizing mismatch for a given topology $T$ is the solution to a constrained balanced min-cut: partition the module graph into $k$ parts minimizing uncovered cross-partition edge weight.
+\end{theorem}
+
+For the independent topology ($E_T = \emptyset$), mismatch equals total cross-partition coupling, reducing to standard balanced min-cut.
+For mesh topology ($E_T$ is complete), mismatch is zero for any assignment, but communication overhead is $O(k^2)$.
+For isolated-then-merge with contracts at coverage $\gamma$, the effective mismatch is $(1-\gamma)$ times the full mismatch, since contracts act as static communication channels conveying interface information without runtime message passing.
+
+
+%% ============================================================
+%% 8. QUALITY-ADJUSTED SPEEDUP
+%% ============================================================
+\section{Quality-Adjusted Speedup}
+\label{sec:qas}
+
+\subsection{Definition}
+
+Standard speedup $S(k) = \Theta_{\mathrm{par}}(k) / \Theta_{\mathrm{seq}}$ does not account for quality costs.
+
+\begin{definition}[Quality-Adjusted Speedup] \synthesis{}
+\label{def:qas}
+\begin{equation}
+\label{eq:qas}
+  \mathrm{QAS}(k) = S(k) \cdot \frac{1 - d(k)}{1 - d(1)}
+\end{equation}
+where $d(k)$ is the defect rate with $k$ agents and $d(1)$ is the single-agent defect rate.
+\end{definition}
+
+Equivalently, defining sequential throughput $\Theta_{\mathrm{seq}} = p_{\mathrm{single}} \cdot q(1) / t_{\mathrm{cycle}}$ and parallel throughput $\Theta_{\mathrm{par}}(k) = k \cdot p_{\mathrm{single}} \cdot R(k) \cdot q(k) / (t_{\mathrm{cycle}} + t_{\mathrm{merge}}(k))$:
+\begin{equation}
+  \mathrm{QAS}(k) = \frac{k \cdot R(k) \cdot q(k)}{q(1) \cdot (1 + t_{\mathrm{merge}}(k)/t_{\mathrm{cycle}})} \cdot \frac{1 - d(k)}{1 - d(1)}
+\end{equation}
+
+\subsection{Throughput Crossover Analysis}
+
+The crossover condition $\Theta_{\mathrm{par}}(k) > \Theta_{\mathrm{seq}}$ requires:
+\begin{equation}
+  G(k) > 1 + M(k)
+\end{equation}
+where $G(k) = k \cdot R(k) \cdot q(k)/q(1)$ is the quality-adjusted parallelism gain and $M(k) = t_{\mathrm{merge}}(k)/t_{\mathrm{cycle}}$ is the merge overhead ratio.
+
+\textbf{Sensitivity to conflict rate.}
+For $k = 5$, uniform pairwise conflict probability $p_c$, and $q(k)/q(1) = 0.95$:
+\begin{itemize}[nosep]
+  \item At $p_c = 0.10$: $R(5) = 0.9^{10} = 0.349$, $G(5) = 5 \times 0.349 \times 0.95 = 1.66$.
+  \item At $p_c = 0.20$: $R(5) = 0.8^{10} = 0.107$, $G(5) = 5 \times 0.107 \times 0.95 = 0.51$.
+\end{itemize}
+Five agents with 20\% pairwise conflict probability are slower than one agent, \emph{regardless of merge cost}.
+
+\textbf{Sensitivity to merge time.}
+For $k = 3$, $p_c = 0.15$, $q(k)/q(1) = 0.95$:
+$R(3) = 0.85^3 = 0.614$, $G(3) = 3 \times 0.614 \times 0.95 = 1.75$.
+Crossover requires $M(3) < 0.75$: merge time must be less than 75\% of cycle time.
+
+\subsection{Calibration against DORA Data}
+
+The DORA 2025 data \citep{DORA2025} provides a partial, \emph{analogical} calibration.
+\textbf{Caveat:} DORA measures human developers assisted by AI tools, not autonomous multi-agent systems. We use it here as a proxy for the qualitative effect of increased code generation throughput on quality metrics, not as a direct measurement of multi-agent QAS.
+PRs merged increased by 98\% ($S \approx 2.0$), while bug rate increased by 9\%.
+If baseline per-PR defect rate is $d_0 = 0.05$:
+\begin{equation}
+  \mathrm{QAS}_{\mathrm{DORA}} = 1.98 \times \frac{1 - 1.09 \cdot d_0}{1 - d_0} = 1.98 \times \frac{0.9455}{0.95} = 1.97
+\end{equation}
+QAS is close to raw speedup when per-PR quality is maintained.
+However, organizational delivery metrics remained flat, implying that review, integration, and testing bottlenecks absorb the throughput gains.
+
+\subsection{Calibration against Kim et al.\ Data}
+
+We calibrate QAS against Kim et al.'s data under the \emph{worst-case assumption} that all system errors become delivered defects (no error filtering by testing or review). This conflates the error amplification factor $A_e$ (probability of at least one agent error) with the defect-rate multiplier (fraction of delivered defective features), which are distinct quantities. The results below are therefore pessimistic upper bounds; a more refined model would account for the error detection rate of the test and review pipeline.
+
+For the independent architecture ($A_e = 17.2$) with $d(1) = 0.20$:
+$d(k)_{\mathrm{indep}} = \min(1, 17.2 \times 0.20) = 1.0$ (saturated under the worst-case assumption).
+\begin{equation}
+  \mathrm{QAS}_{\mathrm{indep}} = S(k) \times \frac{1 - 1.0}{1 - 0.20} = 0
+\end{equation}
+Independent multi-agent systems with high error amplification produce zero quality-adjusted value.
+
+For the centralized architecture ($A_e = 4.4$):
+$d(k)_{\mathrm{central}} = \min(1, 4.4 \times 0.20) = 0.88$.
+$\mathrm{QAS}_{\mathrm{central}} = S(k) \times 0.12/0.80 = S(k) \times 0.15$.
+Even with the best coordination, speedup must exceed $1/0.15 = 6.67$ for QAS to reach 1.0.
+
+\subsection{Demonstration: QAS $< 1$}
+
+\begin{proposition} \synthesis{}
+\label{prop:qas-negative}
+For any topology $t$ and agent count $k > 1$, if:
+\begin{equation}
+  A_e(t, k) \cdot d(1) \geq 1 - \frac{1 - d(1)}{S(k)}
+\end{equation}
+then $\mathrm{QAS}(k) < 1$: parallelism is net-negative.
+\end{proposition}
+
+This condition is easily satisfied when $d(1)$ is moderate (0.15 to 0.30), $A_e$ is large (4 to 17), and $S(k)$ is modest (2 to 3).
+The regime $\mathrm{QAS} < 1$ is not a corner case; it is the default outcome for poorly coordinated multi-agent systems.
+
+
+%% ============================================================
+%% 9. EMPIRICAL CALIBRATION AND DESIGN PRINCIPLES
+%% ============================================================
+\section{Empirical Calibration and Design Principles}
+\label{sec:empirical}
+
+\subsection{Calibration Tables}
+
+Table~\ref{tab:error-params} collects error amplification parameters from the literature.
+
+\begin{table}[ht]
+\centering
+\caption{Error amplification parameters from empirical studies.}
+\label{tab:error-params}
+\small
+\begin{tabular}{llccc}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{95\% CI} & \textbf{Source} & \textbf{Conditions} \\
+\midrule
+$A_e$ (Independent) & 17.2$\times$ & [14.3, 20.1] & \citet{Kim2025} & No shared state \\
+$A_e$ (Centralized) & 4.4$\times$ & [3.8, 5.0] & \citet{Kim2025} & Hub coordinator; 285\% overhead \\
+$A_e$ (Decentralized) & 7.8$\times$ & Not reported$^\dagger$ & \citet{Kim2025} & Peer-to-peer; 263\% overhead \\
+$A_e$ (Hybrid) & 5.1$\times$ & Not reported$^\dagger$ & \citet{Kim2025} & Combined; 515\% overhead \\
+Bug mult.\ (conflict code) & 2$\times$ & NR & \citet{Lesenich2017} & Any merge conflict \\
+Bug mult.\ (manual resolution) & 26$\times$ & NR & \citet{Lesenich2017} & Manual intervention \\
+\bottomrule
+\multicolumn{5}{l}{\footnotesize $^\dagger$Calibrations without CIs are point estimates; interpret with caution.}
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:merge-params} collects merge conflict rate parameters.
+
+\begin{table}[ht]
+\centering
+\caption{Merge conflict rate parameters from large-scale studies.}
+\label{tab:merge-params}
+\small
+\begin{tabular}{llcc}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Source} & \textbf{Sample} \\
+\midrule
+Textual conflict rate & 17-20\% of merges & \citet{Brun2011}; \citet{Ghiotto2018} & 3.4M LOC; 2,731 projects \\
+Project-level range & 7.6-19.3\% & \citet{KasiSarma2013} & Multiple OSS projects \\
+Build conflict rate & 1-10\% & \citet{Brun2011} & 9 projects \\
+Trivial resolution & 75\% & \citet{Ghiotto2018} & 2,731 Java projects \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:throughput-params} collects throughput and productivity parameters.
+
+\begin{table}[ht]
+\centering
+\caption{Throughput and productivity parameters.}
+\label{tab:throughput-params}
+\small
+\begin{tabular}{llcc}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Source} & \textbf{Conditions} \\
+\midrule
+Parallel throughput mult. & 2.2$\times$ & M1-Parallel & Academic; accuracy preserved \\
+Practitioner-reported & $\sim$3$\times$ & \citet{Osmani2025} & 3 agents vs.\ 1 generalist \\
+PRs merged increase & +98\% & \citet{DORA2025} & 10,000+ devs; objective telemetry \\
+Review time increase & +91\% & \citet{DORA2025} & Downstream cost \\
+PR size increase & +154\% & \citet{DORA2025} & AI-generated code \\
+Bug rate increase & +9\% & \citet{DORA2025} & Absolute count \\
+Optimal team size & 3-5 agents & \citet{Osmani2025} & Practitioner consensus \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Coupling Density Dynamics}
+
+Software coupling grows over time per Lehman's Laws \citep{Lehman1980}.
+Model coupling density $\rho(G_t)$ as a stochastic process:
+\begin{equation}
+  \rho(G_{t+1}) = \rho(G_t) + \alpha \cdot \Delta F_t - \beta \cdot R_t + \xi_t
+\end{equation}
+where $\alpha \approx 0.02$-$0.05$ edges/file/feature is the coupling growth rate, $\beta$ is the refactoring reduction rate (typically $\beta < 0.5\alpha$ without active refactoring), and $\xi_t \sim \mathcal{N}(0, \sigma^2)$ is noise.
+
+\begin{definition}[Partition Half-Life] \synthesis{}
+The \textbf{partition half-life} $\tau_{1/2}$ is the expected time before inter-partition coupling exceeds a critical threshold:
+\begin{equation}
+  \mathbb{E}[\tau_{1/2}] \approx \frac{\rho_{\mathrm{inter}}^* - \rho_{\mathrm{inter}}(t_0)}{\dot{\rho} \cdot p_{\mathrm{cross}}}
+\end{equation}
+where $p_{\mathrm{cross}} = 1 - \gamma(\mathcal{P})$ is the fraction of new coupling crossing partition boundaries.
+\end{definition}
+
+For a well-partitioned codebase ($\gamma = 0.8$, $\dot{\rho} = 0.01$ edges/file/week): $\tau_{1/2} \approx 200$ weeks.
+For a poorly-partitioned one ($\gamma = 0.4$): $\tau_{1/2} \approx 67$ weeks.
+Task decompositions must be recomputed on the order of months to years; METIS's $O(|E|)$ runtime makes re-partitioning computationally cheap.
+
+\subsection{Six Design Principles}
+
+The theoretical framework yields the following actionable design principles, each derived from a specific formal result:
+
+\begin{enumerate}[label=\textbf{P\arabic*.}]
+  \item \textbf{Check before scaling.}
+  If single-agent accuracy exceeds the saturation threshold ($P^* \approx 0.45$, Conjecture~\ref{conj:phase}), do not add agents.
+  Invest in improving the single agent instead.
+
+  \item \textbf{Enforce structurally, not via prompts.}
+  Prompt-based constraints fail approximately 72\% of the time under adversarial conditions \citep{AgentSpec2025}.
+  File ownership must be enforced via filesystem permissions, git hooks, or tool-call interception, not via system messages.
+
+  \item \textbf{Partition before parallelizing.}
+  Run METIS or hypergraph partitioning on the coupling graph before dispatching agents (Section~\ref{sec:decomp}).
+  The Cut-Conflict Bridge (Lemma~\ref{lem:bridge}) guarantees that better partitions produce fewer conflicts.
+
+  \item \textbf{Use contracts to reduce conflict scaling.}
+  File-ownership contracts reduce conflict growth from $O(k^2)$ to $O(k)$ (Theorem~\ref{thm:contract-reduction}).
+  The residual semantic conflicts are bounded by $(1-\gamma) \cdot \rho \cdot \binom{k}{2}$.
+
+  \item \textbf{Target 3 to 5 agents per team.}
+  The Extended Amdahl's Law (Theorem~\ref{thm:nstar}) gives $n^* \approx 1/\sqrt{\delta}$.
+  At typical error rates ($\epsilon = 0.2$, $f = 3.9$), $n^* \approx 4.4$.
+  Beyond this, use hierarchical nesting rather than flat scaling.
+
+  \item \textbf{Measure QAS, not throughput.}
+  Raw throughput ignores quality costs.
+  QAS $< 1$ (Proposition~\ref{prop:qas-negative}) means parallelism is net-negative.
+  Monitor the defect ratio $d(k)/d(1)$ and halt scaling when it exceeds $1/S(k)$.
+\end{enumerate}
+
+
+%% ============================================================
+%% 10. RELATED WORK
+%% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Multi-agent scaling science.}
+\citet{Kim2025} provide the most comprehensive empirical evaluation of multi-agent system scaling, establishing error amplification factors, capability saturation, and communication scaling laws.
+Our work builds on their empirical findings by developing a formal framework that explains their observations and derives actionable design rules.
+\citet{Cemri2025} introduced MAST, the first empirically grounded failure taxonomy for multi-agent LLM systems, identifying 14 failure modes across 1,600+ traces.
+
+\paragraph{AI-assisted development metrics.}
+The DORA 2025 report \citep{DORA2025} provides the largest objective measurement of AI's impact on software engineering practice.
+The productivity paradox it documents (individual gains, organizational stagnation) motivates our QAS metric, which formalizes the quality cost of parallelism.
+\citet{McKinney2026} argued that Brooks's Law \citep{Brooks1975} applies directly to LLM agents, a position our Extended Amdahl's Law (Theorem~\ref{thm:amdahl}) formalizes.
+
+\paragraph{Merge conflict research.}
+\citet{Brun2011} pioneered proactive conflict detection with Crystal.
+\citet{KasiSarma2013} developed Cassandra for conflict-minimizing task scheduling.
+\citet{Ghiotto2018} provided the largest study of merge conflict characteristics (2,731 Java projects).
+\citet{Accioly2018} identified structural conflict patterns.
+\citet{Sousa2018} formalized semantic conflict-freedom verification with SafeMerge.
+\citet{Zhu2024congra} introduced ConGra, finding that general-purpose LLMs outperform code-specialized ones at conflict resolution, a counterintuitive result relevant to coordination agent design.
+
+\paragraph{Merge tools.}
+\citet{Falleri2014} developed GumTree for fine-grained AST differencing.
+\citet{Shen2019} developed IntelliMerge for refactoring-aware merging (88.48\% precision).
+\citet{Apel2012} developed JDime for semistructured merge (39\% conflict reduction).
+
+\paragraph{Graph partitioning.}
+\citet{Fiedler1973} introduced algebraic connectivity and spectral bisection.
+\citet{KernighanLin1970} developed the KL heuristic.
+\citet{FiducciaMattheyses1982} improved it with linear-time passes and hypergraph support.
+\citet{KarypisKumar1998} developed METIS with $O(|E|)$ multilevel partitioning.
+\citet{AroraRaoVazirani2009} achieved $O(\sqrt{\log n})$ sparsest cut via SDP.
+\citet{AndreevRacke2006} provided $O(\log^{1.5} n)$ balanced partitioning.
+\citet{Lee2012cheeger} proved higher-order Cheeger inequalities.
+
+\paragraph{Software modularity.}
+\citet{Mitchell2006bunch} developed Bunch for automatic software modularization.
+\citet{Murphy2001} developed reflexion models for comparing intended and actual architecture.
+\citet{Martin1994} defined coupling metrics (afferent, efferent, instability).
+\citet{MacCormack2012} validated Conway's Law empirically via the mirroring hypothesis.
+
+\paragraph{Distributed systems.}
+\citet{BernsteinHadzilacos1987} established the foundations of concurrency control.
+\citet{Berenson1995} formalized isolation levels and identified write skew.
+\citet{Fekete2005} showed how to make snapshot isolation serializable via promotion, a technique analogous to our use of contracts to close the gap from snapshot to serializable isolation for agents.
+\citet{HerlihyWing1990} defined linearizability as the gold standard for concurrent correctness; our strong correctness condition (Definition~\ref{def:qas}) is the agent analogue.
+\citet{Lamport1978} defined happened-before and logical clocks.
+\citet{Herlihy1991} proved the consensus number hierarchy.
+\citet{FLP1985} proved the impossibility of deterministic consensus with one faulty process.
+\citet{Ongaro2014} developed Raft for understandable consensus.
+
+\paragraph{Contract-based design.}
+\citet{Meyer1992} introduced Design by Contract.
+\citet{Henzinger2002} developed assume-guarantee methodology.
+\citet{Jones1983} developed rely-guarantee reasoning.
+\citet{Benveniste2018} provided a comprehensive theory of contracts for system design.
+
+\paragraph{Industrial systems.}
+\citet{Cursor2026} documented the evolution from flat locking to planner/worker/judge topology, providing the strongest empirical evidence that hierarchical role separation succeeds at scale.
+\citet{Osmani2025} synthesized practitioner patterns including optimal team sizing and tier-based tool stacks.
+
+\paragraph{Software evolution.}
+\citet{Lehman1980} established the laws of software evolution, particularly increasing complexity, which our coupling density dynamics model builds upon.
+\citet{Conway1968} articulated the law relating organizational structure to system architecture.
+
+
+%% ============================================================
+%% 11. CONCLUSION
+%% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+\subsection{Summary}
+
+We have developed a formal framework for reasoning about coordination architecture in multi-agent software engineering.
+The framework connects four bodies of theory (reliability engineering, graph partitioning, concurrency control, and assume-guarantee contracts) to the specific problem of coordinating LLM agents on shared codebases.
+
+We summarize the framework via a \textbf{heuristic coordination model} that combines the three forces identified in this paper:
+\begin{equation}
+  S_{\mathrm{eff}} \approx \underbrace{\frac{n}{1 + \sigma(n-1) + \kappa \, n(n-1)}}_{\text{USL throughput}} \cdot \underbrace{(1-\delta)^n}_{\text{reliability}} \cdot \underbrace{(1 - \alpha \, W_{\mathrm{cut}})}_{\text{integration success}}
+\end{equation}
+This is a heuristic, not a derived theorem: the multiplicative combination assumes approximate independence of the three factors, which is violated when agent errors cause merge conflicts (coupling factors 2 and 3). The third factor requires $\alpha W_{\mathrm{cut}} \in [0,1]$, which must be verified for specific parameter values. Despite these limitations, the model captures the qualitative dynamics: parallelism gains (increasing in $n$), error accumulation (decreasing exponentially in $n$), and integration risk (decreasing with cut weight, which tends to grow with $n$).
+The optimal operating point is typically small ($n^* \approx 3$-$5$).
+
+\subsection{Proposed Verification Experiments}
+
+Five experiments would validate or falsify the key claims:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Agent-specific conflict rate.}
+  Run $k \in \{1, 2, 3, 5, 8\}$ agents on the same feature set across 10+ repositories.
+  Measure textual, build, and semantic conflict rates; wall-clock merge time.
+  This calibrates $p_c$, $t_{\mathrm{merge}}(k)$, and $R(k)$.
+
+  \item \textbf{Direct QAS measurement.}
+  For the same task set, run sequential and parallel configurations.
+  Measure features/hour, defects/feature (within 48 hours), and review time.
+  Minimum sample: 50 tasks per configuration for 20\% effect detection at $\alpha = 0.05$.
+
+  \item \textbf{Coupling density evolution.}
+  Instrument 5+ repositories with weekly coupling graph snapshots.
+  Fit the stochastic evolution model ($\alpha$, $\beta$, $\sigma$) over 6 months.
+  Test partition half-life predictions.
+
+  \item \textbf{Error amplification on code tasks.}
+  Replicate Kim et al.'s methodology on SWE-Bench Verified, HumanEval+, and MBPP+.
+  Key hypothesis: $A_e$ for code generation exceeds the general-benchmark values due to tighter coupling.
+
+  \item \textbf{Structural vs.\ prompt enforcement.}
+  Compare prompt-based file ownership against structural enforcement (filesystem permissions) across 100+ agent executions.
+  Measure violation rate, defect rate, and throughput.
+\end{enumerate}
+
+\subsection{Open Questions}
+
+Several important questions remain:
+
+\begin{itemize}[nosep]
+  \item Does the 45\% saturation threshold hold for code generation specifically, or does the tighter coupling shift it lower?
+  \item Can hierarchical topologies beat centralized at scale? Kim et al.'s ``decentralized'' category is coarse.
+  \item What is the optimal merge strategy: LLM-based integration versus AST-level structured merge?
+  \item How does iterative refinement (generate, test, fix loops) change the throughput calculus?
+  \item Can the coupling-to-conflict conversion constant $\alpha$ (Lemma~\ref{lem:bridge}) be calibrated for agent-generated code?
+  \item What is the long-term maintenance cost of multi-agent-generated code?
+\end{itemize}
+
+The framework developed here provides the formal scaffolding for answering these questions.
+The critical next step is empirical calibration: until the six unknown parameters identified in Section~\ref{sec:empirical} are measured for agent-generated code specifically, the quantitative predictions remain approximate.
+The qualitative conclusions, however, are robust: small teams outperform large ones, structural enforcement dominates prompt-based constraints, partition quality determines conflict rate, and quality-adjusted speedup is the right metric for evaluating multi-agent coordination.
+
+
+%% ============================================================
+%% APPENDIX A: EXTENDED PROOFS
+%% ============================================================
+\appendix
+\section{Extended Proofs}
+\label{app:proofs}
+
+\subsection{Proof of Theorem~\ref{thm:error-amp} (Error Amplification, Full Detail)}
+
+\begin{proof}
+We prove three claims: the formula, strict monotonicity, and the asymptotic expansion.
+
+\textit{Formula.}
+Each of $k$ independent agents succeeds with probability $1 - \epsilon$.
+Joint success (all $k$ correct) has probability $(1-\epsilon)^k$.
+System error probability is $1 - (1-\epsilon)^k$.
+Dividing by single-agent error probability $\epsilon$ gives $A_e = (1-(1-\epsilon)^k)/\epsilon$.
+
+\textit{Monotonicity.}
+Treating $k$ as a continuous variable and differentiating:
+\[
+  \frac{\partial A_e}{\partial k} = \frac{-(1-\epsilon)^k \ln(1-\epsilon)}{\epsilon}
+\]
+Since $\ln(1-\epsilon) < 0$ for $\epsilon \in (0,1)$, the numerator is positive, so $\partial A_e / \partial k > 0$.
+
+\textit{Expansion.}
+Using the binomial series $(1-\epsilon)^k = \sum_{j=0}^{k} \binom{k}{j} (-\epsilon)^j$:
+\begin{align}
+  1 - (1-\epsilon)^k &= k\epsilon - \binom{k}{2}\epsilon^2 + \binom{k}{3}\epsilon^3 - \cdots \\
+  A_e &= k - \binom{k}{2}\epsilon + \binom{k}{3}\epsilon^2 - \cdots
+\end{align}
+The leading correction term is $-\binom{k}{2}\epsilon < 0$, confirming $A_e < k$ for all $\epsilon > 0$.
+\end{proof}
+
+\subsection{Proof of Theorem~\ref{thm:nstar} (Optimal Agent Count, Full Detail)}
+
+\begin{proof}
+Write $f(n) = \ln S_{\mathrm{eff}}(n) = -\ln(s + (1-s)/n) + n \ln(1-\delta)$.
+
+Differentiating:
+\[
+  f'(n) = \frac{(1-s)/n^2}{s + (1-s)/n} + \ln(1-\delta)
+\]
+
+Simplifying the first term: $(1-s)/(n^2 s + n(1-s)) = (1-s)/(n(ns + 1 - s))$.
+
+Setting $f'(n) = 0$:
+\[
+  \frac{1-s}{n(ns + 1 - s)} = -\ln(1-\delta) \approx \delta + \delta^2/2 + \cdots
+\]
+
+For small $s$ (small serial fraction), $ns + 1 - s \approx 1$, so $(1-s)/n \approx \delta$, giving $n \approx (1-s)/\delta \approx 1/\delta$.
+More precisely, the denominator is $n^2 s + n(1-s)$.
+For small $s$, the $n(1-s)$ term dominates until $n \gg (1-s)/s$, so the equation becomes $1/n^2 \approx \delta$, i.e., $n^* \approx 1/\sqrt{\delta}$.
+
+\textit{Uniqueness.}
+The second derivative:
+\[
+  f''(n) = -\frac{(1-s)(2ns + 1 - s)}{[n(ns + 1 - s)]^2}
+\]
+For $s \in (0,1)$ and $n \geq 1$, $f''(n) < 0$, so $f$ is strictly concave.
+A strictly concave function on $[1, \infty)$ has at most one critical point; since $f'(1) > 0$ (for small enough $\delta$, adding a second agent helps) and $f'(n) \to \ln(1-\delta) < 0$ as $n \to \infty$, there is exactly one $n^*$ where $f'(n^*) = 0$.
+\end{proof}
+
+\subsection{Proof of Theorem~\ref{thm:composition} (Contract Composition, Full Detail)}
+
+\begin{proof}
+We verify each claim by circular rely-guarantee discharge.
+
+\textit{Claim 1: No write-write conflicts.}
+Suppose for contradiction that files $f \in F_i$ and $f \in F_j$ with $i \neq j$ are both modified.
+By G1, $\mathrm{WriteSet}(A_i) \subseteq F_i$ and $\mathrm{WriteSet}(A_j) \subseteq F_j$.
+By the disjointness condition, $F_i \cap F_j = \emptyset$.
+So $f \in F_i$ and $f \in F_j$ is impossible.
+Contradiction.
+
+\textit{Claim 2: Interface preservation.}
+Fix interface $I_j \in \sigma(f)$ for some $f \in F_i$.
+By G2 for agent $A_i$, the post-modification signature of $I_j$ matches $\mathrm{sig}_j$.
+No other agent modifies $f$ (Claim 1), so $I_j$'s signature is preserved in the merged codebase.
+Since $I_j$ was arbitrary, all interfaces are preserved.
+
+\textit{Claim 3: Merged codebase compiles.}
+By Claim 2, all interfaces are preserved.
+Each agent's modifications compile in isolation against the preserved interfaces (G3).
+We need to show the merged result also compiles.
+
+Consider an arbitrary call site $c$ in file $f \in F_i$ that calls interface $I_j$ in file $g \in F_l$ with $l \neq i$.
+At dispatch time, $c$ was type-correct against $\mathrm{sig}_j$ (A3: snapshot is consistent).
+Agent $A_i$ may have modified $f$; any new call to $I_j$ must be type-correct against $\mathrm{sig}_j$ (G3 ensures compilation against snapshot, which includes $I_j$ with signature $\mathrm{sig}_j$).
+Agent $A_l$ preserves $\mathrm{sig}_j$ (Claim 2).
+Therefore $c$ remains type-correct in the merged result.
+
+Since all call sites remain type-correct and all agents' modifications individually compile, the merged result compiles. This step relies on compositionality of type checking, which holds for languages with sound separate compilation (Java, Rust, Go). For dynamically-typed languages (Python, JavaScript), the guarantee covers only statically checkable constraints; runtime type errors at uncovered call sites remain possible.
+
+\textit{Modularity.}
+Adding $A_{k+1}$ with $F_{k+1}$ disjoint from $\bigcup_{i=1}^k F_i$ preserves all three claims: Claim 1 extends because $F_{k+1}$ is disjoint; Claim 2 extends because $A_{k+1}$ preserves its own interfaces (G2); Claim 3 extends because $A_{k+1}$'s modifications compile against preserved interfaces.
+No existing agent's contract needs re-verification.
+\end{proof}
+
+\subsection{Proof of Theorem~\ref{thm:conway} (Conway's Law, Full Detail)}
+
+\begin{proof}
+Let $(A_i, A_j) \in E_R \setminus E_T$.
+By definition of $E_R$, there exist modules $M_a$ and $M_b$ with $\alpha(M_a) = A_i$, $\alpha(M_b) = A_j$, and $(M_a, M_b) \in E_M$ (inter-module dependency).
+By $(A_i, A_j) \notin E_T$, agents $A_i$ and $A_j$ cannot exchange messages.
+
+Consider the case where $A_i$ modifies the implementation of a function in $M_a$ that $M_b$ depends on.
+Agent $A_j$, responsible for $M_b$, cannot learn about this modification (no communication channel).
+If $A_j$ writes code in $M_b$ that depends on the pre-modification behavior of $M_a$, the result is a semantic conflict.
+
+The probability of this conflict is proportional to: (a) the probability that $A_i$ modifies the relevant interface, which is proportional to the coupling weight $w(M_a, M_b)$; and (b) the probability that $A_j$'s modifications depend on the changed behavior.
+Under the assumption that modification probability is proportional to coupling weight and that agents cannot selectively avoid conflicting changes without communication, the conflict probability is $\Theta(w(M_a, M_b))$.
+\end{proof}
+
+
+%% ============================================================
+%% APPENDIX B: NOTATION TABLE
+%% ============================================================
+\section{Notation Table}
+\label{app:notation}
+
+\begin{table}[ht]
+\centering
+\caption{Notation used throughout the paper.}
+\label{tab:notation}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Defined in} \\
+\midrule
+$k$ & Number of agents & Def.~\ref{def:error-amp} \\
+$\epsilon$ & Per-agent error rate ($1 - p_{\mathrm{single}}$) & Def.~\ref{def:error-amp} \\
+$\mathcal{T}$ & Set of coordination topologies & Def.~\ref{def:topology} \\
+$t$ & A specific topology in $\mathcal{T}$ & Def.~\ref{def:topology} \\
+$A_e(t,k)$ & Error amplification factor & Def.~\ref{def:error-amp} \\
+$G = (F, E, w)$ & Coupling graph (files, edges, weights) & Def.~\ref{def:coupling-graph} \\
+$\mathcal{C}$ & Coordination contract & Def.~\ref{def:contract} \\
+$F_i$ & Owned file set of agent $A_i$ & Def.~\ref{def:contract} \\
+$\gamma$ & Contract coverage (fraction of covered call sites) & \S\ref{sec:concurrency} \\
+$R(n)$ & Reliability factor & Thm.~\ref{thm:amdahl} \\
+$S(n)$ & Amdahl speedup & \S\ref{sec:error} \\
+$S_{\mathrm{eff}}(n)$ & Effective speedup (Amdahl $\times$ reliability) & Thm.~\ref{thm:amdahl} \\
+$\delta$ & Effective per-agent error under coordination & Thm.~\ref{thm:amdahl} \\
+$f(t)$ & Coordination benefit factor & \S\ref{sec:error} \\
+$n^*$ & Optimal agent count & Thm.~\ref{thm:nstar} \\
+$\rho$ & Average inter-task coupling density & Def.~\ref{def:conflict-pgm} \\
+$\sigma$ & USL serialization coefficient & Eq.~(\ref{eq:usl-extended}) \\
+$\kappa$ & USL coherency (crosstalk) coefficient & Eq.~(\ref{eq:usl-extended}) \\
+$s$ & Serial fraction (Amdahl) & \S\ref{sec:error} \\
+$\phi(G)$ & Graph conductance (sparsest cut ratio) & Thm.~\ref{thm:cheeger} \\
+$\lambda_2$ & Fiedler value (algebraic connectivity) & Thm.~\ref{thm:cheeger} \\
+$W_{\mathrm{cut}}(\pi)$ & Total cut weight of partition $\pi$ & Lem.~\ref{lem:bridge} \\
+$C_{ij}^\ell$ & Conflict between agents $i,j$ at level $\ell$ & Def.~\ref{def:conflict-pgm} \\
+$P^*$ & Capability saturation threshold & Def.~\ref{def:saturation} \\
+$\mathrm{QAS}(k)$ & Quality-Adjusted Speedup & Def.~\ref{def:qas} \\
+$d(k)$ & Defect rate with $k$ agents & Def.~\ref{def:qas} \\
+$G_T$ & Communication graph of topology $T$ & \S\ref{sec:topology} \\
+$G_R$ & Required communication graph & \S\ref{sec:topology} \\
+$\tau_{1/2}$ & Partition half-life & \S\ref{sec:empirical} \\
+$\alpha$ (Lem.~\ref{lem:bridge}) & Coupling-to-conflict conversion constant & Lem.~\ref{lem:bridge} \\
+$\alpha$ (\S\ref{sec:topology}) & Module-to-agent assignment function & \S\ref{sec:topology} \\
+$\alpha$ (\S\ref{sec:empirical}) & Coupling growth rate & \S\ref{sec:empirical} \\
+\bottomrule
+\multicolumn{3}{l}{\footnotesize Note: $\alpha$ is overloaded across sections; context disambiguates.}
+\end{tabular}
+\end{table}
+
+
+%% ============================================================
+%% BIBLIOGRAPHY
+%% ============================================================
+\bibliography{coordination_architecture}
+
+\end{document}

@@ -1,0 +1,1109 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{wrapfig}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{arydshln}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{minitoc}
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\usepackage{pifont}
+\usepackage{afterpage}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{titletoc}
+\usepackage{siunitx}
+
+% === Math operators ===
+\DeclareMathOperator*{\maximize}{maximize}
+\DeclareMathOperator*{\minimize}{minimize}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{conjecture}{Conjecture}[section]
+\newtheorem*{remark}{Remark}
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\definecolor{baselinecolor}{gray}{.95}
+\newcommand{\grayrow}{\rowcolor[gray]{.9}}
+\newcommand{\graycell}[1]{\cellcolor{baselinecolor}{#1}}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+\renewcommand{\today}{}
+
+% ================================================================
+\title{Economics Architecture for AI Coding Agent Harnesses}
+
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\begin{abstract}
+\vspace{-0.2in}
+AI coding agents consume millions of tokens across multi-stage pipelines, yet no existing harness includes an explicit cost optimization layer. We present a formal framework grounding economics architecture in five interlocking results. First, we formulate the Token Budget Allocation Problem (TBAP), where quality is multiplicative across pipeline stages while cost is additive; a log-transformation converts this to a concave program admitting a water-filling solution and an Equal Marginal Rate theorem. Second, we formalize model tier selection as a variant of the Generalized Assignment Problem (GAP), proving NP-hardness in general but establishing tractability via enumeration for practical instance sizes (3--5 tiers, 5--8 stages). Third, we analyze the dual-regime cost function (interactive versus autonomous) through queueing economics, deriving the M/M/1 optimal service rate that determines model selection per regime. Fourth, we formalize the Jevons paradox for token markets, proving that cost optimization becomes \emph{more} necessary as per-token prices fall when demand elasticity exceeds unity (empirically estimated at $\epsilon \approx 1.19$). Fifth, we introduce the CVIH metric (cost-adjusted verified iterations per hour) as the true efficiency measure, proving it is quasi-concave with a unique optimal budget strictly below the quality optimum. We derive seven design principles, prove a Weakest-Link theorem and a Cache-First principle, and calibrate all models against April 2026 pricing data reflecting a 300$\times$ price reduction over three years, 90--95\% cache hit rates, and 60$\times$ model tier price spreads.
+\end{abstract}
+
+% ================================================================
+\begin{document}
+\maketitle
+
+% ================================================================
+% SECTION 1: INTRODUCTION
+% ================================================================
+\section{Introduction}\label{sec:intro}
+
+Cost is the binding constraint for AI coding agent deployment at scale. While research attention has focused on capability benchmarks (SWE-bench pass rates, code generation accuracy), practitioners face a more immediate challenge: a single 50-iteration agentic coding session can consume 2--5 million tokens, costing \$3--\$50 depending on model tier and caching configuration. Organizations running hundreds of such sessions daily confront annual token budgets in the range of \$200K--\$2M, placing AI coding costs in the same category as cloud infrastructure expenditure \citep{finops2023}.
+
+The R3 reviewer of a companion paper captured this tension precisely: ``The paper does not sufficiently address the economics of these harnesses. Token costs, model selection, and budget allocation deserve formal treatment, not just a pricing table.'' This paper answers that call.
+
+\paragraph{Quantitative motivation.}
+Consider a typical agentic coding pipeline with $K = 6$ stages (planning, context retrieval, code generation, testing, review, iteration). At April 2026 pricing, a single iteration through this pipeline consumes roughly 40K--80K tokens. A task requiring 30--50 iterations thus demands 1.2M--4M tokens. With parallel execution across 5--10 developer workstreams, daily organizational consumption reaches 50M--200M tokens. At frontier model prices (\$3--\$15 per million input tokens), this translates to \$150--\$3,000 per day before caching discounts. The economics are not negligible; they are a first-order architectural concern.
+
+\paragraph{The missing layer.}
+\Cref{tab:harness-comparison} surveys existing harness architectures. None includes an explicit cost optimization layer. GSD and RAPID treat model selection as a configuration parameter. Turing delegates cost management to the user. Cursor and Codex rely on provider-side optimizations (caching, rate limits) without harness-level cost awareness. Blueprint tracks architectural decisions but does not model their economic consequences.
+
+\begin{table}[t]
+\centering
+\caption{Cost optimization features in existing AI coding agent harnesses. A checkmark (\ding{51}) indicates the feature is present; a cross (\ding{55}) indicates absence.}
+\label{tab:harness-comparison}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Feature} & \textbf{GSD} & \textbf{RAPID} & \textbf{Turing} & \textbf{Blueprint} & \textbf{Cursor} & \textbf{Codex} \\
+\midrule
+Explicit budget allocation & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} \\
+Per-stage model routing & \ding{55} & \ding{55} & \ding{55} & \ding{55} & Partial & \ding{55} \\
+Cache-aware optimization & \ding{55} & \ding{55} & \ding{55} & \ding{55} & Provider & Provider \\
+Cost-quality Pareto analysis & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} \\
+Regime detection (interactive/autonomous) & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} \\
+Jevons-aware demand forecasting & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} & \ding{55} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\paragraph{Contributions.}
+This paper makes the following contributions:
+\begin{enumerate}[leftmargin=*, nosep]
+    \item \textbf{The Token Budget Allocation Problem (TBAP)} with multiplicative quality and additive cost, solved via log-transformation yielding a water-filling solution (\cref{sec:tbap}).
+    \item \textbf{The Model Tier Selection Problem (MTSP)} formalized as a GAP variant, with NP-hardness in general and tractability by enumeration for practical instance sizes (\cref{sec:mtsp}).
+    \item \textbf{Dual-regime queueing economics} (interactive versus autonomous) with the M/M/1 optimal service rate determining model selection (\cref{sec:queueing}).
+    \item \textbf{Formal Jevons paradox for token markets}, proving that cost optimization becomes more necessary as prices fall (\cref{sec:jevons}).
+    \item \textbf{The CVIH metric} and its optimization properties, including quasi-concavity and the result that the CVIH-optimal budget lies strictly below the quality optimum (\cref{sec:cvih}).
+    \item \textbf{Seven design principles} derived from the formal results, each grounded in a theorem or empirical calibration (\cref{sec:principles}).
+    \item \textbf{Empirical calibration} from April 2026 pricing data across Anthropic, OpenAI, and Google, with caching parameters and developer time estimates (\cref{sec:calibration}).
+\end{enumerate}
+
+\paragraph{Scope and novelty.}
+We make no claim to inventing portfolio theory, queueing theory, or the Jevons paradox. Our contribution lies in the application and synthesis: showing that the specific structure of AI coding agent pipelines (multiplicative quality, additive cost, dual operating regimes, extreme price dynamics) creates a distinctive optimization landscape that existing frameworks do not directly address. The formal results in \cref{sec:tbap,sec:cvih} are, to our knowledge, novel in this application domain. The empirical models in \cref{sec:calibration} are precisely that: empirical, calibrated against current data, and subject to revision as the market evolves.
+
+
+% ================================================================
+% SECTION 2: PRELIMINARIES AND DEFINITIONS
+% ================================================================
+\section{Preliminaries and Definitions}\label{sec:prelim}
+
+\subsection{Pipeline Model}
+
+We model an AI coding agent harness as a pipeline of $K$ stages, indexed $k \in \{1, \ldots, K\}$. Each stage $k$ receives a token allocation $r_k \geq 0$, uses a model with per-token price $p_k > 0$, and produces output of quality $q_k(r_k) \in [0, 1]$.
+
+\begin{definition}[Pipeline]\label{def:pipeline}
+A \emph{pipeline} is a tuple $\Pi = (K, \mathbf{r}, \mathbf{p}, \mathbf{q})$ where:
+\begin{itemize}[nosep]
+    \item $K \in \mathbb{N}$ is the number of stages,
+    \item $\mathbf{r} = (r_1, \ldots, r_K) \in \mathbb{R}_{\geq 0}^K$ is the token allocation vector,
+    \item $\mathbf{p} = (p_1, \ldots, p_K) \in \mathbb{R}_{> 0}^K$ is the price vector,
+    \item $\mathbf{q} = (q_1, \ldots, q_K)$ is the quality function vector.
+\end{itemize}
+\end{definition}
+
+In practice, $K$ ranges from 4 to 8 for typical harnesses, and each $r_k$ represents thousands to hundreds of thousands of tokens.
+
+\subsection{Quality Function Axioms}
+
+We require quality functions to satisfy the following axioms, which codify empirically observed behavior of LLM performance as a function of token budget.
+
+\begin{definition}[Quality function axioms]\label{def:quality-axioms}
+A function $q: \mathbb{R}_{\geq 0} \to [0,1]$ is a \emph{quality function} if it satisfies:
+\begin{enumerate}[label=\textbf{(Q\arabic*)}, nosep]
+    \item \textbf{Boundary:} $q(0) = 0$.
+    \item \textbf{Monotonicity:} $q$ is non-decreasing.
+    \item \textbf{Boundedness:} $\lim_{r \to \infty} q(r) \leq 1$.
+    \item \textbf{Concavity:} $q$ is concave on $\mathbb{R}_{\geq 0}$.
+    \item \textbf{Differentiability:} $q$ is continuously differentiable on $\mathbb{R}_{> 0}$.
+\end{enumerate}
+\end{definition}
+
+\begin{remark}
+Axiom \textbf{(Q4)}, concavity, is the critical structural assumption. It encodes diminishing returns: the first thousand tokens of context contribute more to quality than the hundred-thousandth. Empirical evidence from \citet{gao2025context} and \citet{liu2024lost} supports this for retrieval-augmented and long-context settings. However, concavity is an idealization; real quality functions may exhibit non-monotone behavior at extreme context lengths (``context rot'', \citealp{chroma2025rot}). We address this in \cref{sec:principles} with the ``Cap the Context'' principle.
+\end{remark}
+
+\subsection{Multiplicative Quality, Additive Cost}
+
+The key structural feature of our model is the asymmetry between quality aggregation and cost aggregation.
+
+\begin{definition}[Pipeline quality and cost]\label{def:quality-cost}
+Given a pipeline $\Pi$, the \emph{aggregate quality} and \emph{aggregate cost} are:
+\begin{align}
+    Q(\mathbf{r}) &= \prod_{k=1}^{K} q_k(r_k), \label{eq:mult-quality} \\
+    C(\mathbf{r}) &= \sum_{k=1}^{K} p_k \cdot r_k. \label{eq:add-cost}
+\end{align}
+\end{definition}
+
+The multiplicative structure of \cref{eq:mult-quality} reflects a fundamental operational reality: if any single stage fails completely ($q_k = 0$), the entire pipeline output is worthless. A brilliant code generation (stage 3) is useless if the planning stage (stage 1) misidentified the task, or if the test stage (stage 4) fails to validate correctness. This is the software reliability series-system model of \citet{barlow1975}, applied to cognitive pipeline stages.
+
+The additive structure of \cref{eq:add-cost} is straightforward: token costs accumulate linearly. There are no cross-stage cost interactions (aside from caching, which we model separately in \cref{sec:caching}).
+
+This asymmetry, multiplicative quality but additive cost, is what makes the optimization problem interesting and is the source of most of our formal results.
+
+\subsection{The CVIH Metric}
+
+We now define the efficiency metric that will serve as our primary optimization objective.
+
+\begin{definition}[CVIH]\label{def:cvih}
+The \emph{cost-adjusted verified iterations per hour} (CVIH) is:
+\begin{equation}\label{eq:cvih-def}
+    \text{CVIH} = \frac{\lambda_{\text{raw}} \cdot p_{\text{verify}}}{C_{\text{total}}},
+\end{equation}
+where $\lambda_{\text{raw}}$ is the raw iteration rate (iterations per hour), $p_{\text{verify}} \in [0,1]$ is the probability that an iteration produces a verified-correct result, and $C_{\text{total}}$ is the total cost per iteration.
+\end{definition}
+
+CVIH measures \emph{verified progress per dollar-hour}. It is the natural efficiency metric for cost-constrained agentic systems: maximizing CVIH means getting the most verified work done per unit of combined time and money.
+
+\begin{remark}
+CVIH is not directly computable from first principles; it depends on empirical estimates of $\lambda_{\text{raw}}$ and $p_{\text{verify}}$, both of which are functions of the token allocation and model selection. We treat CVIH as an empirical metric that can be \emph{optimized} using the formal framework, not as a quantity that can be computed from axioms alone. This honest framing distinguishes CVIH from metrics that claim formal status while depending on unobservable quantities.
+\end{remark}
+
+
+% ================================================================
+% SECTION 3: THE TOKEN BUDGET ALLOCATION PROBLEM
+% ================================================================
+\section{The Token Budget Allocation Problem}\label{sec:tbap}
+
+\subsection{Problem Formulation}
+
+\begin{definition}[TBAP]\label{def:tbap}
+The \emph{Token Budget Allocation Problem} is:
+\begin{equation}\label{eq:tbap}
+\begin{aligned}
+    \maximize_{\mathbf{r} \in \mathbb{R}_{\geq 0}^K} \quad & Q(\mathbf{r}) = \prod_{k=1}^{K} q_k(r_k) \\
+    \text{subject to} \quad & \sum_{k=1}^{K} p_k \cdot r_k \leq B,
+\end{aligned}
+\end{equation}
+where $B > 0$ is the total budget.
+\end{definition}
+
+The TBAP asks: given a fixed token budget, how should tokens be allocated across pipeline stages to maximize the probability that the entire pipeline succeeds?
+
+\subsection{Log-Transformation}
+
+The multiplicative objective is inconvenient for direct optimization. A standard technique converts it to an additive form.
+
+\begin{proposition}[Log-transformation equivalence]\label{prop:log-transform}
+The TBAP (\cref{eq:tbap}) is equivalent to:
+\begin{equation}\label{eq:tbap-log}
+\begin{aligned}
+    \maximize_{\mathbf{r} \in \mathbb{R}_{\geq 0}^K} \quad & \sum_{k=1}^{K} \log q_k(r_k) \\
+    \text{subject to} \quad & \sum_{k=1}^{K} p_k \cdot r_k \leq B, \\
+    & r_k > 0 \quad \forall k,
+\end{aligned}
+\end{equation}
+in the sense that both problems have the same set of optimal solutions (restricting to $\mathbf{r} > \mathbf{0}$).
+\end{proposition}
+
+\begin{proof}
+Since $\log$ is strictly increasing on $(0, \infty)$, maximizing $\prod_k q_k(r_k)$ over the feasible set where all $q_k(r_k) > 0$ is equivalent to maximizing $\sum_k \log q_k(r_k)$. By axiom \textbf{(Q1)}, $q_k(0) = 0$, so the optimal solution must have $r_k > 0$ for all $k$ (otherwise $Q = 0$).
+\end{proof}
+
+\begin{proposition}[Concavity of transformed objective]\label{prop:concavity}
+Under axioms \textbf{(Q1)}--\textbf{(Q5)}, the function $f(\mathbf{r}) = \sum_{k=1}^K \log q_k(r_k)$ is concave on $\{r \in \mathbb{R}_{>0}^K\}$.
+\end{proposition}
+
+\begin{proof}
+Each $q_k$ is concave and maps into $(0,1] \subset (0, \infty)$ (axioms \textbf{Q1}--\textbf{Q4}). The function $\log$ is concave and non-decreasing on all of $(0, \infty)$. By the composition rule for concave functions \citep[Section 3.2.4]{boyd2004}, if $h$ is concave and non-decreasing and $g$ is concave, then $h \circ g$ is concave. Applying this with $h = \log$ and $g = q_k$ yields that $\log \circ\, q_k$ is concave on the domain where $q_k > 0$. Since $f$ is a sum of concave functions, it is concave.
+\end{proof}
+
+\subsection{The Equal Marginal Rate Theorem}
+
+With concavity established, the TBAP is a concave maximization problem with a linear constraint. The Karush-Kuhn-Tucker (KKT) conditions characterize its solution.
+
+\begin{theorem}[Equal Marginal Rate]\label{thm:emr}
+Let $\mathbf{r}^*$ be an optimal solution to the TBAP with $r_k^* > 0$ for all $k$. Then there exists $\lambda^* \geq 0$ such that for every stage $k$:
+\begin{equation}\label{eq:emr}
+    \frac{q_k'(r_k^*)}{q_k(r_k^*) \cdot p_k} = \lambda^*.
+\end{equation}
+That is, the \emph{marginal quality return per dollar} is equalized across all stages at optimality.
+\end{theorem}
+
+\begin{proof}
+The KKT conditions for the log-transformed problem (\cref{eq:tbap-log}) require:
+\[
+    \frac{\partial}{\partial r_k} \sum_{j=1}^K \log q_j(r_j) = \lambda^* \cdot p_k \quad \forall k,
+\]
+which gives $q_k'(r_k^*) / q_k(r_k^*) = \lambda^* p_k$. Dividing both sides by $p_k$ yields \cref{eq:emr}. Existence of $\lambda^*$ follows from the constraint qualification (Slater's condition holds since the feasible set has non-empty interior). See \cref{app:proofs} for the complete argument.
+\end{proof}
+
+\begin{theorem}[Uniqueness]\label{thm:uniqueness}
+If each $q_k$ is strictly concave on $\mathbb{R}_{>0}$, the optimal allocation $\mathbf{r}^*$ is unique.
+\end{theorem}
+
+\begin{proof}
+Strict concavity of each $q_k$ implies strict concavity of $\log q_k$ (since $\log$ is strictly concave and $q_k$ is strictly concave and positive). Therefore $f(\mathbf{r}) = \sum_k \log q_k(r_k)$ is strictly concave, and a strictly concave function on a convex set has at most one maximizer \citep{rockafellar1970}.
+\end{proof}
+
+\paragraph{Interpretation.}
+\Cref{thm:emr} is the token-economics analogue of the equal marginal utility per dollar condition from consumer theory \citep{mas-colell1995}. The ratio $q_k'(r_k^*) / (q_k(r_k^*) \cdot p_k)$ measures the percentage improvement in stage-$k$ quality per additional dollar spent. At optimality, this ratio is the same for all stages. If it were higher for some stage $j$, one could improve total quality by shifting budget from a low-ratio stage to stage $j$.
+
+\subsection{The Weakest-Link Theorem}
+
+The multiplicative structure implies a strong equalization result that goes beyond equal marginal rates.
+
+\begin{theorem}[Weakest-Link, Symmetric Case]\label{thm:weakest-link}
+In the special case where all stages have identical quality functions ($q_k = q$ for all $k$) and identical prices ($p_k = p$ for all $k$), the optimal allocation is uniform: $r_k^* = B / (Kp)$ for all $k$.
+\end{theorem}
+
+\begin{proof}
+By the EMR condition (\cref{thm:emr}), at optimality $q'(r_k^*) / (q(r_k^*) \cdot p) = \lambda^*$ for all $k$. Since $q$ is strictly concave and $p$ is identical across stages, this requires $r_k^* = r_j^*$ for all $k, j$. The budget constraint then gives $r_k^* = B/(Kp)$.
+\end{proof}
+
+The symmetric case illustrates a more general principle. For \emph{any} allocation (not necessarily optimal), the AM-GM inequality bounds the product:
+
+\begin{proposition}[AM-GM Quality Bound]\label{prop:amgm}
+For any allocation $\mathbf{r}$ with quality values $q_k(r_k)$:
+\begin{equation}\label{eq:weakest-link}
+    \prod_{k=1}^K q_k(r_k) \leq \left(\frac{1}{K} \sum_{k=1}^K q_k(r_k)\right)^K,
+\end{equation}
+with equality if and only if $q_1(r_1) = q_2(r_2) = \cdots = q_K(r_K)$.
+\end{proposition}
+
+This bound is a property of quality \emph{values}, not directly of budget allocations. It establishes that for a fixed sum of stage qualities, the product is maximized when qualities are equalized. The connection to budget allocation is mediated by the quality functions: in the symmetric case, equal budgets yield equal qualities; in the heterogeneous case, the EMR condition drives the optimizer to approximately equalize quality levels, investing more in stages with lower baseline quality. See \cref{app:proofs} for the full proof.
+
+\begin{corollary}[Raise the Floor]\label{cor:raise-floor}
+Given a current allocation $\mathbf{r}$ with $q_j(r_j) < q_k(r_k)$ for some stages $j, k$, the marginal return from increasing $r_j$ (the weaker stage) exceeds the marginal return from increasing $r_k$ (the stronger stage), provided both are in the concave region.
+\end{corollary}
+
+This is the formal basis for the ``raise the floor'' design principle: invest disproportionately in the weakest pipeline stage. A 10\% improvement in the worst stage yields a larger multiplicative quality gain than a 10\% improvement in the best stage.
+
+\subsection{The Water-Filling Analogy}
+
+The structure of the TBAP solution is identical to the classical water-filling solution for parallel Gaussian channels \citep{cover2006}. In that setting, one allocates power across channels to maximize total capacity; the optimal allocation ``fills'' channels with the lowest noise first, up to a common water level.
+
+In our setting, the ``channels'' are pipeline stages, ``power'' is token budget, and ``noise'' is the inverse of quality function responsiveness. The common ``water level'' is the Lagrange multiplier $\lambda^*$ from \cref{thm:emr}. Stages with high price $p_k$ or low responsiveness $q_k'(\cdot)$ receive less budget, analogous to noisy channels receiving less power.
+
+\subsection{Pareto Frontier Characterization}
+
+As the budget $B$ varies, the optimal quality $Q^*(B)$ traces out the cost-quality Pareto frontier.
+
+\begin{proposition}[Pareto frontier properties]\label{prop:pareto}
+Under axioms \textbf{(Q1)}--\textbf{(Q5)}, the function $Q^*: \mathbb{R}_{>0} \to (0,1]$ defined by $Q^*(B) = \max_{\mathbf{r}} \{Q(\mathbf{r}) : C(\mathbf{r}) \leq B\}$ satisfies:
+\begin{enumerate}[nosep]
+    \item $Q^*$ is non-decreasing in $B$.
+    \item $\log Q^*$ is concave in $B$ (i.e., $Q^*$ is log-concave).
+    \item The slope of the Pareto frontier at budget $B$ equals the optimal Lagrange multiplier: $\frac{d}{dB}\log Q^*(B) = \lambda^*(B)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+Property (1) follows from feasibility: increasing $B$ enlarges the feasible set. Property (2) follows from the concavity of the log-transformed objective in $\mathbf{r}$ and the convexity of the feasible set in $B$ (see \cref{app:proofs}). Property (3) is the envelope theorem applied to the parametric optimization problem.
+\end{proof}
+
+
+% ================================================================
+% SECTION 4: MODEL TIER SELECTION AND JOINT OPTIMIZATION
+% ================================================================
+\section{Model Tier Selection and Joint Optimization}\label{sec:mtsp}
+
+\subsection{The Model Tier Selection Problem}
+
+In practice, the price $p_k$ is not fixed for each stage; it depends on which model is assigned to that stage. Let $\mathcal{M} = \{m_1, \ldots, m_M\}$ be a set of available models, each with price $p^{(i)}$ and a stage-specific capability modifier $\gamma_k^{(i)} \in [0,1]$ that scales the quality function: if model $i$ is assigned to stage $k$, then $q_k^{(i)}(r) = \gamma_k^{(i)} \cdot q_k(r)$.
+
+\begin{definition}[MTSP]\label{def:mtsp}
+The \emph{Model Tier Selection Problem} is:
+\begin{equation}\label{eq:mtsp}
+\begin{aligned}
+    \minimize_{\sigma: [K] \to [M]} \quad & \sum_{k=1}^{K} p^{(\sigma(k))} \cdot r_k \\
+    \text{subject to} \quad & \gamma_k^{(\sigma(k))} \geq \gamma_k^{\min} \quad \forall k, \\
+    & \prod_{k=1}^{K} \gamma_k^{(\sigma(k))} \cdot q_k(r_k) \geq Q_{\min},
+\end{aligned}
+\end{equation}
+where $\sigma$ is the model assignment function, $\gamma_k^{\min}$ is the minimum capability required at stage $k$, and $Q_{\min}$ is the minimum acceptable pipeline quality.
+\end{definition}
+
+\subsection{Relationship to GAP}
+
+The MTSP is a variant of the Generalized Assignment Problem (GAP), in which items (stages) must be assigned to bins (models) subject to capacity and quality constraints \citep{chekuri2005}. The GAP is NP-hard in general, but admits polynomial-time approximation schemes for fixed numbers of bins.
+
+\begin{proposition}[NP-hardness]\label{prop:np-hard}
+The MTSP is NP-hard in general (when $M$ and $K$ are both part of the input).
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+We reduce from the 0-1 knapsack problem. Given a knapsack instance with $n$ items (weights $w_i$, values $v_i$) and capacity $W$, construct an MTSP instance with $K = n$ stages and $M = 2$ models. Model 1 has cost $p^{(1)} = 0$ and quality modifier $\gamma_k^{(1)} = 1$ for all stages; model 2 has cost $p^{(2)} = 1$ and quality modifier $\gamma_k^{(2)} = e^{v_k}$. Set token demands $r_k = w_k$, budget $B = W$, and quality floor $Q_{\min} = e^{V}$ where $V$ is the required total value. An assignment $\sigma$ maps each stage to model 1 (``exclude item'') or model 2 (``include item''). The cost $\sum_{k: \sigma(k)=2} w_k \leq W$ encodes the weight constraint; the quality $\prod_k \gamma_k^{(\sigma(k))} = e^{\sum_{k: \sigma(k)=2} v_k} \geq e^V$ encodes the value constraint. Since 0-1 knapsack is NP-hard, so is MTSP.
+\end{proof}
+
+\begin{proposition}[Practical tractability]\label{prop:tractable}
+For fixed $M$ (number of model tiers), the MTSP is solvable in $O(M^K)$ time by enumeration. For typical values ($M \in \{3, 4, 5\}$ and $K \in \{5, 6, 7, 8\}$), this yields at most $5^8 = 390{,}625$ candidate assignments, which is tractable.
+\end{proposition}
+
+\begin{proof}
+The assignment function $\sigma: [K] \to [M]$ has $M^K$ possible values. Each can be checked against the constraints in $O(K)$ time. For the stated parameter ranges, $M^K \leq 5^8 = 390{,}625$.
+\end{proof}
+
+\subsection{Joint Allocation-Selection Problem}
+
+The full optimization problem combines TBAP and MTSP.
+
+\begin{definition}[JASP]\label{def:jasp}
+The \emph{Joint Allocation-Selection Problem} is:
+\begin{equation}\label{eq:jasp}
+\begin{aligned}
+    \maximize_{\sigma, \mathbf{r}} \quad & \prod_{k=1}^{K} \gamma_k^{(\sigma(k))} \cdot q_k(r_k) \\
+    \text{subject to} \quad & \sum_{k=1}^{K} p^{(\sigma(k))} \cdot r_k \leq B, \\
+    & \gamma_k^{(\sigma(k))} \geq \gamma_k^{\min} \quad \forall k.
+\end{aligned}
+\end{equation}
+\end{definition}
+
+The JASP decomposes naturally: for each candidate assignment $\sigma$, the inner problem (optimizing $\mathbf{r}$ given $\sigma$) is a TBAP instance, which is convex and efficiently solvable. The outer problem enumerates over at most $M^K$ assignments.
+
+\paragraph{Worked example.}
+Consider 3 model tiers and 6 stages. The frontier model (Tier~1) costs \$15/Mtok with $\gamma = 1.0$; the mid-tier (Tier~2) costs \$3/Mtok with $\gamma \in [0.7, 0.95]$ depending on stage; the economy tier (Tier~3) costs \$0.25/Mtok with $\gamma \in [0.4, 0.8]$. With $3^6 = 729$ candidate assignments, each requiring a convex optimization over 6 variables, the full JASP solves in under one second on commodity hardware. The optimal assignment typically places the frontier model on the most quality-sensitive stages (planning, code generation) while routing less sensitive stages (formatting, simple retrieval) to economy tiers, achieving 70--85\% of the all-frontier quality at 20--35\% of the cost.
+
+
+% ================================================================
+% SECTION 5: QUEUEING ECONOMICS
+% ================================================================
+\section{Queueing Economics of Developer Waiting Time}\label{sec:queueing}
+
+\subsection{The Dual-Regime Cost Function}
+
+AI coding agents operate in two fundamentally different regimes:
+\begin{itemize}[nosep]
+    \item \textbf{Interactive regime:} The developer waits for each response, maintaining a conversational loop. Latency directly impacts flow state and productivity.
+    \item \textbf{Autonomous regime:} The agent runs independently (background execution, batch processing). Latency matters only at the granularity of task completion, not individual responses.
+\end{itemize}
+
+These regimes have different cost structures. In the interactive regime, developer waiting time has high opportunity cost; in the autonomous regime, it has near-zero opportunity cost (the developer works on other tasks). This duality has profound implications for model selection.
+
+\begin{definition}[Effective cost]\label{def:effective-cost}
+The \emph{effective cost per token} in regime $\mathcal{R}$ is:
+\begin{equation}\label{eq:effective-cost}
+    p_{\text{eff}}^{(\mathcal{R})} = p_m + \frac{c_w^{(\mathcal{R})}}{s_m},
+\end{equation}
+where $p_m$ is the per-token price of model $m$, $c_w^{(\mathcal{R})}$ is the cost of developer waiting time per unit time in regime $\mathcal{R}$, and $s_m$ is the throughput of model $m$ (tokens per unit time).
+\end{definition}
+
+In the interactive regime, $c_w^{(\text{int})}$ equals the developer's fully loaded hourly rate (\$90--\$200/hr). In the autonomous regime, $c_w^{(\text{auto})} \approx 0$ since the developer is productive elsewhere.
+
+\subsection{M/M/1 Optimal Service Rate}
+
+We model the interactive regime as an M/M/1 queue with arrival rate $\lambda$ (developer requests per unit time) and service rate $\mu$ (model response rate), following \citet{kleinrock1975}.
+
+\begin{proposition}[Optimal service rate]\label{prop:optimal-mu}
+In the M/M/1 model with waiting cost $c_w$ per unit time and service cost $c_s$ per unit service rate, the optimal service rate is:
+\begin{equation}\label{eq:optimal-mu}
+    \mu^* = \lambda + \sqrt{\frac{c_w \cdot \lambda}{c_s}}.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+The expected waiting time in an M/M/1 queue is $W = 1/(\mu - \lambda)$ \citep{kleinrock1975}. The total cost rate is $c_w \cdot \lambda \cdot W + c_s \cdot \mu = c_w \lambda / (\mu - \lambda) + c_s \mu$. Taking the derivative with respect to $\mu$, setting it to zero, and solving yields \cref{eq:optimal-mu}. The second-order condition confirms this is a minimum.
+\end{proof}
+
+\paragraph{Interpretation.}
+The optimal service rate exceeds the arrival rate by $\sqrt{c_w \lambda / c_s}$. When developer time is expensive ($c_w$ large) or request volume is high ($\lambda$ large), one should invest in faster (more expensive) models. When service cost is high ($c_s$ large), one should tolerate more waiting.
+
+\subsection{The $c\mu$ Priority Rule}
+
+For mixed workloads containing both interactive and autonomous tasks, the classical $c\mu$ rule \citep{vanmieghem1995} dictates priority ordering:
+
+\begin{proposition}[$c\mu$ rule for mixed workloads]\label{prop:cmu}
+In a single-server system with multiple task classes, the policy that minimizes total weighted waiting cost processes tasks in decreasing order of $c_j \mu_j$, where $c_j$ is the per-unit-time waiting cost of class $j$ and $\mu_j$ is the service rate for class $j$.
+\end{proposition}
+
+For AI coding agents, this implies interactive tasks (high $c_j$) should always be prioritized over autonomous tasks (low $c_j$), and within each regime, tasks with faster expected completion should be prioritized.
+
+\subsection{The Flow-State Step Function}
+
+Empirical research on interruption costs suggests that developer context-switching cost is not a smooth function of waiting time but rather a step function with a critical threshold.
+
+\citet{mark2008interrupted} found that interrupted knowledge workers take approximately 23 minutes to return to their original task context. \citet{leroy2009} identified ``attention residue,'' where performance on the new task suffers because attention remains partially focused on the prior task.
+
+For AI coding agents, we model the flow-state cost as:
+\begin{equation}\label{eq:flow-state}
+    c_{\text{flow}}(w) = \begin{cases}
+        0 & \text{if } w < w_{\text{thresh}}, \\
+        c_{\text{switch}} & \text{if } w \geq w_{\text{thresh}},
+    \end{cases}
+\end{equation}
+where $w$ is the waiting time per interaction, $w_{\text{thresh}} \approx 120$--$180$ seconds (based on empirical observation), and $c_{\text{switch}}$ is the context-switching cost (estimated at 15--30 minutes of reduced productivity, or \$25--\$100 at loaded developer rates).
+
+This step-function structure implies a clear model selection criterion for the interactive regime: choose the cheapest model whose response time is below $w_{\text{thresh}}$.
+
+\subsection{Regime-Optimal Model Selection}
+
+Combining the effective cost (\cref{def:effective-cost}) with the flow-state step function (\cref{eq:flow-state}):
+
+\begin{itemize}[nosep]
+    \item \textbf{Interactive regime:} Select the cheapest model $m$ such that expected response time $\mathbb{E}[T_m] < w_{\text{thresh}}$. The effective cost is dominated by $c_w / s_m$.
+    \item \textbf{Autonomous regime:} Select the model $m$ that minimizes $p_m / \gamma_m$ (cost per unit capability). The waiting cost term vanishes.
+\end{itemize}
+
+In practice, this often means using a faster, mid-tier model for interactive work and a slower, frontier model for autonomous batch processing, the opposite of the naive ``use the best model for everything'' strategy.
+
+
+% ================================================================
+% SECTION 6: THE JEVONS PARADOX
+% ================================================================
+\section{The Jevons Paradox for Token Economics}\label{sec:jevons}
+
+\subsection{Formal Setup}
+
+The Jevons paradox \citep{jevons1865} states that improvements in efficiency of resource use tend to \emph{increase} rather than decrease total resource consumption, because lower per-unit costs stimulate demand expansion. We formalize this for token markets.
+
+Let $p$ denote the per-token price, $D(p)$ the aggregate demand (tokens consumed), and $S(p) = p \cdot D(p)$ the total spend.
+
+\begin{definition}[Price elasticity of demand]\label{def:elasticity}
+The \emph{price elasticity of demand} is:
+\begin{equation}\label{eq:elasticity}
+    \epsilon = -\frac{p}{D(p)} \cdot \frac{dD}{dp}.
+\end{equation}
+\end{definition}
+
+\begin{theorem}[Jevons condition]\label{thm:jevons}
+Total spend $S(p) = p \cdot D(p)$ increases when price $p$ decreases if and only if $\epsilon > 1$. That is:
+\begin{equation}\label{eq:jevons-condition}
+    \frac{dS}{dp} < 0 \iff \epsilon > 1.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+\[
+    \frac{dS}{dp} = D(p) + p \cdot D'(p) = D(p)\left(1 + \frac{p \cdot D'(p)}{D(p)}\right) = D(p)(1 - \epsilon).
+\]
+Since $D(p) > 0$, we have $dS/dp < 0$ if and only if $1 - \epsilon < 0$, i.e., $\epsilon > 1$.
+\end{proof}
+
+\subsection{Elasticity Estimation}
+
+Estimating $\epsilon$ for token markets requires aggregate data on price and consumption changes. From publicly available data (April 2023 to April 2026):
+\begin{itemize}[nosep]
+    \item Frontier model input prices fell from approximately \$30/Mtok to approximately \$3/Mtok (a roughly 10$\times$ reduction; with caching, the effective reduction is closer to 50$\times$).
+    \item Aggregate token consumption grew by an estimated 100--500$\times$ (based on provider capacity reports).
+\end{itemize}
+
+Using the midpoint formula for arc elasticity over this period yields $\epsilon \approx 1.1$--$1.3$, with a point estimate of $\epsilon \approx 1.19$. This places the token market firmly in the elastic regime ($\epsilon > 1$), confirming the Jevons condition.
+
+\begin{remark}[Sensitivity and limitations of the elasticity estimate]
+This estimate has several caveats. First, the consumption growth range (100--500$\times$) spans half an order of magnitude; at the lower bound, $\epsilon \approx 1.1$, while at the upper bound, $\epsilon \approx 1.3$. Second, the estimate conflates the intensive margin (existing users consuming more tokens per task) and the extensive margin (new users and use cases entering the market). If the extensive margin dominates (as we argue in \cref{sec:jevons-demand}), the Jevons paradox applies to the \emph{market} but not necessarily to individual organizations that do not adopt new use cases. An organization with fixed workflows may have $\epsilon < 1$ even while the aggregate market has $\epsilon > 1$. Third, no confidence interval can be constructed from two aggregate data points. Despite these limitations, the qualitative conclusion ($\epsilon > 1$ for the aggregate market) is robust: the direction is unambiguous (prices fell dramatically, spending rose), and even the conservative bound ($\epsilon \approx 1.1$) exceeds unity.
+\end{remark}
+
+\subsection{Demand Decomposition}\label{sec:jevons-demand}
+
+Token demand expansion has two components:
+\begin{enumerate}[nosep]
+    \item \textbf{Intensive margin:} Existing agentic pipelines use more tokens per task (longer contexts, more iterations, higher-quality prompts). This is the direct analogue of Jevons's coal efficiency scenario.
+    \item \textbf{Extensive margin:} Falling prices make previously uneconomical use cases viable (automated code review, speculative pre-computation, parallel hypothesis testing).
+\end{enumerate}
+
+Both margins contribute to $\epsilon > 1$. The extensive margin is likely dominant in the current growth phase, as entirely new agentic workflows become cost-feasible each time prices fall by 2--3$\times$.
+
+\subsection{Implication for Cost Optimization}
+
+\begin{corollary}[Jevons imperative]\label{cor:jevons}
+When $\epsilon > 1$, falling per-token prices \emph{increase} total organizational token spend. Therefore, the value of cost optimization (measured as potential savings) grows as prices fall.
+\end{corollary}
+
+This is counterintuitive. The naive expectation is that falling prices eliminate the need for cost optimization. The Jevons paradox reverses this: falling prices stimulate demand expansion that more than offsets the per-unit savings, making budget discipline and allocation optimization more valuable, not less. The bandwidth market of the 2000s provides a close historical analogy: as bandwidth prices collapsed, total telecom spending increased, and traffic engineering became more, not less, important \citep{sorrell2009}.
+
+
+% ================================================================
+% SECTION 7: THE CVIH METRIC AND BUDGET OPTIMALITY
+% ================================================================
+\section{The CVIH Metric and Budget Optimality}\label{sec:cvih}
+
+\subsection{CVIH as an Optimization Objective}
+
+Recall from \cref{def:cvih} that $\text{CVIH} = \lambda_{\text{raw}} \cdot p_{\text{verify}} / C_{\text{total}}$. We now study how CVIH depends on the total budget $B$ allocated to the pipeline.
+
+Both $\lambda_{\text{raw}}$ and $p_{\text{verify}}$ are functions of $B$: increasing the budget generally increases quality ($p_{\text{verify}}$ rises) but may decrease throughput ($\lambda_{\text{raw}}$ falls due to longer processing) and always increases cost ($C_{\text{total}} = B$ when the budget is fully spent). Let us define:
+\begin{equation}\label{eq:cvih-budget}
+    \text{CVIH}(B) = \frac{V(B)}{B},
+\end{equation}
+where $V(B) = \lambda_{\text{raw}}(B) \cdot p_{\text{verify}}(B)$ is the ``value function'' (verified iterations per hour as a function of budget).
+
+\begin{theorem}[CVIH tangent optimality]\label{thm:cvih-tangent}
+The budget $B^*$ that maximizes $\text{CVIH}(B) = V(B)/B$ satisfies:
+\begin{equation}\label{eq:cvih-tangent}
+    V'(B^*) = \frac{V(B^*)}{B^*},
+\end{equation}
+i.e., the marginal value equals the average value. Geometrically, this is the point where the line from the origin is tangent to the value curve $V(B)$.
+\end{theorem}
+
+\begin{proof}
+Setting $\frac{d}{dB}[V(B)/B] = 0$ gives $[V'(B) \cdot B - V(B)] / B^2 = 0$, hence $V'(B^*) = V(B^*)/B^*$.
+\end{proof}
+
+\begin{theorem}[Quasi-concavity of CVIH]\label{thm:cvih-quasi}
+If $V(B)$ is concave, continuously differentiable, $V(0) = 0$, and $V'(0) > 0$, then $\text{CVIH}(B) = V(B)/B$ is quasi-concave on $(0, \infty)$ with a unique maximizer $B^*$.
+\end{theorem}
+
+\begin{proof}
+Since $V$ is concave with $V(0) = 0$ and $V'(0) > 0$, the function $V(B)/B$ starts at $V'(0) > 0$ (by L'H\^{o}pital's rule), is continuous, and eventually decreases (since $V$ is bounded while $B \to \infty$). The ratio of a concave function to a linear function through the origin is quasi-concave \citep{boyd2004}. The unique maximizer follows from the strict concavity of $V$ implying strict quasi-concavity of the ratio.
+\end{proof}
+
+\begin{theorem}[Budget separation]\label{thm:budget-separation}
+Let $B^*_{\text{CVIH}}$ maximize CVIH. Let $B^*_Q$ denote the quality-optimal budget, defined as follows: if $Q^*(B)$ attains a finite maximum (as occurs when quality functions are non-monotone with a peak), then $B^*_Q = \arg\max_B Q^*(B)$; if $Q^*(B)$ is strictly increasing for all $B$ (as occurs for monotone quality functions with an asymptote at 1), then $B^*_Q = \infty$. In either case:
+\begin{equation}\label{eq:budget-sep}
+    B^*_{\text{CVIH}} < B^*_Q.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+\emph{Case 1: $B^*_Q < \infty$ (non-monotone quality).} At $B^*_Q$, we have $(Q^*)'(B^*_Q) = 0$. Since $V(B) = Q^*(B)$ is concave with $V'(B^*_Q) = 0$ and $V(B^*_Q) > 0$, the ratio $V(B)/B$ is strictly decreasing at $B^*_Q$ (its derivative is $(V'B - V)/B^2 = -V/B^2 < 0$). Hence $B^*_{\text{CVIH}} < B^*_Q$.
+
+\emph{Case 2: $B^*_Q = \infty$ (monotone quality with asymptote).} The function $V(B)/B$ has a finite maximizer because $V$ is bounded (by 1, since $Q^* \leq 1$) while $B \to \infty$, so $V(B)/B \to 0$. Since $V(B)/B$ starts positive and tends to zero, it must achieve its maximum at some finite $B^*_{\text{CVIH}} < \infty = B^*_Q$.
+\end{proof}
+
+\paragraph{Interpretation.}
+\Cref{thm:budget-separation} formalizes a crucial operational insight: the budget that maximizes quality is not the budget that maximizes efficiency. Spending more always (weakly) improves quality, but past $B^*_{\text{CVIH}}$, each additional dollar buys less verified output than the average dollar already spent. The CVIH-optimal budget represents the ``sweet spot'' where value per dollar is maximized.
+
+\subsection{Budget Sufficiency and Graceful Degradation}
+
+When the available budget $B_{\text{avail}}$ falls below $B^*_{\text{CVIH}}$, the system must degrade gracefully.
+
+\begin{conjecture}[Graceful degradation]\label{conj:graceful}
+Under the TBAP optimal allocation, if the budget is reduced from $B^*$ to $\alpha B^*$ (with $\alpha \in (0,1)$), the quality degrades sub-linearly in the log domain:
+\begin{equation}\label{eq:graceful}
+    \frac{\log Q^*(\alpha B^*)}{\log Q^*(B^*)} \leq \frac{1}{\alpha},
+\end{equation}
+that is, a fraction $\alpha$ of the budget retains more than a fraction $\alpha$ of the log-quality.
+\end{conjecture}
+
+\begin{remark}
+This conjecture is motivated by the concavity of $\log Q^*(B)$ (\cref{prop:pareto}), which implies that the log-quality curve bends downward: earlier dollars contribute more than later dollars. We have verified this numerically for exponential saturation quality functions, where a 50\% budget cut ($\alpha = 0.5$) retains 65--80\% of the log-quality depending on the number of stages and saturation rate. A formal proof would require bounding the curvature of $\log Q^*$ from below, which depends on the specific quality function family. We leave this as an open problem.
+\end{remark}
+
+
+% ================================================================
+% SECTION 8: CACHING ECONOMICS
+% ================================================================
+\section{Caching Economics}\label{sec:caching}
+
+\subsection{Cache Hit Rate Model}
+
+Prompt caching is the single most impactful cost optimization available to LLM-based systems. When a prefix of the prompt matches a cached entry, the provider charges a reduced rate.
+
+\begin{definition}[Effective price with caching]\label{def:cache-price}
+The effective per-token price at stage $k$ with caching is:
+\begin{equation}\label{eq:cache-price}
+    p_k^{\text{eff}} = p_k \cdot \left(1 - \rho_k + \rho_k \cdot \delta_k\right),
+\end{equation}
+where $\rho_k \in [0,1]$ is the cache hit rate at stage $k$ and $\delta_k \in (0,1)$ is the cache discount factor (the fraction of the full price charged for cached tokens).
+\end{definition}
+
+For example, with $\rho_k = 0.92$ (92\% cache hit rate) and $\delta_k = 0.10$ (90\% discount on cached tokens), the effective price is $p_k^{\text{eff}} = p_k \cdot (1 - 0.92 + 0.92 \times 0.10) = p_k \cdot 0.172$, an 82.8\% cost reduction.
+
+\subsection{Empirical Caching Data}
+
+Recent empirical data confirms the magnitude of caching benefits:
+\begin{itemize}[nosep]
+    \item \textbf{Claude Code (Anthropic):} Reports 90--95\% prompt cache hit rates in typical agentic coding sessions, with an effective cost reduction of approximately 81\% \citep{anthropic2026coding}.
+    \item \textbf{Cross-provider analysis:} \citet{liang2026cache} document 41--80\% cost reductions across providers using prompt-aware caching strategies.
+    \item \textbf{Agentic plan caching:} \citet{zhang2025plancache} demonstrate a complementary approach, caching not just prompt prefixes but entire plan structures, achieving approximately 50\% cost reduction and 27\% latency reduction for recurring task patterns.
+\end{itemize}
+
+\subsection{The Cache-First Principle}
+
+\begin{proposition}[Cache-First principle]\label{thm:cache-first}
+Under current LLM provider implementations (where cached tokens produce identical model computation to uncached tokens), caching reduces cost with zero quality impact. Formally, increasing $\rho_k$ reduces $p_k^{\emph{eff}}$ without affecting $q_k(r_k)$, since the cached tokens deliver identical model behavior. All other cost levers (reducing $r_k$, switching to a cheaper model, compressing prompts) reduce $q_k$ along with cost.
+\end{proposition}
+
+\begin{remark}
+The Cache-First principle is an empirical property of current provider implementations, not a mathematical necessity. If a provider implemented approximate caching with lossy compression, cached tokens could produce different behavior, and the zero-quality-impact property would no longer hold. Under the current exact-caching paradigm, the principle follows directly: $q_k(r_k)$ is invariant to $\rho_k$, while $C(\mathbf{r}) = \sum_k p_k^{\text{eff}} r_k$ is strictly decreasing in $\rho_k$ for $\delta_k < 1$.
+\end{remark}
+
+\begin{corollary}\label{cor:cache-first}
+The Cache-First principle implies a strict ordering of cost optimization activities: maximize cache hit rates before pursuing any optimization that trades quality for cost.
+\end{corollary}
+
+
+% ================================================================
+% SECTION 9: DESIGN PRINCIPLES
+% ================================================================
+\section{Design Principles}\label{sec:principles}
+
+We now distill the formal results into seven actionable design principles for economics-aware harness architecture. Each principle is grounded in a theorem or empirical result from the preceding sections.
+
+\subsection{Principle 1: Equal Marginal Rate}
+
+\textbf{Statement:} Equalize the marginal quality-per-dollar across all pipeline stages.
+
+\textbf{Basis:} \Cref{thm:emr} (Equal Marginal Rate theorem).
+
+\textbf{Implementation:} Monitor $q_k'(r_k) / (q_k(r_k) \cdot p_k)$ for each stage. If this ratio is significantly higher for some stage $j$ than for stage $k$, shift budget from $k$ to $j$. In practice, this means: do not over-invest in code generation while starving the planning or testing stages.
+
+\subsection{Principle 2: Raise the Floor}
+
+\textbf{Statement:} Invest disproportionately in the weakest pipeline stage.
+
+\textbf{Basis:} \Cref{thm:weakest-link} (Weakest-Link theorem) and \cref{cor:raise-floor}.
+
+\textbf{Implementation:} Identify the stage with the lowest $q_k(r_k)$ and prioritize budget increases there. A pipeline with qualities $(0.95, 0.92, 0.88, 0.60, 0.93, 0.91)$ has aggregate quality $Q = 0.382$. Improving the weakest stage (0.60) to 0.80 yields $Q = 0.509$, a 33\% improvement. Improving the best stage (0.95) to 0.99 yields $Q = 0.398$, only a 4\% improvement.
+
+\subsection{Principle 3: Cap the Context}
+
+\textbf{Statement:} Set a maximum useful token budget per stage, beyond which additional tokens may harm quality.
+
+\textbf{Basis:} Empirical evidence from \citet{gao2025context} and \citet{liu2024lost} showing that LLM performance degrades with excessive context length (``lost in the middle'' and ``context rot'' effects; \citealp{chroma2025rot}).
+
+\textbf{Implementation:} For each stage, establish an empirical ceiling $r_k^{\max}$ beyond which quality is non-monotone. Enforce $r_k \leq r_k^{\max}$ as a hard constraint in the TBAP. This modifies axiom \textbf{(Q2)} for practical use: quality is monotone only up to $r_k^{\max}$.
+
+\subsection{Principle 4: Detect the Regime}
+
+\textbf{Statement:} Use different models for interactive and autonomous workloads.
+
+\textbf{Basis:} The dual-regime cost function (\cref{sec:queueing}) and the regime-optimal model selection result.
+
+\textbf{Implementation:} Classify each task as interactive or autonomous. For interactive tasks, select the cheapest model with response time below the flow-state threshold ($w_{\text{thresh}} \approx 120$--$180$ seconds). For autonomous tasks, select the model with the best cost-per-quality ratio regardless of latency.
+
+\subsection{Principle 5: Cache First}
+
+\textbf{Statement:} Maximize cache hit rates before pursuing any cost optimization that trades quality for cost.
+
+\textbf{Basis:} \Cref{thm:cache-first} (Cache-First principle).
+
+\textbf{Implementation:} Structure prompts with stable prefixes to maximize prompt cache hit rates. Implement plan-level caching for recurring task patterns \citep{zhang2025plancache}. Design harness data flow to preserve cacheable segments across iterations.
+
+\subsection{Principle 6: Route by Economics}
+
+\textbf{Statement:} Model selection should be driven by cost-effectiveness, not capability alone.
+
+\textbf{Basis:} The JASP (\cref{def:jasp}) and the worked example in \cref{sec:mtsp}.
+
+\textbf{Implementation:} Maintain a cost-capability matrix for available models. For each stage, select the model that minimizes cost subject to the minimum capability threshold. This often means using cheaper models for stages where the frontier model provides little incremental quality (formatting, simple retrieval, boilerplate generation).
+
+\subsection{Principle 7: Budget for Jevons}
+
+\textbf{Statement:} Expect total token spend to increase when per-token prices fall; plan accordingly.
+
+\textbf{Basis:} \Cref{thm:jevons} and \cref{cor:jevons} (Jevons paradox).
+
+\textbf{Implementation:} When projecting token budgets, do not assume that falling prices will reduce costs. Model demand expansion at both the intensive margin (more tokens per task) and the extensive margin (new use cases becoming viable). Budget forecasts should include an elasticity multiplier: if prices fall by factor $x$, expect spend to change by factor $x^{1-\epsilon}$ (which increases for $\epsilon > 1$).
+
+
+% ================================================================
+% SECTION 10: EMPIRICAL CALIBRATION
+% ================================================================
+\section{Empirical Calibration}\label{sec:calibration}
+
+The formal results in \cref{sec:tbap,sec:mtsp,sec:queueing,sec:jevons,sec:cvih} require empirical parameterization. This section provides calibration data from April 2026.
+
+\subsection{Quality Function Families}
+
+Two parametric families fit observed LLM quality-vs-token curves:
+
+\paragraph{Exponential saturation.}
+\begin{equation}\label{eq:exp-sat}
+    q(r) = 1 - \exp(-\alpha r),
+\end{equation}
+where $\alpha > 0$ controls the rate of quality improvement. This satisfies all five axioms \textbf{(Q1)}--\textbf{(Q5)}. Typical values: $\alpha \in [0.5 \times 10^{-4}, 5 \times 10^{-4}]$ when $r$ is measured in tokens.
+
+\paragraph{Hill function.}
+\begin{equation}\label{eq:hill}
+    q(r) = \frac{r^n}{r^n + K_d^n},
+\end{equation}
+where $n > 0$ is the Hill coefficient and $K_d > 0$ is the half-saturation constant. For $n \leq 1$, this is concave. The Hill function better captures the empirical observation that very small token allocations produce near-zero quality (sharper threshold than exponential).
+
+Both families are empirical approximations. The true quality-vs-token relationship depends on model architecture, task type, prompt structure, and many other factors. We recommend fitting parameters per-stage from logged pipeline data rather than assuming universal constants.
+
+\subsection{Token Pricing Data (April 2026)}
+
+\begin{table}[t]
+\centering
+\caption{Selected model pricing, April 2026 (per million tokens). Prices are approximate and subject to change. Cache discount is the fraction of full price charged for cached tokens.}
+\label{tab:pricing}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Provider} & \textbf{Model} & \textbf{Input (\$/Mtok)} & \textbf{Output (\$/Mtok)} & \textbf{Cache Discount} \\
+\midrule
+Anthropic & Claude Opus 4 & 15.00 & 75.00 & 0.10 \\
+Anthropic & Claude Sonnet 4 & 3.00 & 15.00 & 0.10 \\
+Anthropic & Claude Haiku 3.5 & 0.80 & 4.00 & 0.10 \\
+\midrule
+OpenAI & GPT-4.1 & 2.00 & 8.00 & 0.50 \\
+OpenAI & GPT-4.1 mini & 0.40 & 1.60 & 0.50 \\
+OpenAI & GPT-4.1 nano & 0.10 & 0.40 & 0.50 \\
+OpenAI & o3 & 10.00 & 40.00 & -- \\
+\midrule
+Google & Gemini 2.5 Pro & 1.25 & 10.00 & 0.25 \\
+Google & Gemini 2.5 Flash & 0.15 & 0.60 & 0.25 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+Key observations from \cref{tab:pricing}:
+\begin{itemize}[nosep]
+    \item The price spread from cheapest to most expensive input pricing is approximately 150$\times$ (GPT-4.1 nano at \$0.10/Mtok versus Claude Opus 4 at \$15.00/Mtok).
+    \item Cache discounts vary significantly: Anthropic offers 90\% off for cached tokens, OpenAI 50\%, Google 75\%.
+    \item The three-year trend (April 2023 to April 2026) shows approximately 300$\times$ reduction in effective cost at the frontier tier when caching is included.
+\end{itemize}
+
+\subsection{Caching Parameters}
+
+Empirical caching parameters for agentic coding workflows:
+\begin{itemize}[nosep]
+    \item \textbf{Prompt cache hit rate:} 85--95\% for iterative coding sessions with stable system prompts and tool definitions \citep{anthropic2026coding, liang2026cache}.
+    \item \textbf{Plan cache hit rate:} 40--70\% for recurring task patterns (e.g., ``add a REST endpoint,'' ``write unit tests for module X'') \citep{zhang2025plancache}.
+    \item \textbf{Effective cost reduction:} 60--85\% when prompt caching and plan caching are combined.
+\end{itemize}
+
+\subsection{Developer Time Data}
+
+For the queueing economics of \cref{sec:queueing}:
+\begin{itemize}[nosep]
+    \item \textbf{Fully loaded developer cost:} \$90--\$200/hr (including salary, benefits, overhead, tooling). The range reflects variation across markets, seniority levels, and organizational overhead factors.
+    \item \textbf{Flow-state threshold:} 120--180 seconds. Responses faster than this allow the developer to maintain focus; slower responses trigger context-switching \citep{mark2008interrupted, leroy2009}.
+    \item \textbf{Context-switching cost:} 15--30 minutes of reduced productivity per interruption \citep{mark2008interrupted}.
+\end{itemize}
+
+\subsection{The Calibration Protocol}
+
+We recommend the following protocol for calibrating the economics architecture:
+\begin{enumerate}[nosep]
+    \item \textbf{Measure:} Instrument the pipeline to log per-stage token consumption, latency, quality proxies (test pass rate, review acceptance rate), and cache hit rates.
+    \item \textbf{Fit:} Estimate quality function parameters ($\alpha$, $K_d$, $n$) per stage from logged data using maximum likelihood or method of moments.
+    \item \textbf{Optimize:} Solve the JASP (\cref{def:jasp}) using fitted parameters and current pricing data.
+    \item \textbf{Verify:} Run A/B tests comparing the optimized allocation against the current allocation. Measure CVIH improvement.
+    \item \textbf{Repeat:} Re-calibrate monthly or when pricing changes by more than 20\%.
+\end{enumerate}
+
+
+% ================================================================
+% SECTION 11: RELATED WORK
+% ================================================================
+\section{Related Work}\label{sec:related}
+
+\paragraph{Model routing and cost optimization.}
+\citet{chen2023frugalgpt} introduced the idea of LLM cascades, where queries are routed to increasingly expensive models only when cheaper models fail, achieving up to 98\% cost savings with minimal quality loss. \citet{madaan2024automix} extended this to automatic mixing of language models based on query complexity, learning routing policies from preference data. \citet{ong2024routellm} formalized the routing problem and proposed learned preference-based routers that achieve cost-quality Pareto improvements. Our work differs in scope: these systems optimize per-query model selection, while we optimize per-stage allocation within a multi-stage pipeline, addressing the joint allocation-selection problem.
+
+\paragraph{Prompt and plan caching.}
+\citet{liang2026cache} provided the first systematic study of prompt-aware caching strategies across LLM providers, documenting 41--80\% cost reductions and identifying cache-friendly prompt design patterns. \citet{zhang2025plancache} introduced plan-level caching for agentic workflows, caching not just prompts but entire reasoning plans, achieving 50\% cost and 27\% latency reductions. Our Cache-First principle (\cref{thm:cache-first}) provides the formal justification for prioritizing these optimizations.
+
+\paragraph{Context length and quality.}
+\citet{gao2025context} demonstrated that increasing context length alone does not improve code agent performance and can actively hurt it, contradicting the assumption that more context is always better. \citet{liu2024lost} identified the ``lost in the middle'' phenomenon where LLMs underutilize information placed in the middle of long contexts. \citet{chroma2025rot} documented ``context rot,'' where agent performance degrades systematically with context accumulation over long sessions. These findings motivate our ``Cap the Context'' principle and the non-trivial shape of empirical quality functions.
+
+\paragraph{Classical economics and optimization.}
+The TBAP draws on portfolio theory \citep{markowitz1952} (optimal allocation across assets with different risk-return profiles), the Kelly criterion \citep{kelly1956} (optimal bet sizing under multiplicative returns), and the water-filling solution from information theory \citep{cover2006}. The queueing analysis builds on \citet{kleinrock1975, kleinrock1976} and the Erlang loss model \citep{erlang1917}. The Jevons paradox formalization follows \citet{jevons1865} with modern treatment from \citet{sorrell2009} and \citet{alcott2005}.
+
+\paragraph{Value of information.}
+\citet{howard1966} formalized the value of information in decision theory, and \citet{blackwell1953} established the comparison of experiments framework. Our CVIH metric can be viewed as an operational instantiation of the value-of-information concept, where each pipeline stage's token allocation represents an ``experiment'' whose output informs subsequent stages.
+
+\paragraph{Submodular optimization.}
+The multiplicative quality structure connects to submodular function maximization \citep{nemhauser1978, krause2014, buchbinder2015, feige2011}, though our specific structure (product of concave functions subject to a linear constraint) is more tractable than the general submodular case. \citet{sviridenko2004} provides relevant approximation results for submodular maximization under knapsack constraints.
+
+\paragraph{Developer productivity and AI tools.}
+\citet{peng2023impact} measured the productivity impact of GitHub Copilot, finding 55\% faster task completion. \citet{metr2025} studied early-2025 AI tool impact on developer productivity in realistic settings. These studies provide context for the developer time parameters in our queueing model but do not address the economics architecture of the tools themselves.
+
+\paragraph{Behavioral economics.}
+\citet{kahneman1979} and \citet{thaler1999} established that economic agents exhibit systematic biases (loss aversion, mental accounting) that deviate from rational optimization. While our formal framework assumes rational optimization, we acknowledge in \cref{sec:limitations} that behavioral factors (e.g., sunk cost bias leading to over-investment in failing pipelines, mental accounting of ``AI budget'' as separate from ``infrastructure budget'') may distort real-world adoption of these principles.
+
+
+% ================================================================
+% SECTION 12: CONTRARIAN POSITIONS
+% ================================================================
+\section{Contrarian Positions}\label{sec:contrarian}
+
+We engage four common objections to economics-focused harness design, evaluating each on a 5-point strength scale.
+
+\subsection{``Quality Over Cost''}
+
+\textbf{Claim:} Always use the best available model; cost optimization compromises output quality.
+
+\textbf{Strength:} 5/5 for safety-critical applications (medical, financial, security-sensitive code); 3/5 for general software engineering.
+
+\textbf{Evidence:} The claim is strongest where errors have catastrophic consequences. For security-sensitive code, \citet{ibmponemon2025} estimates the average cost of a data breach at \$4.5M, dwarfing any token cost savings. However, for the median coding task (refactoring, feature implementation, test writing), the quality gap between frontier and mid-tier models is narrowing. SWE-bench data shows that mid-tier models achieve 70--85\% of frontier pass rates at 10--20\% of the cost \citep{jetbrains2025}.
+
+\textbf{Resolution:} Tiered quality. Use the JASP (\cref{def:jasp}) with stage-specific capability thresholds: frontier models for security-critical stages, mid-tier for the rest. This is not ``quality over cost'' or ``cost over quality'' but rather ``appropriate quality at appropriate cost.''
+
+\subsection{``Falling Prices Make Optimization Unnecessary''}
+
+\textbf{Claim:} Token prices are falling so fast that cost optimization is a wasted effort; just wait six months.
+
+\textbf{Strength:} 2/5.
+
+\textbf{Evidence:} While prices have indeed fallen approximately 300$\times$ in three years, the Jevons paradox (\cref{thm:jevons}) with estimated $\epsilon \approx 1.19$ means total spend increases as prices fall. The bandwidth market provides the closest historical analogue: per-bit costs fell by over 1000$\times$ from 1995 to 2015, yet total telecom spending increased throughout, and traffic engineering became a specialized discipline.
+
+\textbf{Resolution:} The ``falling prices'' argument confuses per-unit cost with total cost. Cost optimization addresses total cost, which is a function of both price and demand. With elastic demand ($\epsilon > 1$), falling prices make optimization more necessary, not less.
+
+\subsection{``Developer Time Dominates Token Cost''}
+
+\textbf{Claim:} Developer time is so expensive relative to token cost that optimizing token spend is not worth the engineering effort.
+
+\textbf{Strength:} 4/5 for interactive workflows (correct in the interactive regime); 1/5 for autonomous workflows (incorrect in the autonomous regime).
+
+\textbf{Evidence:} In the interactive regime, a developer earning \$150/hr who waits 30 seconds for each response incurs \$1.25 in waiting cost per interaction. At mid-tier pricing with caching (\$0.50/Mtok effective), a 50K-token interaction costs \$0.025 in token costs. Developer time dominates by 50$\times$. However, in the autonomous regime (overnight batch runs, CI/CD pipelines, parallel task execution), developer waiting cost is zero. A 100-iteration autonomous run consuming 5M tokens costs \$2.50--\$75 in tokens with no developer time cost, and at organizational scale (100 such runs per day), the annual token budget reaches \$100K--\$2.7M.
+
+\textbf{Resolution:} Regime detection (\cref{sec:queueing}). The claim is correct for interactive work, where optimizing for latency dominates optimizing for token cost. It is incorrect for autonomous work, where token cost is the only cost. A well-designed harness distinguishes the two regimes.
+
+\subsection{``Routing Complexity Outweighs Savings''}
+
+\textbf{Claim:} The engineering complexity of multi-model routing, caching optimization, and budget allocation is not worth the savings.
+
+\textbf{Strength:} 3/5 for small-scale deployments (fewer than 10 developers); 1/5 for large-scale deployments (more than 100 developers).
+
+\textbf{Evidence:} At small scale, the absolute savings from optimization may be \$500--\$2,000/month, which is less than the engineering cost of building and maintaining the optimization layer. At large scale, savings of \$20K--\$200K/month easily justify dedicated infrastructure. The FinOps survey \citep{finops2023} found that organizations spending over \$1M/year on cloud services save 20--30\% from active cost optimization, well above the cost of the optimization effort.
+
+\textbf{Resolution:} Tiered routing complexity. Small deployments should use simple rules (e.g., ``frontier model for planning, economy model for everything else''). Medium deployments should implement the JASP with periodic recalibration. Large deployments should invest in real-time optimization with continuous monitoring. The framework in this paper supports all three tiers.
+
+
+% ================================================================
+% SECTION 13: LIMITATIONS
+% ================================================================
+\section{Limitations}\label{sec:limitations}
+
+\paragraph{Quality function estimation.}
+The quality functions $q_k(\cdot)$ must be estimated empirically from pipeline execution data. The parametric families in \cref{sec:calibration} (exponential saturation, Hill function) are approximations; real quality functions may have non-concave regions (especially at very large or very small token counts), discontinuities (from model-specific behavior), or task-dependent shapes. Misspecification of quality functions leads to suboptimal allocation.
+
+\paragraph{Stage independence.}
+The multiplicative quality model (\cref{eq:mult-quality}) assumes that each $q_k$ depends only on its own token allocation $r_k$, not on upstream outputs. In practice, a poor planning stage (stage 1) not only reduces $q_1$ but also degrades the effective quality function $q_k(\cdot)$ for all downstream stages. A more realistic model would write $q_k(r_k, q_{k-1})$, creating a sequential dependency chain. This correlated model is substantially harder to optimize (the log-transformed objective is no longer separable). We conjecture that the EMR condition (\cref{thm:emr}) and the Weakest-Link result (\cref{thm:weakest-link}) are qualitatively robust to moderate correlations: the incentive to raise the floor on the weakest stage is amplified (not diminished) when weak stages propagate failures downstream. Formally verifying this robustness for specific correlation structures is an important direction for future work.
+
+\paragraph{Static optimization.}
+The TBAP and JASP solve a static optimization problem: given a task, allocate budget optimally before execution begins. In practice, the harness could dynamically reallocate budget during execution based on intermediate results (e.g., allocate more tokens to testing if initial tests fail). Dynamic reallocation is a richer but harder problem (stochastic dynamic programming) that we leave to future work.
+
+\paragraph{Pricing volatility.}
+The empirical calibration in \cref{sec:calibration} reflects April 2026 pricing. Model prices change frequently (new model releases, competitive pricing moves, promotional discounts). The optimization must be reparameterized whenever prices change materially, which could be monthly or even weekly.
+
+\paragraph{Behavioral factors.}
+We assume rational optimization throughout. Real decision-makers exhibit biases documented by \citet{kahneman1979} and \citet{thaler1999}: sunk cost bias (continuing to invest in a failing pipeline), mental accounting (treating ``AI budget'' differently from equivalent spending categories), and loss aversion (preferring the certainty of a high-cost, high-quality model over the uncertainty of an optimized mixed-model pipeline). These behavioral factors may impede adoption of formally optimal strategies.
+
+
+% ================================================================
+% SECTION 14: CONCLUSION
+% ================================================================
+\section{Conclusion}\label{sec:conclusion}
+
+We have presented a formal economics architecture for AI coding agent harnesses, grounded in the structural asymmetry between multiplicative quality and additive cost. The Token Budget Allocation Problem yields an Equal Marginal Rate theorem and a Weakest-Link result that together prescribe equalization of quality-per-dollar across pipeline stages. The Model Tier Selection Problem, while NP-hard in general, is tractable by enumeration for the small instance sizes encountered in practice. Queueing analysis of the dual-regime cost function (interactive versus autonomous) reveals that optimal model selection is regime-dependent, with different models preferred in each regime. The Jevons paradox, confirmed empirically for token markets ($\epsilon \approx 1.19$), implies that cost optimization becomes more valuable as prices fall. The CVIH metric provides a principled efficiency measure whose optimum lies strictly below the quality optimum, formalizing the trade-off between quality and cost-effectiveness.
+
+The seven design principles derived from these results (Equal Marginal Rate, Raise the Floor, Cap the Context, Detect the Regime, Cache First, Route by Economics, Budget for Jevons) provide actionable guidance for harness architects. The Cache-First principle is particularly significant: prompt and plan caching offer 60--85\% cost reductions with zero quality penalty, making them the unambiguous first priority for any cost optimization effort.
+
+As token prices continue to fall and agentic workflows continue to expand, the economics architecture of AI coding harnesses will become as critical as their capability architecture. The framework presented here provides the formal foundation for that economic layer.
+
+
+% ================================================================
+% APPENDICES
+% ================================================================
+\begin{appendices}
+
+\section{Proofs}\label{app:proofs}
+
+\subsection{Proof of the Equal Marginal Rate Theorem (\texorpdfstring{\cref{thm:emr}}{Theorem 3.3})}
+
+\begin{proof}
+Consider the log-transformed TBAP:
+\[
+    \maximize_{\mathbf{r} > \mathbf{0}} \sum_{k=1}^K \log q_k(r_k) \quad \text{subject to} \quad \sum_{k=1}^K p_k r_k \leq B.
+\]
+
+The Lagrangian is:
+\[
+    \mathcal{L}(\mathbf{r}, \lambda) = \sum_{k=1}^K \log q_k(r_k) - \lambda \left(\sum_{k=1}^K p_k r_k - B\right).
+\]
+
+Slater's constraint qualification holds: the point $\mathbf{r} = (B/(2Kp_k))_k$ is strictly feasible (it uses only half the budget). Therefore, by the KKT theorem \citep{boyd2004, bertsekas1999}, there exists $\lambda^* \geq 0$ such that:
+\[
+    \frac{\partial \mathcal{L}}{\partial r_k}\bigg|_{\mathbf{r}^*} = \frac{q_k'(r_k^*)}{q_k(r_k^*)} - \lambda^* p_k = 0 \quad \forall k.
+\]
+
+Rearranging:
+\[
+    \frac{q_k'(r_k^*)}{q_k(r_k^*) \cdot p_k} = \lambda^* \quad \forall k.
+\]
+
+The complementary slackness condition $\lambda^* (B - \sum_k p_k r_k^*) = 0$ implies that either $\lambda^* = 0$ (in which case each $q_k$ is individually maximized, which contradicts the budget constraint being tight for any finite $B$ when quality functions are strictly increasing) or the budget constraint is tight: $\sum_k p_k r_k^* = B$. In the non-degenerate case, $\lambda^* > 0$ and the budget is fully spent.
+
+The second-order sufficiency condition holds because $\log q_k$ is concave (\cref{prop:concavity}), ensuring $\mathbf{r}^*$ is a global maximum.
+\end{proof}
+
+\subsection{Proof of the Weakest-Link Theorem (\texorpdfstring{\cref{thm:weakest-link}}{Theorem 3.5})}
+
+\begin{proof}
+We prove the result in two steps.
+
+\textbf{Step 1: AM-GM bound.} By the inequality of arithmetic and geometric means \citep{hardy1952}, for non-negative reals $a_1, \ldots, a_K$:
+\[
+    \left(\prod_{k=1}^K a_k\right)^{1/K} \leq \frac{1}{K}\sum_{k=1}^K a_k,
+\]
+with equality if and only if $a_1 = a_2 = \cdots = a_K$. Setting $a_k = q_k(r_k)$ gives \cref{eq:weakest-link}.
+
+\textbf{Step 2: Connection to budget-constrained optimization.} Consider two allocations $\mathbf{r}$ and $\mathbf{r}'$ with the same total cost $C(\mathbf{r}) = C(\mathbf{r}') = B$, but suppose $\mathbf{r}$ yields stage qualities $(q_1, \ldots, q_K)$ with $q_j < q_k$ for some stages $j, k$, while $\mathbf{r}'$ achieves more equalized qualities. The AM-GM inequality implies:
+\[
+    \prod_{k=1}^K q_k(r_k') \leq \left(\frac{1}{K}\sum_{k=1}^K q_k(r_k')\right)^K,
+\]
+with equality when all qualities are equal. Since the arithmetic mean is a linear function of the individual qualities, and quality functions are concave, reallocating budget from high-quality stages to low-quality stages (``raising the floor'') increases the product while keeping the budget constant. The optimal allocation equalizes the marginal rates (\cref{thm:emr}), which, in the symmetric case, yields equal allocation and hence equal qualities.
+\end{proof}
+
+\subsection{Proof of Pareto Frontier Log-Concavity (\texorpdfstring{\cref{prop:pareto}}{Proposition 3.8})}
+
+\begin{proof}
+Define $g(B) = \log Q^*(B) = \max_{\mathbf{r}} \{\sum_k \log q_k(r_k) : \sum_k p_k r_k \leq B, \mathbf{r} > \mathbf{0}\}$.
+
+For any $B_1, B_2 > 0$ and $\alpha \in [0,1]$, let $\mathbf{r}_1^*$ and $\mathbf{r}_2^*$ be optimal for budgets $B_1$ and $B_2$ respectively. The convex combination $\mathbf{r}_\alpha = \alpha \mathbf{r}_1^* + (1-\alpha)\mathbf{r}_2^*$ is feasible for budget $\alpha B_1 + (1-\alpha)B_2$ (by linearity of the cost function). By concavity of each $\log q_k$:
+\begin{align*}
+    g(\alpha B_1 + (1-\alpha)B_2) &\geq \sum_k \log q_k(\alpha r_{1,k}^* + (1-\alpha)r_{2,k}^*) \\
+    &\geq \sum_k \left[\alpha \log q_k(r_{1,k}^*) + (1-\alpha)\log q_k(r_{2,k}^*)\right] \\
+    &= \alpha g(B_1) + (1-\alpha) g(B_2).
+\end{align*}
+
+Therefore $g(B) = \log Q^*(B)$ is concave, i.e., $Q^*$ is log-concave.
+
+For property (3), by the envelope theorem, $g'(B) = \lambda^*(B)$, where $\lambda^*(B)$ is the optimal Lagrange multiplier at budget $B$. Since $g = \log Q^*$, we have $\frac{d}{dB}\log Q^*(B) = \lambda^*(B)$.
+\end{proof}
+
+\subsection{Proof of CVIH Quasi-Concavity (\texorpdfstring{\cref{thm:cvih-quasi}}{Theorem 7.2})}
+
+\begin{proof}
+Let $h(B) = V(B)/B$ where $V$ is concave, $V(0) = 0$, and $V'(0) > 0$. We show $h$ is quasi-concave with a unique maximizer.
+
+\textbf{Quasi-concavity.} The upper level sets $\{B > 0 : h(B) \geq c\} = \{B > 0 : V(B) \geq cB\}$ are the intersection of the epigraph of $V$ (a concave function) with the half-space above the line $cB$. This intersection is convex (it is an interval $[B_l(c), B_u(c)]$ for each $c$, since $V(B) - cB$ is concave). Therefore $h$ is quasi-concave.
+
+\textbf{Existence and uniqueness of maximizer.} Since $V(0) = 0$:
+\[
+    \lim_{B \to 0^+} h(B) = \lim_{B \to 0^+} \frac{V(B)}{B} = V'(0^+) > 0,
+\]
+by L'H\^{o}pital's rule (or the definition of the derivative). Since $V$ is bounded (quality is bounded by 1 and iteration rate is bounded), $h(B) \to 0$ as $B \to \infty$. The function $h$ is continuous on $(0,\infty)$, positive near zero, and vanishes at infinity, so it attains a maximum at some $B^* > 0$.
+
+For uniqueness, note that $h'(B) = [V'(B)B - V(B)]/B^2$. The numerator $\phi(B) = V'(B)B - V(B)$ satisfies $\phi'(B) = V''(B)B < 0$ for all $B > 0$ (since $V$ is strictly concave, $V'' < 0$). Therefore $\phi$ is strictly decreasing, so $\phi(B) = 0$ has at most one solution, implying $h'(B) = 0$ has a unique solution $B^*$.
+\end{proof}
+
+
+% ================================================================
+\section{Empirical Data}\label{app:empirical}
+
+\subsection{Complete Pricing Tables}
+
+\begin{table}[H]
+\centering
+\caption{Anthropic model pricing, April 2026 (per million tokens).}
+\label{tab:anthropic-pricing}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Model} & \textbf{Input} & \textbf{Output} & \textbf{Cache Write} & \textbf{Cache Read} \\
+\midrule
+Claude Opus 4 & \$15.00 & \$75.00 & \$18.75 & \$1.50 \\
+Claude Sonnet 4 & \$3.00 & \$15.00 & \$3.75 & \$0.30 \\
+Claude Haiku 3.5 & \$0.80 & \$4.00 & \$1.00 & \$0.08 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{OpenAI model pricing, April 2026 (per million tokens).}
+\label{tab:openai-pricing}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Model} & \textbf{Input} & \textbf{Output} & \textbf{Cached Input} & \textbf{Cache Discount} \\
+\midrule
+o3 & \$10.00 & \$40.00 & \$5.00 & 50\% \\
+o4-mini & \$1.10 & \$4.40 & \$0.55 & 50\% \\
+GPT-4.1 & \$2.00 & \$8.00 & \$1.00 & 50\% \\
+GPT-4.1 mini & \$0.40 & \$1.60 & \$0.20 & 50\% \\
+GPT-4.1 nano & \$0.10 & \$0.40 & \$0.05 & 50\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Google model pricing, April 2026 (per million tokens, for prompts up to 200K tokens).}
+\label{tab:google-pricing}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Model} & \textbf{Input} & \textbf{Output} & \textbf{Cache Discount} \\
+\midrule
+Gemini 2.5 Pro & \$1.25 & \$10.00 & 75\% \\
+Gemini 2.5 Flash & \$0.15 & \$0.60 & 75\% \\
+Gemini 2.0 Flash & \$0.10 & \$0.40 & 75\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Caching Mechanism Comparison}
+
+\begin{table}[H]
+\centering
+\caption{Caching mechanisms across providers and approaches.}
+\label{tab:caching-comparison}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llrrll}
+\toprule
+\textbf{Approach} & \textbf{Scope} & \textbf{Cost Reduction} & \textbf{Latency Reduction} & \textbf{Quality Impact} & \textbf{Source} \\
+\midrule
+Prompt prefix caching & Token-level & 60--85\% & 50--80\% & None & \citet{anthropic2026coding} \\
+Prompt-aware caching & Token-level & 41--80\% & 30--60\% & None & \citet{liang2026cache} \\
+Agentic plan caching & Plan-level & $\sim$50\% & $\sim$27\% & Minimal & \citet{zhang2025plancache} \\
+Semantic deduplication & Embedding-level & 20--40\% & 10--20\% & Low & Various \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Model Routing Results Summary}
+
+\begin{table}[H]
+\centering
+\caption{Summary of model routing approaches and their reported savings.}
+\label{tab:routing-summary}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llrrl}
+\toprule
+\textbf{System} & \textbf{Routing Strategy} & \textbf{Cost Savings} & \textbf{Quality Retention} & \textbf{Source} \\
+\midrule
+FrugalGPT & LLM cascade (cheap to expensive) & up to 98\% & 95--100\% & \citet{chen2023frugalgpt} \\
+AutoMix & Learned complexity routing & 50--70\% & 90--98\% & \citet{madaan2024automix} \\
+RouteLLM & Preference-based routing & 40--75\% & 95--99\% & \citet{ong2024routellm} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\end{appendices}
+
+% ================================================================
+\bibliography{economics_architecture}
+
+\end{document}

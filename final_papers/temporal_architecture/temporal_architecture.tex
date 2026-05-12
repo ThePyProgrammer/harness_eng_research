@@ -1,0 +1,569 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{microtype}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem*{remark}{Remark}
+
+% === Custom commands ===
+\newcommand{\VIH}{\mathrm{VIH}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+
+% Paper Title
+\title{Temporal Architecture for AI Coding Agent Harnesses}
+
+\renewcommand{\today}{}
+
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\begin{abstract}
+AI coding agent harnesses face a central tension: faster iteration improves throughput but degrades output quality. We propose \emph{Verified Iterations per Hour} (VIH), a composite metric that captures this tradeoff, and develop a formal framework grounding temporal architecture in stochastic scheduling, queueing theory, speculative execution, and cache competitive analysis. Our contributions include: (1)~an information-theoretic model of context freshness with exponential staleness decay; (2)~a speculation ratio test determining when speculative execution has positive expected value; (3)~a cache-staleness tradeoff theorem yielding an EOQ-analog optimal refresh interval; (4)~a decision-theoretic framework for execution mode selection under asymmetric costs; and (5)~a Pareto frontier analysis showing that VIH is maximized at the unit-elasticity point. Illustrative calibration against published data from multiple harnesses suggests that speculative pipelining, tiered verification, and asynchronous governance can reduce cycle time by approximately 34\%, while naive persistent state may be VIH-negative when context quality penalties are large.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+% ============================================================
+\section{Introduction}\label{sec:intro}
+
+The dominant complaint about AI coding agent harnesses is speed. GSD takes 45--60 minutes per full cycle; 24 open issues cite iteration time as the primary bottleneck \citep{iskohm2026comparison}. But speed is not merely a user experience concern. In agentic loops, faster iteration enables more attempts per unit time, and empirically, more attempts can compensate for lower per-attempt accuracy up to a threshold \citep{sweeffi2025}. A model scoring 2\% higher but taking 3$\times$ longer can be worse for agentic loops \citep{iskohm2026comparison}.
+
+The naive response is to make everything faster. This paper argues that the naive response is wrong, or at least incomplete. Raw speed, measured as iterations per hour, is a misleading metric because it ignores the quality of those iterations. Skipping verification to go faster compounds errors geometrically and destroys effective throughput. We propose \emph{Verified Iterations per Hour} (VIH) as a useful intermediate metric: the rate at which an agent completes iterations that pass all verification gates. VIH does not capture all quality dimensions (architectural correctness, maintainability, and failure severity lie outside its scope), but it formalizes the speed--quality tradeoff that dominates current harness design decisions.
+
+This reframing has deep implications for pipeline design, caching policy, speculative execution strategy, and execution mode selection. We develop these implications formally, drawing on four classical bodies of theory:
+
+\begin{enumerate}[label=(\roman*)]
+    \item \textbf{Stochastic scheduling} \citep{graham1966bounds, mohring1984stochastic, pinedo2016scheduling}: multi-stage pipelines with probabilistic failure and speculative rollback.
+    \item \textbf{Queueing theory} \citep{little1961proof, kingman1961single, hopp2000factory}: bottleneck identification, the utilization cliff, and the throughput--latency tradeoff.
+    \item \textbf{Speculative execution} \citep{tomasulo1967efficient, smith1981branch, yeh1991two}: conditions under which pre-computing likely future results has positive expected value.
+    \item \textbf{Cache competitive analysis} \citep{belady1966replacement, sleator1985amortized, denning1968working}: staleness--computation tradeoffs and optimal refresh policies.
+\end{enumerate}
+
+\noindent Our contributions are:
+
+\begin{enumerate}
+    \item A \textbf{context fidelity model} (\S\ref{sec:freshness}) with exponential staleness decay, calibrated against the 17.1\% Fresh Eyes advantage \citep{suzgun2024metaprompting}.
+    \item A \textbf{VIH decomposition and optimization} (\S\ref{sec:vih}) showing that VIH $= \lambda_{\mathrm{raw}} \cdot p_{\mathrm{verify}}$, with the optimal operating point at the unit-elasticity condition.
+    \item A \textbf{speculation ratio test} (\S\ref{sec:speculation}) and depth limit for multi-stage pipelines.
+    \item A \textbf{cache-staleness theorem} (\S\ref{sec:caching}) yielding an EOQ-analog optimal refresh interval.
+    \item A \textbf{Pareto frontier analysis} (\S\ref{sec:pareto}) proving that mixing strategies dominate pure strategies in concave frontier regions.
+    \item \textbf{Illustrative calibration} (\S\ref{sec:calibration}) against published harness data.
+\end{enumerate}
+
+Throughout, we distinguish established results applied without modification (marked \textbf{[E]}), novel synthesis of known results in the agent harness setting (\textbf{[S]}), and conjectured claims supported by empirical data but lacking formal proof (\textbf{[C]}).
+
+
+% ============================================================
+\section{Preliminaries and Definitions}\label{sec:prelim}
+
+\subsection{The Agent Pipeline as a Stochastic DAG}
+
+\begin{definition}[Agent Pipeline DAG]\label{def:pipeline}
+An agent pipeline is a stochastic DAG $G = (V, E, \mathbf{D}, \mathbf{q})$ where $V = \{v_1, \ldots, v_n\}$ are pipeline stages, $E \subseteq V \times V$ encodes precedence constraints, each stage $v_i$ has duration $t_i \sim D_i$ with mean $\mu_i$ and variance $\sigma_i^2$, and failure probability $q_i \in [0,1]$ with success probability $p_i = 1 - q_i$.
+\end{definition}
+
+In the Pinedo classification \citep{pinedo2016scheduling}, the harness scheduling problem is $\mathrm{Rm} \mid \mathrm{prec}, \mathrm{stoch} \mid \E[C_{\max}]$: unrelated parallel machines, precedence constraints, stochastic processing times, minimizing expected makespan.
+
+The canonical pipeline for a GSD-style harness is a chain:
+\[
+    \text{context\_load} \to \text{research} \to \text{planning} \to \text{execution} \to \text{verification} \to \text{review}
+\]
+
+\begin{table}[ht]
+\centering
+\caption{Estimated stage parameters for the GSD pipeline (derived from reported ranges; no controlled measurement).}\label{tab:stages}
+\begin{tabular}{lcccc}
+\toprule
+Stage & $\mu_i$ (min) & $\sigma_i$ (min) & $q_i$ & Distribution \\
+\midrule
+Context loading & 10 & 2.0 & 0.02 & Log-normal \\
+Research & 7.5 & 2.5 & 0.05 & Log-normal \\
+Planning & 6.5 & 1.5 & 0.08 & Log-normal \\
+Execution & 12.5 & 2.5 & 0.15 & Log-normal \\
+Verification & 10 & 2.0 & 0.10 & Log-normal \\
+Human review & 10 & 5.0 & 0.05 & Log-normal \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Key Classical Results}
+
+\textbf{[E]} \emph{Graham's bound} \citep{graham1966bounds}: List scheduling on $m$ identical machines achieves makespan within a factor of $(2 - 1/m)$ of optimal. For a 4-agent system, this guarantees at most $1.75\times$ optimal.
+
+\textbf{[E]} \emph{Little's Law} \citep{little1961proof}: $L = \lambda W$, where $L$ is the average number of items in the system, $\lambda$ is throughput, and $W$ is average latency. This constrains the throughput--latency--concurrency triad in any pipeline.
+
+\textbf{[E]} \emph{Kingman's approximation} \citep{kingman1961single}: For a GI/G/1 queue, expected wait time $\E[W_q] \approx \frac{c_a^2 + c_s^2}{2} \cdot \frac{\rho}{1 - \rho} \cdot \E[S]$, where $c_a^2, c_s^2$ are squared coefficients of variation of interarrival and service times, and $\rho$ is utilization. The $\rho/(1-\rho)$ term creates a ``utilization cliff'': at 90\% utilization, queue wait is $9\times$ that at 50\%.
+
+\textbf{[E]} \emph{Amdahl's Law} \citep{amdahl1967validity}: If a fraction $f$ of computation is serial, maximum speedup from parallelizing the rest is $1/f$.
+
+
+% ============================================================
+\section{Context Freshness and Information Decay}\label{sec:freshness}
+
+\subsection{The Context Channel Model}
+
+\begin{definition}[Context Fidelity]\label{def:fidelity}
+\textbf{[S]} Let $\mathcal{X}$ be the true codebase state and $\mathcal{Y}$ the agent's context representation. The \emph{context fidelity} at time $t$ after a fresh read at $t_0$ is:
+\[
+    \Phi(t) = \frac{I_{\mathrm{stale}}(t)}{I_{\mathrm{fresh}}} = e^{-\Lambda(t - t_0)}
+\]
+where $\Lambda = \lambda \alpha$ is the effective decay rate, $\lambda$ is the codebase change rate (changes per unit time), and $\alpha$ is the average information disruption per change.
+\end{definition}
+
+\begin{theorem}[Exponential Staleness Decay]\label{thm:staleness}
+\textbf{[S]} Assume: (A1) codebase changes follow a Poisson process with rate $\lambda$; (A2) each change independently invalidates a fraction $\alpha$ of the agent's cached context; (A3) $\alpha$ is constant across change events. Then:
+\[
+    I_{\mathrm{stale}}(t) = I_{\mathrm{fresh}} \cdot e^{-\lambda\alpha(t - t_0)}
+\]
+\end{theorem}
+
+\begin{remark}[Assumptions and limitations]
+Assumptions A2 and A3 are strong. In practice, changes are correlated (a refactor touches many files; a bugfix touches one), and the disruption fraction $\alpha$ varies across changes. The multi-exponential extension in Appendix~\ref{app:proofs} relaxes A3 by partitioning context into strata with different decay rates. The single-rate model should be understood as a first-order approximation; the sensitivity of downstream results to violations of A2--A3 is an open empirical question.
+\end{remark}
+
+\begin{proof}
+The number of changes in $[t_0, t]$ is $N \sim \mathrm{Poisson}(\lambda\Delta t)$ where $\Delta t = t - t_0$. After $k$ changes, the surviving information fraction is $(1-\alpha)^k$. Taking the expectation via the Poisson probability generating function:
+\[
+    \E[(1-\alpha)^N] = e^{\lambda\Delta t((1-\alpha) - 1)} = e^{-\lambda\alpha\Delta t}
+\]
+\end{proof}
+
+The context fidelity has half-life $t_{1/2} = \ln 2 / \Lambda$.
+
+\subsection{Illustrative Calibration}
+
+\citet{suzgun2024metaprompting} found that fresh-context expert instances outperform accumulated-context prompting by 17.1\%. This advantage likely conflates two effects: context freshness \emph{and} task decomposition (each expert receives a narrower scope). The pure context-freshness contribution is therefore $\leq 17.1\%$; we use the full figure as an upper bound, acknowledging that the true freshness penalty may be smaller.
+
+Treating the 17.1\% as an upper bound on fidelity loss:
+\[
+    1 - \Phi_{\mathrm{inc}} \leq 0.171 \implies \Phi_{\mathrm{inc}} \geq 0.829
+\]
+
+With a typical GSD cycle of $\bar{t} \approx 50$ minutes $\approx 0.83$ hours, this gives an upper bound on the effective decay rate of $\Lambda \leq 0.226$ per hour (context half-life $\geq 3$ hours). The maximum refresh interval before 20\% fidelity loss is then $T_{\max} \geq 59$ minutes, which aligns with the empirical GSD cycle time of 45--60 minutes. Supporting evidence (though from different experimental contexts) includes: agent drift onset at a median of 73 interactions \citep{agentdrift2026}, context rot affecting all 18 tested frontier models \citep{chroma2025rot}, and 23\% accuracy loss from just 10\% irrelevant content \citep{chroma2025rot}. These numbers are drawn from different systems under different conditions; they should be treated as suggestive, not as a validated calibration.
+
+
+% ============================================================
+\section{Verified Iterations per Hour}\label{sec:vih}
+
+\subsection{Definition and Decomposition}
+
+\begin{definition}[VIH]\label{def:vih}
+\textbf{[S]} For a model-harness pair $m$ operating over wall-clock time $T_{\mathrm{wall}}$:
+\[
+    \VIH(m) = \frac{n_{\mathrm{verified}}(m)}{T_{\mathrm{wall}}}
+\]
+where $n_{\mathrm{verified}}$ counts only iterations passing all verification gates.
+\end{definition}
+
+\begin{theorem}[VIH Decomposition]\label{thm:vih-decomp}
+\textbf{[S]} $\VIH = \lambda_{\mathrm{raw}} \cdot p_{\mathrm{verify}}$, where $\lambda_{\mathrm{raw}} = 1/\E[\tau_{\mathrm{cycle}}]$ is the raw iteration rate and $p_{\mathrm{verify}} = P(\text{iteration passes verification})$.
+\end{theorem}
+
+\begin{proof}
+By definition, $n_{\mathrm{verified}} = n_{\mathrm{total}} \cdot p_{\mathrm{verify}}$ in expectation. Since $n_{\mathrm{total}} = \lambda_{\mathrm{raw}} \cdot T_{\mathrm{wall}}$, dividing by $T_{\mathrm{wall}}$ gives the result.
+\end{proof}
+
+\subsection{The Speed--Quality Tradeoff}
+
+\begin{proposition}[Speed--Quality Tradeoff]\label{prop:tradeoff}
+\textbf{[C]} In general, $p_{\mathrm{verify}}$ is a decreasing function of $\lambda_{\mathrm{raw}}$. Increasing the raw iteration rate tends to decrease the verification pass rate.
+\end{proposition}
+
+Empirical support: the DORA 2025 report finds a 7.2\% delivery stability decrease per 25\% AI adoption increase \citep{dora2025}; GitClear reports code churn nearly doubling from 2020 to 2024 with AI adoption \citep{gitclear2025}; the Yerkes--Dodson law predicts performance degradation on complex tasks under time pressure \citep{yerkes1908relation}.
+
+We adopt an exponential degradation model $p_{\mathrm{verify}}(\lambda) = p_0 e^{-\beta(\lambda - \lambda_0)}$ for $\lambda \geq \lambda_0$ as a tractable parametric form. This functional form is a modeling choice, not an empirically validated relationship; the true shape of the speed--quality curve in agent pipelines is unknown. The exponential is chosen for analytical convenience and because it satisfies the qualitative requirements (monotone decreasing, bounded between 0 and 1, convex). Results that depend on this specific functional form (particularly the closed-form $\lambda^* = 1/\beta$) should be understood as illustrative of the framework rather than quantitative predictions:
+
+\begin{theorem}[VIH Optimal Speed]\label{thm:vih-opt}
+\textbf{[S]} The VIH-maximizing raw iteration rate satisfies:
+\[
+    \frac{p_{\mathrm{verify}}'(\lambda^*)}{p_{\mathrm{verify}}(\lambda^*)} = -\frac{1}{\lambda^*}
+\]
+The optimum occurs where a 1\% increase in raw speed causes exactly a 1\% decrease in verification rate. Under exponential degradation, $\lambda^* = 1/\beta$.
+\end{theorem}
+
+\begin{proof}
+Differentiate $\VIH(\lambda) = \lambda \cdot p_{\mathrm{verify}}(\lambda)$ and set to zero: $p_{\mathrm{verify}}(\lambda) + \lambda \cdot p_{\mathrm{verify}}'(\lambda) = 0$. Rearranging gives the elasticity condition. Under $p_{\mathrm{verify}}' = -\beta \cdot p_{\mathrm{verify}}$, the condition becomes $\beta = 1/\lambda^*$.
+\end{proof}
+
+\subsection{Amdahl's Law Bound on VIH}
+
+If verification is a serial fraction $f$ of the cycle (it runs after execution), then even with infinite parallelization of other stages \citep{amdahl1967validity}:
+\[
+    \VIH^{\max} = \frac{p_{\mathrm{verify}}}{f \cdot \tau_{\mathrm{cycle}}}
+\]
+
+From the GSD data, $f \approx 0.20$ (verification takes 10 of 50 minutes). With $p_{\mathrm{verify}} \approx 0.67$ (Devin's PR merge rate as proxy, \citealt{cognition2025devin}), VIH$^{\max} \approx 4.0$ verified iterations per hour, regardless of non-verification speedups.
+
+
+% ============================================================
+\section{Stochastic Pipeline Scheduling}\label{sec:scheduling}
+
+\subsection{Sequential Makespan}
+
+\begin{theorem}[Sequential Makespan]\label{thm:seq}
+\textbf{[E]} For a chain pipeline under sequential execution, $\E[M_{\mathrm{seq}}] = \sum_{i=1}^n \mu_i$.
+\end{theorem}
+
+Calibrating with \Cref{tab:stages}: $\E[M_{\mathrm{seq}}] = 56.5$ minutes, consistent with the observed 45--60 minute range.
+
+\subsection{Makespan with Failures}
+
+\begin{theorem}[Expected Makespan with Geometric Retries]\label{thm:failures}
+\textbf{[S]} Under the restart-from-failed-stage model with independent failures:
+\[
+    \E[M_{\mathrm{fail}}] = \sum_{i=1}^n \frac{\mu_i}{p_i}
+\]
+\end{theorem}
+
+\begin{proof}
+Each stage is attempted until success; the number of attempts follows $\mathrm{Geometric}(p_i)$ with expectation $1/p_i$.
+\end{proof}
+
+Calibrating: $\E[M_{\mathrm{fail}}] \approx 61.5$ minutes. Failures add approximately 5 minutes (8.8\%) to expected cycle time.
+
+
+% ============================================================
+\section{Speculative Execution in Agent Pipelines}\label{sec:speculation}
+
+\subsection{The Speculation Ratio Test}
+
+\begin{definition}[Speculation Policy]\label{def:spec}
+\textbf{[S]} A speculation policy $\pi: V \to \{0,1\}$ assigns each stage a binary decision: $\pi(v_j) = 1$ if $v_j$ begins before its predecessor commits.
+\end{definition}
+
+\begin{theorem}[Speculation Ratio Test]\label{thm:spec-ratio}
+\textbf{[S]} For adjacent stages $(v_i, v_j)$, define the parallelism benefit $B = \E[\min(t_i, t_j)]$ and the rollback penalty $R = \E[d_i + t_i^{\mathrm{retry}}]$. Assume $R$ is a known scalar (i.e., rollback cost does not depend on the speculative state). Then speculation is EV-positive when:
+\[
+    \frac{p_i}{q_i} > \frac{R}{B}
+\]
+
+In practice, rollback cost in agent pipelines is state-dependent and may have a heavy tail (speculative execution can write files, trigger CI, or update caches). The test should be applied with a conservative estimate of $R$ that accounts for worst-case rollback scenarios, not just expected cleanup time.
+\end{theorem}
+
+\begin{proof}
+Expected speculative time: $\E[T_{\mathrm{spec}}] = p_i \cdot \E[\max(t_i, t_j)] + q_i(R + \E[t_j])$. Sequential baseline: $\E[T_{\mathrm{seq}}] = \E[t_i] + \E[t_j]$. The saving under success is $B = \E[t_i] + \E[t_j] - \E[\max(t_i, t_j)]$. Speculation is profitable when $p_i \cdot B > q_i \cdot R$.
+\end{proof}
+
+At 55\% next-action prediction accuracy \citep{zhou2025speculative}, the success-to-failure odds ratio is $0.55/0.45 = 1.22$. Speculation is profitable whenever $R/B < 1.22$, which holds when rollback cost is less than 122\% of the parallelism benefit.
+
+\subsection{Speculation Depth Limit}
+
+\begin{theorem}[Speculation Depth Limit]\label{thm:depth}
+\textbf{[S]} For a homogeneous chain with per-stage success probability $p$, benefit $B_0$, and rollback cost $R_0$, the maximum useful speculation depth is:
+\[
+    k^* < \frac{\ln(1 + B_0/R_0)}{\ln(1/p)}
+\]
+\end{theorem}
+
+For $p = 0.85$ and $B_0/R_0 = 2$: $k^* \leq 6$ stages. For $p = 0.70$ and $B_0/R_0 = 1$: $k^* \leq 1$. The exponential decay of $p^k$ places a natural horizon on useful speculation, consistent with the practical finding that deep speculation chains in agent pipelines are rarely profitable \citep{zhou2025speculative}.
+
+\subsection{The Spectre Analogy and Hidden Costs}
+
+Speculative execution in CPUs was considered a pure optimization for two decades before Spectre and Meltdown revealed that speculative state changes in microarchitecture created security vulnerabilities \citep{spectre2018}. In agent pipelines, the analogous risks include: (1) state pollution from discarded speculative work, (2) combinatorial branching complexity when speculation chains interact, (3) debugging difficulty when causal chains include hypothetical branches, and (4) cognitive overhead for humans monitoring speculative pipelines. These hidden costs suggest that speculation should be applied conservatively, typically at depth 1, and only when the prediction accuracy and rollback cost satisfy the ratio test of \Cref{thm:spec-ratio}.
+
+
+% ============================================================
+\section{Caching and the Staleness Tradeoff}\label{sec:caching}
+
+\subsection{The Cache Refresh Problem}
+
+At each step, the agent chooses between full re-read (cost $R$, zero staleness) and incremental update (cost $r \ll R$, staleness probability $s_t$). This is structurally a rent-or-buy problem \citep{sleator1985amortized}.
+
+\begin{theorem}[Cache-Staleness EOQ Theorem]\label{thm:cache-eoq}
+\textbf{[S]} If staleness grows linearly with time since last refresh (rate $\lambda\alpha$) and staleness-induced errors cost $E_{\mathrm{stale}}$ in expectation, the optimal refresh interval is:
+\[
+    T^* = \sqrt{\frac{2R}{\lambda\alpha \cdot E_{\mathrm{stale}}}}
+\]
+This has the structure of the Economic Order Quantity formula, with $R$ as fixed ordering cost and $\lambda\alpha \cdot E_{\mathrm{stale}}$ as holding cost rate.
+\end{theorem}
+
+\begin{proof}
+The amortized cost per unit time is $C(T) = R/T + \frac{1}{2}\lambda\alpha T \cdot E_{\mathrm{stale}}$ (the staleness integral over $[0, T]$ under linear growth averages to $\frac{1}{2}\lambda\alpha T$). Setting $C'(T) = 0$: $-R/T^2 + \frac{1}{2}\lambda\alpha E_{\mathrm{stale}} = 0$, yielding the stated formula.
+\end{proof}
+
+\subsection{Competitive Analysis}
+
+\textbf{[E]} The break-even deterministic policy (refresh after $\lceil R/r \rceil$ incremental steps) is 2-competitive against the offline optimal \citep{sleator1985amortized}. The optimal randomized policy achieves $e/(e-1) \approx 1.58$-competitive \citep{fiat1991competitive}.
+
+\subsection{Three Caching Layers}
+
+Agent harnesses interact with three distinct caching layers, each governed by different dynamics:
+
+\textbf{KV-Cache} (attention state reuse): Provider-level caching of computed key-value pairs for shared prompt prefixes. Claude Code achieves 92\% hit rate and 81\% cost reduction (vendor-reported; \citealt{anthropic2026agentic}). Hit rate depends on prompt structure: append-only prompts with static prefixes maximize hits.
+
+\textbf{Prompt Caching} (token-level): Server-side caching of prompt computation for repeated prefixes. \citet{liang2026cache} report 41--80\% cost reduction and 13--31\% TTFT improvement across providers.
+
+\textbf{Plan Template Caching} (reasoning-level): Reuse of structured plan templates across similar tasks. \citet{zhang2025apc} achieve 50\% cost and 27\% latency reduction while maintaining 96.6\% of optimal performance.
+
+The Denning working set model \citep{denning1968working} applies to all three layers: cache effectiveness depends on temporal locality in the request stream. The cache TTL must match the agent's task locality window to avoid thrashing.
+
+\subsection{The Cache--Quality Tension}
+
+\textbf{[C]} Caching creates a fundamental tension: append-only context maximizes cache hits but accumulates noise, while context reset loses the cache but gains fresh reasoning quality (the 17.1\% advantage of \S\ref{sec:freshness}). The optimal cycle length is partially determined by when cache savings from continuation are outweighed by quality loss from context accumulation.
+
+
+% ============================================================
+\section{Execution Mode Selection}\label{sec:modes}
+
+\subsection{Decision-Theoretic Framework}
+
+The harness selects execution mode $m \in \{\text{Fast}, \text{Standard}, \text{Governed}\}$ for each task. The cost matrix $C(i,j)$ captures the asymmetric consequences of misclassification:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+& \multicolumn{3}{c}{Optimal mode} \\
+\cmidrule(l){2-4}
+Chosen mode & Fast & Standard & Governed \\
+\midrule
+Fast & 0 & $c_{\mathrm{FS}}$ & $c_{\mathrm{FG}}$ \\
+Standard & $c_{\mathrm{SF}}$ & 0 & $c_{\mathrm{SG}}$ \\
+Governed & $c_{\mathrm{GF}}$ & $c_{\mathrm{GS}}$ & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The critical asymmetry: $c_{\mathrm{FG}} \gg c_{\mathrm{GF}}$. Choosing Fast when Governed is needed risks undetected quality failures (10--100$\times$ the task time in rework), while choosing Governed when Fast suffices merely wastes time (2--5$\times$ the task time).
+
+\begin{theorem}[Bayesian Mode Selection]\label{thm:mode}
+\textbf{[S]} For the binary simplification (Fast vs.\ Governed), the optimal decision rule following \citet{elkan2001foundations} is:
+\[
+    \text{Choose Governed iff } P(\text{Governed} \mid \mathbf{x}) > \frac{c_{\mathrm{GF}}}{c_{\mathrm{FG}} + c_{\mathrm{GF}}}
+\]
+Since $c_{\mathrm{FG}} \gg c_{\mathrm{GF}}$, the threshold is small (typically 0.05--0.10), meaning the harness should choose Governed even when the probability of needing it is quite low.
+\end{theorem}
+
+\subsection{Bainbridge's Ironies}
+
+\citet{bainbridge1983ironies} identified a double bind in automated decision-making: if mode selection rules can be fully specified, a computer can apply them faster than a human monitor can verify; if mode selection requires judgment, automation will fail at boundary cases while the human monitor, deprived of practice, performs even worse. The implication: mode selection may require a hybrid approach where the harness proposes a mode and the human confirms or overrides, rather than full automation. The feature engineering problem is itself recursive: deciding how much analysis to do requires analysis.
+
+
+% ============================================================
+\section{The Speed--Quality Pareto Frontier}\label{sec:pareto}
+
+\subsection{Frontier Structure}
+
+\begin{definition}[Pareto Frontier]\label{def:pareto}
+\textbf{[E]} Let $\mathcal{C}$ be the set of harness configurations. The Pareto frontier $\mathcal{F} = \{c \in \mathcal{C} : \nexists\, c'$ with $S(c') \geq S(c)$, $Q(c') \geq Q(c)$, and at least one strict$\}$.
+\end{definition}
+
+\begin{proposition}[Mixed Frontier Shape]\label{prop:shape}
+\textbf{[C]} The empirical Pareto frontier has three regimes: (1) concave at low speed (redundant checks; easy to gain speed cheaply), (2) convex at moderate speed (each gain requires skipping progressively more important verification), and (3) concave again at high speed (statistical filtering via best-of-$N$ stabilizes quality).
+\end{proposition}
+
+Evidence for Regime~3 comes from SWE-bench data showing Pass@5 substantially exceeding Pass@1, meaning running $5\times$ more cheap iterations with majority voting yields higher effective quality than fewer careful iterations \citep{sweeffi2025}.
+
+\subsection{Mixing Strategies}
+
+\begin{theorem}[Convexification]\label{thm:convex}
+\textbf{[E+S]} In concave frontier regions, the mixed strategy using configuration $c_1$ with probability $\alpha$ and $c_2$ with probability $(1-\alpha)$ achieves $(S_{\mathrm{mix}}, Q_{\mathrm{mix}}) = \alpha(S_1, Q_1) + (1-\alpha)(S_2, Q_2)$, which Pareto-dominates every pure strategy in that region.
+\end{theorem}
+
+This is the direct analogue of the classical result that mixed strategies expand the achievable set to the convex hull of pure-strategy outcomes.
+
+\subsection{VIH Maximization}
+
+\begin{theorem}[VIH Tangency Condition]\label{thm:tangency}
+\textbf{[S]} VIH $= S \cdot Q$ is maximized on the frontier where the iso-VIH hyperbola $Q = \VIH/S$ is tangent to the frontier curve $Q = f(S)$. At this point, the elasticity of quality with respect to speed is exactly $-1$:
+\[
+    \varepsilon_{Q,S} = \frac{dQ}{dS} \cdot \frac{S}{Q} = -1
+\]
+Below this point, speed gains improve VIH; above it, speed gains degrade VIH.
+\end{theorem}
+
+\begin{proof}
+Maximize $\VIH(S) = S \cdot f(S)$. Setting $\VIH'(S) = f(S) + S f'(S) = 0$ gives $f'(S^*) = -f(S^*)/S^* = -Q^*/S^*$, which is the elasticity condition.
+\end{proof}
+
+
+% ============================================================
+\section{Illustrative Calibration}\label{sec:calibration}
+
+The calibration in this section draws on published data from multiple systems (GSD, Claude Code, SWE-bench, Devin) under different conditions. No single system has been measured end-to-end against the model's predictions. The stage parameters in \Cref{tab:stages} are estimates derived from reported ranges, not from controlled measurement with known sample sizes. The results should be understood as illustrative of the framework's predictions, not as validated empirical findings.
+
+\subsection{Pipeline Speedup Analysis}
+
+We estimate the expected speedup from four proposed strategies against the GSD baseline of $\E[T_{\mathrm{seq}}] = 56.8$ minutes:
+
+\begin{table}[ht]
+\centering
+\caption{Speedup analysis for the four temporal optimization strategies.}\label{tab:speedup}
+\begin{tabular}{lcccc}
+\toprule
+Strategy & Time saved & Quality impact & VIH impact & Net verdict \\
+\midrule
+Persistent state & 7.0 min & $-17.1\%$ & Negative & VIH-negative \\
+Speculative pipelining & 8.5 min & Minimal & $+19\%$ & Positive \\
+Tiered verification & 4.8 min & $-1.5\%$ & $+7.6\%$ & Positive \\
+Async governance & 8.0 min & Minimal & $+17\%$ & Positive \\
+\midrule
+Combined (VIH-optimal) & 19.3 min & $-1.5\%$ & $+34\%$ & Positive \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The key finding: \textbf{naive persistent state is likely VIH-negative} when the quality penalty approaches the 17.1\% upper bound. The break-even threshold (the ratio of time saved to total cycle time) is approximately 12.3\% for these parameters, though this threshold is parameter-specific and shifts with cycle time and time savings.
+
+The combined speedup from speculative pipelining, tiered verification, and asynchronous governance is estimated at $\E[T_{\mathrm{combined}}] \approx 37.5$ minutes. This estimate assumes approximate additivity of the three optimizations, which is a simplification: in practice, speculative pipelining accuracy depends on verification depth, and async governance changes the pipeline structure. The true combined speedup may be smaller due to interaction effects. A conservative estimate would be 20--34\% cycle time reduction.
+
+\subsection{Token Economics}
+
+Production agent workflows exhibit input-to-output token ratios of approximately 100:1 \citep{manus2025context}. With the 10$\times$ price differential between cached (\$0.30/MTok) and uncached (\$3.00/MTok) input tokens, caching is economically decisive. At Claude Code's 92\% hit rate, total cost reduction is 78.9\%, bounded at 85.7\% because output tokens are irreducible.
+
+The VIH-adjusted cost per verified iteration is:
+\[
+    C_{\mathrm{verified}} = \frac{C_{\mathrm{iteration}}}{p_{\mathrm{verify}}}
+\]
+
+The ``token snowball'' effect \citep{sweeffi2025} means failed attempts consume 3--13$\times$ more tokens than successful ones, making failure the dominant cost driver. A 1.71$\times$ more expensive model can be cheaper overall if it raises success rate from 27\% to 40\%.
+
+\subsection{Diminishing Returns in Multi-Agent Iteration}
+
+Multi-agent code verification shows diminishing returns: $+14.9$ pp, $+13.5$ pp, $+11.2$ pp per additional agent. Fitting a saturating exponential $Q(n) = Q_{\max}(1 - e^{-\alpha n})$, the VIH-optimal agent count is approximately $k^* = 4$.
+
+
+% ============================================================
+\section{Related Work}\label{sec:related}
+
+\textbf{Agent efficiency benchmarks.} SWE-bench \citep{sweeffi2025} measures resolve rates, but SWE-Effi introduces resource-bounded effectiveness scores, penalizing high-scoring but slow agents. \citet{bian2025limits} decompose bottlenecks, finding web environment latency dominates (53.7\% of runtime) with LLM API latency varying up to 69$\times$.
+
+\textbf{Speculative execution for agents.} \citet{zhou2025speculative} achieve 46--55\% next-action prediction accuracy. \citet{ji2026dualspec} extend this with heterogeneous speculation for research agents, achieving 3.28$\times$ speedup. Our contribution is the formal speculation ratio test and depth limit, grounded in classical scheduling theory.
+
+\textbf{Caching for LLM agents.} \citet{liang2026cache} evaluate prompt caching empirically. \citet{zhang2025apc} introduce plan template caching at the reasoning level. Our contribution is the competitive-analysis grounding and EOQ-analog theorem.
+
+\textbf{Context management.} \citet{suzgun2024metaprompting} establish the Fresh Eyes advantage. \citet{liu2024lost} identify the ``lost in the middle'' phenomenon. \citet{agentdrift2026} quantify performance degradation over extended interactions. Our contribution is the information-theoretic formalization connecting these empirical findings.
+
+\textbf{Speed--quality tradeoffs in software.} Reinertsen's \emph{Principles of Product Development Flow} (2009) formalizes the cost-of-delay framework and batch-size optimization for product development, providing the direct ancestor of our VIH-based approach in a more general setting. \citet{forsgren2018accelerate} show that speed and stability can be improved simultaneously through DevOps practices. The DORA 2025 report \citep{dora2025} complicates this picture for AI-assisted development, finding throughput gains but stability losses. \citet{kahneman2011thinking} provides the cognitive science foundation for why speed pressure degrades complex reasoning.
+
+
+% ============================================================
+\section{Design Principles}\label{sec:principles}
+
+The formal analysis yields six actionable principles:
+
+\begin{enumerate}
+    \item \textbf{Optimize VIH, not raw speed.} VIH $= \lambda_{\mathrm{raw}} \cdot p_{\mathrm{verify}}$ captures the speed--quality tradeoff in a single metric. Monitor it directly.
+
+    \item \textbf{Speculate conservatively.} Use the ratio test ($p/q > R/B$) to decide whether to speculate. Limit speculation depth to 1 for pipelines with per-stage success probability below 85\%. The Spectre analogy warns that hidden costs may not surface immediately.
+
+    \item \textbf{Refresh context at the EOQ interval.} The optimal refresh interval $T^* = \sqrt{2R/(\Lambda \cdot E_{\mathrm{stale}})}$ balances re-read cost against staleness risk. For typical parameters, this is 15--60 minutes.
+
+    \item \textbf{Bias mode selection toward safety.} The asymmetric cost structure ($c_{\mathrm{FG}} \gg c_{\mathrm{GF}}$) means choosing Governed mode at even 5--10\% posterior probability of needing it is Bayes-optimal.
+
+    \item \textbf{Exploit mixing in concave frontier regions.} When two operating points span a concave region of the speed--quality frontier, probabilistic alternation dominates any intermediate pure strategy.
+
+    \item \textbf{Treat the 12.3\% threshold as a gate for persistent state.} Any context reuse strategy must demonstrate quality degradation below 12.3\% (the break-even for a 7-minute time saving on a 57-minute cycle) to be VIH-positive.
+\end{enumerate}
+
+
+% ============================================================
+\section{Contrarian Positions and Limitations}\label{sec:contrarian}
+
+We engage seven contrarian positions that challenge the temporal optimization thesis.
+
+\textbf{``Speed kills quality.''} The Yerkes--Dodson law \citep{yerkes1908relation} predicts that complex tasks degrade under time pressure. Incubation effects in creative problem-solving \citep{sio2009incubation, wallas1926art} suggest that pauses between work sessions do genuine cognitive work. GitClear data showing doubled code churn with AI adoption \citep{gitclear2025} supports this concern. The strongest form of this argument is that \emph{verification itself becomes less reliable under time pressure}, creating a feedback loop: faster iterations produce lower quality, and the verification that would catch the quality loss is itself degraded. If verification fidelity degrades with speed, VIH is systematically overestimated at high speeds, because $p_{\mathrm{verify}}$ as measured by the harness diverges from the true pass rate. Our framework does not account for this feedback loop, and doing so would require a model of verification accuracy as a function of speed, which remains an open empirical question.
+
+\textbf{``Fresh Eyes is worth the cost.''} The 17.1\% advantage is large. Our analysis shows that naive persistent state is indeed VIH-negative (\S\ref{sec:calibration}). The contrarian position is partially validated; incremental context is only justified when compaction reduces quality loss below 12.3\%.
+
+\textbf{``Speculative execution has hidden costs.''} The Spectre analogy \citep{spectre2018} is apt: speculative state changes may have consequences that do not surface for a long time. We limit speculation depth formally (\Cref{thm:depth}), but the complexity budget consumed by speculation management competes with other engineering needs. For many workloads, the 10--30\% cycle time saving may not justify the implementation and debugging complexity.
+
+\textbf{``Mode selection is hard to automate.''} Bainbridge's ironies \citep{bainbridge1983ironies} create a genuine double bind. Our Bayesian framework (\Cref{thm:mode}) provides a principled threshold, but the features needed for accurate classification (semantic impact, architectural coupling) are themselves expensive to compute, creating a recursive problem.
+
+\textbf{``Caching is a false economy.''} Cache invalidation bugs are intermittent, state-dependent, and compound through cascading cached values. For rapidly changing codebases (active development), cache hit rates may be too low to justify the infrastructure overhead. Our EOQ theorem (\Cref{thm:cache-eoq}) provides a principled refresh schedule, but assumes knowledge of the change rate $\lambda$, which itself must be estimated.
+
+\textbf{``VIH is the wrong metric.''} The most fundamental objection: VIH treats all verified iterations as equally valuable, but they are not. A verified iteration that introduces subtle architectural debt, passes tests but degrades maintainability, or solves the wrong subproblem is ``verified'' but not valuable. The correct target may be \emph{value delivered per unit cost}, incorporating developer time, compute cost, architectural debt, and opportunity cost. VIH is a useful proxy for the speed--quality tradeoff specifically, but it should not be mistaken for a complete objective function. Reinertsen's cost-of-delay framework provides a more comprehensive alternative that accounts for the economic value of delivery timing.
+
+\textbf{Limitations.} Our formal models make simplifying assumptions: Poisson change processes, exponential quality degradation, independence of stage durations, and log-normal stage distributions. The context fidelity model treats staleness as uniform across information types, while in reality, architectural knowledge decays slowly and implementation details decay quickly. The VIH metric, while better than raw speed, does not capture all quality dimensions relevant to long-lived software systems. Empirical validation through controlled experiments (outlined in Appendix~\ref{app:verification}) is needed to test the key predictions.
+
+
+% ============================================================
+\section{Conclusion}\label{sec:conclusion}
+
+We have developed a formal framework for the temporal architecture of AI coding agent harnesses, grounded in classical scheduling, queueing, speculative execution, and cache theory. The central insight is that a useful intermediate metric, Verified Iterations per Hour, has a non-trivial maximum: pushing speed beyond the unit-elasticity point on the speed--quality Pareto frontier degrades effective throughput. The framework yields concrete, falsifiable predictions: naive persistent state is VIH-negative when quality penalties exceed a cycle-time-dependent threshold; speculation is EV-positive only when the success-to-failure odds ratio exceeds the rollback-to-benefit ratio; the optimal cache refresh interval follows an EOQ-analog formula; and mode selection should be biased toward safety by the cost asymmetry ratio. Illustrative calibration suggests that speculative pipelining, tiered verification, and asynchronous governance can reduce GSD cycle time by 20--34\% without significant quality degradation. VIH is not a complete objective function (it ignores failure severity, architectural debt, and delivery value), but it formalizes the speed--quality tradeoff that currently dominates harness design decisions. Controlled experiments validating the key predictions (Appendix~\ref{app:verification}) are needed before the quantitative results should be treated as more than illustrative.
+
+
+% ============================================================
+\begin{appendices}
+
+\section{Verification Roadmap}\label{app:verification}
+
+We outline five experiments to validate the key theoretical predictions:
+
+\textbf{Experiment 1: VIH is maximized at intermediate speed.} Run 100 identical coding tasks at varying speed levels (by adjusting model temperature, planning depth, and verification thoroughness). Measure VIH at each level. Prediction: VIH peaks at an intermediate speed and declines at maximum throughput.
+
+\textbf{Experiment 2: Speculation EV threshold.} Implement speculative pipelining with varying prediction accuracy (by injecting controlled noise into the predictor). Measure cycle time with and without speculation. Prediction: net cycle time reduction is positive only when prediction accuracy exceeds $R/(R+B)$.
+
+\textbf{Experiment 3: Cache refresh interval.} Vary the refresh interval from 5 to 120 minutes across 50 coding sessions. Measure error rates and total cost. Prediction: optimal interval follows $T^* \propto \sqrt{R/(\lambda \cdot E_{\mathrm{stale}})}$.
+
+\textbf{Experiment 4: Mode misclassification asymmetry.} Record 200 mode selection decisions with ground-truth labels (determined post hoc by senior engineers). Compute costs of Type I and Type II errors. Prediction: Type II costs (Fast when Governed needed) exceed Type I costs (Governed when Fast suffices) by $10\times$ or more.
+
+\textbf{Experiment 5: Context fidelity decay.} Measure task accuracy at 10, 30, 60, and 120 minutes after the last full context read, controlling for task difficulty. Prediction: accuracy decays exponentially with time, with half-life approximately 3 hours.
+
+
+\section{Extended Proofs}\label{app:proofs}
+
+\subsection{Multi-Exponential Context Decay}
+
+The single-rate model of \Cref{thm:staleness} can be extended to $K$ information strata with different disruption rates:
+\[
+    I_{\mathrm{stale}}(t) = \sum_{k=1}^K I_k \cdot e^{-\lambda\alpha_k(t - t_0)}
+\]
+where $\sum_k I_k = I_{\mathrm{fresh}}$. This captures the empirical observation that architectural knowledge ($\alpha_k$ small) persists longer than implementation details ($\alpha_k$ large). The aggregate fidelity is a weighted sum of exponentials, which is no longer a single exponential but retains the monotone decreasing property.
+
+\subsection{VIH with Rework Cycles}
+
+If failed iterations require $r$ rework cycles on average:
+\[
+    \VIH_{\mathrm{eff}} = \frac{\lambda_{\mathrm{raw}} \cdot p_{\mathrm{verify}}}{1 + (1 - p_{\mathrm{verify}}) \cdot r}
+\]
+For $r > 0$, this penalizes low $p_{\mathrm{verify}}$ more severely than the basic VIH formula. The optimal speed under rework is strictly lower than under the no-rework model.
+
+\subsection{Sequential Mode Escalation via SPRT}
+
+Instead of a one-shot mode decision, the harness can use Wald's Sequential Probability Ratio Test to accumulate evidence and escalate from Fast to Governed as the task reveals its complexity. The test continues sampling features until the likelihood ratio $\Lambda_n = \prod_{i=1}^n f_1(x_i)/f_0(x_i)$ crosses either threshold $A = (1 - \beta)/\alpha$ (escalate to Governed) or $B = \beta/(1-\alpha)$ (commit to Fast), where $\alpha$ is the false-escalation rate and $\beta$ is the missed-escalation rate. This provides an adaptive alternative to the one-shot Bayesian classifier of \Cref{thm:mode}.
+
+\end{appendices}
+
+
+% ============================================================
+\bibliography{temporal_architecture}
+
+\end{document}

@@ -1,0 +1,566 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{siunitx}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem*{remark}{Remark}
+
+% === Colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+\renewcommand{\today}{}
+
+\title{Information Architecture for AI Coding Agent Harnesses}
+
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\begin{abstract}
+\vspace{-0.2in}
+We present a formal information-theoretic framework for reasoning about how context flows through AI coding agent harnesses, from human-written specifications to executable code. The central problem is \emph{context selection under degradation}: given a finite context window of $W$ tokens and a codebase of size $T \gg W$, select a subset $C$ that maximizes task success probability while accounting for the empirically observed degradation function $\delta(|C|)$ that reduces recall quality as context length increases. We prove that the context relevance function is submodular under mild conditions (yielding a greedy $(1-1/e)$ approximation guarantee), that the degradation-adjusted objective is non-monotone (requiring different algorithmic treatment), and that the optimal context size $|C^*|$ is strictly less than window capacity $W$, with practical estimates of $|C^*| \approx 0.15W$ to $0.40W$ depending on task type. We decompose the spec-to-code \emph{abstraction gap} $H(P|S)$ into three estimable terms (residual uncertainty, context contribution, and prior contribution) using Shannon's chain rule, and show this decomposition is bimodal: trivial for common patterns where the model's prior dominates, large for novel logic where context is the primary lever. We formalize the three-tier information architecture (active, searchable, hidden) adopted by production harnesses, prove that structural enforcement of tier boundaries dominates instructional enforcement with reliability gap growing as $(1-\epsilon)^T$, and characterize the unsolved reuse discovery problem as approximate nearest-neighbor search in a semantic embedding space. Empirical calibration draws on results from 18 frontier models \citep{chroma2025contextrot}, the ETH Zurich AGENTS.md evaluation \citep{gloaguen2026agents}, JetBrains' observation masking study \citep{jetbrains2025complexity}, and production harness architectures.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+% ================================================================
+\section{Introduction}
+\label{sec:introduction}
+
+AI coding agents operate within a fundamental constraint: the context window. A codebase of millions of tokens must be compressed into a window of at most $W$ tokens (typically 128K to 1M), with the agent's task success depending critically on \emph{which} tokens are selected. This is not merely a practical engineering problem; it is an optimization problem with formal structure, approximation guarantees, and hard limits imposed by the physics of transformer attention.
+
+The problem is compounded by a counterintuitive empirical fact: \emph{more context is not better context}. Every frontier model tested by \citet{chroma2025contextrot} (18 models across four providers) exhibited monotonic performance degradation as input length increased. The ``lost in the middle'' effect \citep{liu2024lost} shows that models attend strongly to context boundaries but miss information buried in the middle, with accuracy drops exceeding 30 percentage points. Even whitespace padding (zero semantic content) degrades performance by 13.9\% to 85\% \citep{du2025context}. These findings collectively establish that context is a \emph{scarce resource requiring budgeting, not a bucket to be filled}.
+
+Production coding agent harnesses have converged on a common architecture: a three-tier information model with hard boundaries between always-loaded context (active), on-demand retrieval (searchable), and permanently excluded information (hidden). This convergence is not accidental; it reflects the underlying optimization structure of the context selection problem.
+
+Yet no formal framework exists for reasoning about this architecture. Context engineering remains an empirical discipline guided by practitioner intuition rather than theoretical guarantees. This paper provides such a framework. Our contributions are:
+
+\begin{enumerate}
+    \item A formal definition of the \textbf{context selection problem} as degradation-adjusted submodular maximization under a knapsack constraint, with proof that the greedy algorithm achieves a $1/2$-approximation for the non-monotone objective (\S\ref{sec:context-selection}).
+    \item An \textbf{abstraction gap decomposition} $H(P|S) = H(P|S,C,\theta) + I(P;C|S,\theta) + I(P;\theta|S)$ using Shannon's chain rule, with exact equality and all terms estimable from LLM log-probabilities (\S\ref{sec:abstraction-gap}).
+    \item A formal characterization of the \textbf{context degradation function} $\delta(|C|)$, fit to empirical data from five independent studies, establishing the power law $\delta(n) = (n/W_{\text{eff}})^\alpha$ with $\alpha \in [0.3, 0.5]$ as the best-fit model (\S\ref{sec:degradation}).
+    \item A proof that the \textbf{optimal context size is strictly less than window capacity} ($|C^*| < W$), with practical estimates of $|C^*| \approx 0.15W$ to $0.40W$ (\S\ref{sec:budget}).
+    \item A formalization of the \textbf{three-tier information architecture} with a proof that structural enforcement dominates instructional enforcement, the reliability gap growing as $(1-\epsilon)^T$ over agent trajectories (\S\ref{sec:tiered}).
+    \item A characterization of the \textbf{reuse discovery problem} as approximate nearest-neighbor search in a semantic embedding space, with a proposed decision gate protocol (\S\ref{sec:reuse}).
+\end{enumerate}
+
+This is a \emph{theory and position paper}: we develop formal tools and calibrate them against published empirical results, but we do not conduct new experiments. We note that this is a rapidly evolving area where practitioner discourse (blog posts, industry reports, preprints) frequently precedes peer-reviewed publication; we draw on such sources where they provide the best available evidence, and flag them accordingly.
+
+
+% ================================================================
+\section{Preliminaries and Definitions}
+\label{sec:preliminaries}
+
+\subsection{Notation}
+
+We work within Shannon's information-theoretic framework throughout. All logarithms are base 2; entropy is measured in bits.
+
+\begin{itemize}[nosep]
+    \item $S$: specification (natural language task description), treated as a random variable
+    \item $P$: correct program (the target output), random variable over programs
+    \item $U = \{u_1, \ldots, u_n\}$: codebase units (files, functions, classes)
+    \item $C \subseteq U$: context, a selected subset of codebase units
+    \item $\theta$: model prior (training data, weights); fixed during inference
+    \item $W$: context window capacity in tokens
+    \item $|C| = \sum_{u_i \in C} s_i$: total token size of context, where $s_i$ is the size of unit $u_i$
+    \item $H(\cdot)$, $I(\cdot;\cdot)$: Shannon entropy and mutual information
+\end{itemize}
+
+\subsection{Why Shannon, Not Kolmogorov}
+
+Prior work on the abstraction gap defines it as conditional Kolmogorov complexity $K(P|S)$, which is uncomputable. We prefer Shannon entropy $H(P|S)$ for four reasons: (1) it is computable from data; (2) it handles distributions naturally (LLMs are probabilistic); (3) the chain rule holds with exact equality (no $O(\log n)$ error terms); (4) all derived quantities ($H(P|S,C,\theta)$, $I(P;C|S,\theta)$) are estimable from LLM log-probabilities. The relationship between the two frameworks is well-characterized: for sequences typical according to a source, Kolmogorov complexity is asymptotically close to Shannon code length \citep{vitanyi2004shannon}. Shannon underestimates difficulty for atypical (genuinely novel) code, which is precisely where context investment matters most; we address this directly in \S\ref{sec:bimodal}.
+
+\subsection{The Entropy of Specifications and Code}
+
+\citet{shannon1951prediction} measured the entropy of English text at 0.6 to 1.3 bits per character using human prediction experiments. Recent LLM-based measurements \citep{bialek2025entropy} show the conditional entropy continues to decrease with context length beyond $10^4$ characters, suggesting Shannon's estimate may have been an upper bound.
+
+\citet{hindle2012naturalness} measured Java source code cross-entropy at 3 to 4 bits per token using smoothed trigrams. \citet{hellendoorn2017deep} refined this to 1.92 bits/token (nested cache n-gram) and 1.25 bits/token (combined best model). The low conditional entropy of code means context selection has very high leverage: the right context can make code generation nearly deterministic.
+
+
+% ================================================================
+\section{The Context Selection Problem}
+\label{sec:context-selection}
+
+\subsection{Formal Statement}
+
+\begin{definition}[Context Relevance Function]
+\label{def:relevance}
+Define $f: 2^U \to \mathbb{R}_{\geq 0}$ as:
+$$f(C) \triangleq I(C; P \mid S, \theta) = H(P \mid S, \theta) - H(P \mid S, C, \theta)$$
+This measures the reduction in uncertainty about the correct program $P$ when context $C$ is provided.
+\end{definition}
+
+\begin{definition}[Context Degradation Function]
+\label{def:degradation}
+Define $\delta: \mathbb{R}_{\geq 0} \to [0, 1]$ satisfying: (i) $\delta(0) = 0$; (ii) $\delta$ is monotonically nondecreasing; (iii) $\delta$ is convex on $[0, W]$. Empirical evidence (\S\ref{sec:degradation}) supports the parametric form $\delta(x) = (x/W_{\text{eff}})^{\alpha_d}$ with $\alpha_d \in [0.3, 0.5]$ and $W_{\text{eff}} \in [0.1W, 0.7W]$.
+\end{definition}
+
+\begin{definition}[Context Selection Problem]
+\label{def:csp}
+$$C^* = \arg\max_{C \subseteq U,\; |C| \leq W} \; \tilde{f}(C) = \arg\max_{C \subseteq U,\; |C| \leq W} \; f(C) \cdot (1 - \delta(|C|))$$
+Select a subset of codebase units, subject to a knapsack constraint, maximizing the product of information gain and exploitation efficiency.
+\end{definition}
+
+\subsection{Submodularity Analysis}
+
+\begin{theorem}[Submodularity of Context Relevance]
+\label{thm:submodularity}
+Let $f(C) = I(C; P \mid S, \theta)$. If the conditional entropy $g(C) = H(P|S,C,\theta)$ is supermodular, then $f$ is submodular.
+\end{theorem}
+
+\begin{proof}
+Since $f(C) = H(P|S,\theta) - g(C)$ and $H(P|S,\theta)$ is constant with respect to $C$, $f$ is submodular if and only if $g$ is supermodular. The supermodularity condition states that for $A \subseteq B \subseteq U$ and $u \notin B$:
+$$g(A \cup \{u\}) - g(A) \leq g(B \cup \{u\}) - g(B)$$
+Equivalently, the marginal reduction in entropy from adding $u$ is larger for smaller sets (diminishing returns of information).
+\end{proof}
+
+\begin{proposition}[Sufficient Conditions]
+\label{prop:sufficient}
+The relevance function $f$ is submodular under any of:
+\begin{enumerate}[nosep,label=(\alph*)]
+    \item Conditional independence of $u_1, \ldots, u_n$ given $(P, S, \theta)$;
+    \item Jointly Gaussian distribution of $(U, P)$ given $(S, \theta)$ \citep{krause2008near};
+    \item Log-supermodular conditional density $p(P, C | S, \theta)$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proposition}[Code Dependencies Break Submodularity]
+\label{prop:break}
+When codebase units have strong complementarities (e.g., an interface definition $u_i$ and its implementation $u_j$), $f(\{u_i, u_j\}) > f(\{u_i\}) + f(\{u_j\})$, violating submodularity.
+\end{proposition}
+
+In practice, complementarities are localized within modules while diminishing returns dominate globally. The \emph{submodularity ratio} $\gamma_f$ \citep{das2011submodular} quantifies this: when $\gamma_f < 1$ but bounded away from zero, greedy algorithms achieve a $(1 - e^{-\gamma_f})$ approximation, degrading gracefully.
+
+\subsection{The Degradation-Adjusted Objective}
+
+\begin{theorem}[Non-Monotonicity of the Product Objective]
+\label{thm:nonmonotone}
+Let $f$ be monotone submodular and $\delta$ convex nondecreasing with $\delta(0) = 0$. The degradation-adjusted objective $\tilde{f}(C) = f(C) \cdot (1 - \delta(|C|))$ is neither submodular nor monotone in general.
+\end{theorem}
+
+\begin{proof}
+\emph{Non-monotonicity.} Let $C$ be such that $|C| = W - s_u$ for some unit $u$ with $f(\{u\}) > 0$, and suppose $\delta(W) > 1 - f(C)/(f(C) + f(\{u\}))$. Then:
+\begin{align*}
+\tilde{f}(C \cup \{u\}) &= (f(C) + \Delta_u f(C)) \cdot (1 - \delta(W)) \\
+&< f(C) \cdot (1 - \delta(|C|)) = \tilde{f}(C)
+\end{align*}
+whenever $\Delta_u f(C) \cdot (1 - \delta(W)) < f(C) \cdot (\delta(W) - \delta(|C|))$, which holds for sufficiently large $|C|$ by convexity of $\delta$ and diminishing returns of $f$.
+
+\emph{Non-submodularity.} Consider $A = \emptyset$, $B$ with $|B|$ near $W/2$, and a small unit $u$. Adding $u$ to $A$ gives $\tilde{f}(\{u\}) = f(\{u\}) \cdot (1 - \delta(s_u)) \approx f(\{u\})$. Adding $u$ to $B$ gives marginal gain $\Delta_u f(B) \cdot (1 - \delta(|B| + s_u)) - f(B) \cdot (\delta(|B|+s_u) - \delta(|B|))$. The second (negative) term can dominate the submodular ordering when $\delta$ is steep, making the marginal gain for $B$ \emph{larger} than for some intermediate set, violating diminishing returns.
+\end{proof}
+
+\begin{proposition}[Greedy Approximation]
+\label{thm:greedy}
+Write $\tilde{f}(C) = f(C) \cdot (1 - \delta(|C|))$. When $\delta$ is small (so the linear approximation $\tilde{f}(C) \approx f(C) - \bar{f} \cdot \delta(|C|)$ is tight), the regularized objective $g(C) = f(C) - \bar{f} \cdot \delta(|C|)$ is the difference of a submodular and a supermodular function, hence submodular. A modified greedy algorithm with early stopping (halting when no element has positive net marginal gain) achieves:
+$$g(\hat{C}) \geq \frac{1}{2} \cdot g(C^*)$$
+for the unconstrained problem \citep{buchbinder2015tight}. The knapsack constraint $|C| \leq W$ is non-binding in practice because the early stopping rule terminates well before $|C| = W$ (as shown in Theorem~\ref{thm:budget}), making the unconstrained guarantee applicable. The approximation error from linearization is bounded by $O(\delta^2)$, which is small when $\delta(|C^*|) \ll 1$.
+\end{proposition}
+
+\begin{remark}
+\citet{jina2025submodular} independently proposed submodular optimization for context engineering using the lazy greedy algorithm. Our extension to the degradation-adjusted, non-monotone setting addresses the regime where naive greedy overfills the window. The $1/2$-guarantee should be understood as holding for the linearized surrogate; tighter bounds for the multiplicative objective remain an open problem.
+\end{remark}
+
+
+% ================================================================
+\section{The Abstraction Gap Decomposition}
+\label{sec:abstraction-gap}
+
+\begin{theorem}[Abstraction Gap Decomposition]
+\label{thm:decomposition}
+For specification $S$, program $P$, context $C$, and model prior $\theta$:
+$$H(P \mid S) = \underbrace{H(P \mid S, C, \theta)}_{\text{residual}} + \underbrace{I(P; C \mid S, \theta)}_{\text{context}} + \underbrace{I(P; \theta \mid S)}_{\text{prior}}$$
+\end{theorem}
+
+\begin{proof}
+Apply the chain rule twice. Step 1: $H(P|S) = H(P|S,\theta) + I(P;\theta|S)$. Step 2: $H(P|S,\theta) = H(P|S,C,\theta) + I(P;C|S,\theta)$. Substituting yields the result. Each step is an instance of $H(X|Y) = H(X|Y,Z) + I(X;Z|Y)$, which holds with exact equality for Shannon entropy.
+\end{proof}
+
+The three terms have distinct interpretations and design implications:
+
+\begin{itemize}[nosep]
+    \item \textbf{Residual uncertainty} $H(P|S,C,\theta)$: bits the model cannot determine even with context and prior. These are genuinely novel design decisions.
+    \item \textbf{Context contribution} $I(P;C|S,\theta) = f(C)$: bits the context provides beyond spec and prior. This is what context engineering optimizes.
+    \item \textbf{Prior contribution} $I(P;\theta|S)$: bits the model's training data provides. For common patterns, this term dominates.
+\end{itemize}
+
+\subsection{The Bimodal Gap}
+\label{sec:bimodal}
+
+\noindent\textbf{Empirical Observation (Bimodal Gap Distribution).}
+\label{cor:bimodal}
+The abstraction gap $H(P|S)$ appears bimodally distributed across tasks in practice:
+\begin{itemize}[nosep]
+    \item \textbf{Low-gap} (common patterns: CRUD, auth, forms): $H(P|S) \approx I(P;\theta|S)$, mostly resolved by the prior.
+    \item \textbf{High-gap} (novel logic: custom algorithms, domain-specific state machines): $H(P|S) \approx I(P;C|S,\theta) + H(P|S,C,\theta)$, dominated by context and residual uncertainty.
+\end{itemize}
+This does not follow deductively from the decomposition (which holds for all tasks); it is an empirical hypothesis supported by the evidence below.
+
+Empirical support comes from \citet{gloaguen2026agents}: LLM-generated context files \emph{reduced} success rates by 3\% while increasing costs by 20\%, because for common patterns the prior already supplies the needed information and additional context creates distraction. Human-written files helped only 4\%, and only when existing documentation was sparse.
+
+\begin{remark}
+The bimodal gap implies a strategic allocation principle: invest context engineering effort proportional to task novelty. A triage function should classify tasks before deciding context retrieval intensity.
+\end{remark}
+
+\subsection{Advantage Over Kolmogorov}
+
+The analogous Kolmogorov decomposition $K(P|S) \approx K(P|S,C) + I_K(P:C|S) + O(\log n)$ holds only up to $O(\log n)$ additive error. The Shannon version holds with exact equality. The first two terms are directly estimable: $H(P|S,C,\theta)$ from LLM token-level log-probabilities, and $I(P;C|S,\theta)$ by comparing generation perplexity with and without context. The prior contribution $I(P;\theta|S)$ is harder to estimate, as it requires a reference model without task-relevant training data (a randomly initialized model produces near-uniform outputs, making the estimate ill-conditioned). Practical approximation strategies include comparing models of different sizes or using held-out domain-specific evaluation sets, but this remains an open methodological challenge.
+
+
+% ================================================================
+\section{Context Degradation: Empirical Characterization}
+\label{sec:degradation}
+
+\subsection{Universal Degradation}
+
+\citet{chroma2025contextrot} tested 18 frontier models (Claude Opus 4, Sonnet 4, GPT-4.1, Gemini 2.5 Pro, Qwen3 variants, and others) and found \textbf{every model degrades as input length increases}. The degradation is monotonic, non-linear, and early-onset (beginning well before advertised context limits).
+
+\subsection{The U-Shaped Positional Recall Function}
+
+\citet{liu2024lost} established the positional degradation profile. We model it as a double-exponential with length-dependent floor:
+
+\begin{definition}[Positional Recall Function]
+\label{def:recall}
+$$\text{recall}(i, n) = \phi_0 \left(\frac{n_0}{n}\right)^{\!\gamma} + A_p \cdot e^{-\lambda_p \cdot i} + A_r \cdot e^{-\lambda_r \cdot (n - i)}$$
+where $\phi_0$ is the baseline floor at reference length $n_0$, $\gamma$ controls floor collapse with length, and $(A_p, \lambda_p)$, $(A_r, \lambda_r)$ parameterize primacy and recency effects respectively.
+\end{definition}
+
+Fitting to \citet{liu2024lost}'s 20-document QA data: $\phi_0 = 0.55$, $A_p = 0.20$, $\lambda_p = 0.26$, $A_r = 0.17$, $\lambda_r = 0.15$, $\gamma = 0.23$. The primacy effect is grounded in the attention sink mechanism: \citet{xiao2024efficient} showed that the first 4 tokens absorb over half the total attention mass regardless of content, with perplexity exploding 955$\times$ when they are removed.
+
+\subsection{Degradation Function Fit}
+
+We fit three candidate forms to empirical data from \citet{du2025context} and the Context Discipline study \citep{contextdiscipline2025}:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Form} & \textbf{$\delta(5.3\text{K})$} & \textbf{$\delta(13\text{K})$} & \textbf{$\delta(20\text{K})$} \\
+\midrule
+Observed (Llama-3.1-70B) & 0.60 & 0.82 & 0.88 \\
+Exponential: $1 - e^{-\lambda n}$ & 0.60 & 0.90 & 0.97 \\
+\textbf{Power law: $(n/W_{\text{eff}})^\alpha$} & \textbf{0.60} & \textbf{0.82} & \textbf{0.86} \\
+Sigmoid: $1/(1+e^{-k(n-n_0)})$ & 0.60 & 0.85 & 0.95 \\
+\bottomrule
+\end{tabular}
+\caption{Degradation function fits. The power law ($\alpha \approx 0.35$, $W_{\text{eff}} \approx 22{,}750$ tokens) provides the best fit, capturing steep early degradation followed by a flattening tail.}
+\label{tab:degradation-fit}
+\end{table}
+
+The recommended model is:
+$$\delta(n) = \min\!\left(1, \;\left(\frac{n}{W_{\text{eff}}}\right)^{\!\alpha}\right), \quad \alpha \in [0.3, 0.5], \quad W_{\text{eff}} \in [0.1W, 0.7W]$$
+
+The range of $W_{\text{eff}}/W$ is task-dependent: reasoning tasks (multi-hop, code generation) have $W_{\text{eff}} \approx 0.1W$ to $0.2W$; retrieval tasks (lexical, NIAH) have $W_{\text{eff}} \approx 0.6W$ to $0.7W$ \citep{kuratov2024babilong, hsieh2024ruler}.
+
+\begin{remark}[Limitations of the parametric fit]
+The fit in Table~\ref{tab:degradation-fit} is calibrated to three data points from a single model (Llama-3.1-70B). The broad parameter ranges ($\alpha \in [0.3, 0.5]$, $W_{\text{eff}}/W \in [0.1, 0.7]$) reflect this uncertainty. Validation across the full 18-model Chroma dataset and additional task types is needed before the parametric form can be treated as more than a useful approximation. Similarly, the positional recall model (Definition~\ref{def:recall}) has six free parameters fitted to one study; it should be understood as a descriptive model pending cross-study validation, not a predictive law.
+\end{remark}
+
+\subsection{Position Dominates Relevance}
+
+\begin{proposition}[Position Dominance Inequality]
+\label{prop:position}
+Define the effective recall of item $i$ as $\text{eff\_recall}(i, n, r_i) = \text{recall}(i,n) \cdot (1 + \eta \cdot (r_i - r_{\text{avg}}))$, where $\eta \in [0,1]$ is the \emph{relevance sensitivity} (how much relevance modulates positional recall) and $r_i \in [0,1]$ is the item's relevance. Empirical evidence from \citet{du2025context} and \citet{chroma2025contextrot} constrains $\eta \leq 0.3$: relevance can boost effective recall by at most 30\% relative to the positional baseline. Under typical parameters, a moderately relevant item ($r = 0.5$) at a boundary position outperforms a highly relevant item ($r = 1.0$) at the middle by approximately 18\%.
+\end{proposition}
+
+This formalizes the empirical observation that even highly relevant content suffers substantial degradation when placed in the middle of a long context \citep{liu2024lost, du2025context}. The practical implication is that context \emph{ordering} matters as much as content: highest-relevance items should be placed at context boundaries.
+
+\subsection{Superlinear Distractor Interference}
+
+\citet{chroma2025contextrot} found that models perform better on shuffled (incoherent) haystacks than on logically structured ones, a finding consistent across all 18 models tested. We explain this via superlinear distractor interference: coherent distractors form clusters with high pairwise similarity, producing a quadratic reinforcement term $\binom{n_d}{2} \cdot \bar{s}_d$ in the attention competition. Shuffling destroys cluster structure, reducing interference to linear.
+
+
+% ================================================================
+\section{The Context Budget Theorem}
+\label{sec:budget}
+
+\begin{theorem}[Optimal Context Is Less Than Capacity]
+\label{thm:budget}
+Assume: (i) $f$ is monotone nondecreasing submodular with $f(\emptyset) = 0$; (ii) $\delta$ is continuously differentiable, convex, nondecreasing with $\delta(0) = 0$; (iii) some context is useful ($\exists u: f(\{u\}) > 0$); (iv) the marginal exhaustion condition holds: at full capacity, the last unit's marginal gain is less than its marginal degradation cost. Then $|C^*| < W$.
+\end{theorem}
+
+\begin{proof}
+By contradiction. If $|C^*| = W$, removing the unit with smallest marginal gain $u_{\text{last}}$ yields $C' = C^* \setminus \{u_{\text{last}}\}$ with $\tilde{f}(C') > \tilde{f}(C^*)$ by the marginal exhaustion condition, contradicting optimality.
+\end{proof}
+
+The continuous relaxation yields an elasticity-matching condition at the optimum:
+$$\frac{F'(x^*)}{F(x^*)} = \frac{\delta'(x^*)}{1 - \delta(x^*)}$$
+where $F(x) = \max_{C:|C|=x} f(C)$. The relative rate of information gain must equal the relative rate of degradation increase.
+
+\begin{corollary}[Practical Budget Rule]
+\label{cor:budget}
+For typical parameters ($\alpha \approx 0.35$, $\beta \approx 1.5$, 80\% information captured by $0.2W$, $\delta(W) \approx 0.3$):
+$$|C^*| \approx 0.15W \text{ to } 0.40W$$
+\end{corollary}
+
+For a 200K-token window performing code generation ($\rho \approx 0.15$), the optimal context budget is approximately 30K tokens. The remaining 170K tokens are not merely wasted if filled; they are \emph{actively harmful}. This is consistent with JetBrains' finding that removing 52\% of context tokens \emph{improved} performance by 2.6\% \citep{jetbrains2025complexity}.
+
+
+% ================================================================
+\section{The Three-Tier Information Architecture}
+\label{sec:tiered}
+
+\subsection{Formal Model}
+
+\begin{definition}[Three-Tier Partition]
+\label{def:tiers}
+A tiered information architecture is a partition $\mathcal{I} = T_1 \sqcup T_2 \sqcup T_3$:
+\begin{itemize}[nosep]
+    \item $T_1$ (Active): always loaded, cost $c_1 = 0$, capacity $|T_1| \leq B_1 \ll W$
+    \item $T_2$ (Searchable): loaded on demand, cost $c_2 > 0$ per retrieval, transient
+    \item $T_3$ (Hidden): never loaded, cost $c_3 = \infty$
+\end{itemize}
+\end{definition}
+
+Production harnesses converge on $B_1 \approx 60$ lines: HumanLayer's CLAUDE.md under 60 lines \citep{humanlayer2025skillissue}, OpenAI Codex's AGENTS.md at roughly 100 lines \citep{openai2025codex}, and \citet{gloaguen2026agents}'s recommendation of ``only minimal requirements.''
+
+\begin{proposition}[Greedy Tier 1 Assignment]
+Under convex $\delta$, the optimal $T_1$ is approximately solved by greedy-by-density: sort items by $v(f_i)/|f_i|$ (information value per token), assign in decreasing order until $B_1$ is exhausted.
+\end{proposition}
+
+\subsection{Context Curation Theorem}
+
+\begin{theorem}[Curation Beats Accumulation]
+\label{thm:curation}
+Let $C_s$ (curated, $|C_s| \ll W$) and $C_l$ (uncurated, $|C_l| \approx W$) be two context configurations. The curated configuration delivers higher effective information whenever:
+$$\rho(C_s) \cdot |C_s| \cdot (1 - \delta(|C_s|)) > \rho(C_l) \cdot |C_l| \cdot (1 - \delta(|C_l|))$$
+where $\rho(C) = \sum v(f_i) / |C|$ is the information density.
+\end{theorem}
+
+\begin{corollary}[Diminishing Returns of Expansion]
+Each additional item must clear a rising inclusion bar:
+$$\sum_{f_i \in \Delta} v(f_i) > \frac{\delta(|C| + |\Delta|) - \delta(|C|)}{1 - \delta(|C| + |\Delta|)} \cdot V_{\text{eff}}(C)$$
+As $|C|$ grows and $\delta$ steepens, the right-hand side grows rapidly.
+\end{corollary}
+
+\subsection{Structural vs. Instructional Enforcement}
+
+\begin{definition}[Enforcement Modalities]
+An \emph{instructional constraint} $d$ has compliance probability $P(\text{comply}|d) = 1 - \epsilon$ where $\epsilon \in (0,1)$ always. A \emph{structural constraint} $m$ has $P(\text{comply}|m) = 1$.
+\end{definition}
+
+\begin{theorem}[Multi-Step Compliance Decay]
+\label{thm:compliance}
+Over an agent trajectory of $T$ steps, instructional compliance decays as $(1-\epsilon)^T$ while structural compliance remains at 1. The reliability gap $\Gamma(T) = 1 - (1-\epsilon)^T$ exceeds 99\% by $T = 100$ for $\epsilon = 0.05$.
+\end{theorem}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{rcc}
+\toprule
+\textbf{Trajectory $T$} & \textbf{Instructional} & \textbf{Gap $\Gamma$} \\
+\midrule
+1 & 95.0\% & 5.0\% \\
+10 & 59.9\% & 40.1\% \\
+50 & 7.7\% & 92.3\% \\
+100 & 0.6\% & 99.4\% \\
+250 & $< 0.001\%$ & $\approx 100\%$ \\
+\bottomrule
+\end{tabular}
+\caption{Compliance probability under instructional enforcement ($\epsilon = 0.05$). By 250 steps (JetBrains' upper bound for agent runs), instructional enforcement is virtually guaranteed to fail at least once.}
+\label{tab:compliance}
+\end{table}
+
+Production harnesses implement structural enforcement through five categories: filesystem isolation (RAPID worktrees, Codex containers), tool restriction (Spotify Honk's allowlisted commands), context scoping (GSD's fresh 200K per task), output filtering (JetBrains' observation masking), and interface contracts (typed tool schemas). The principle: prefer mechanisms over policies.
+
+\subsection{Fresh Context Advantage}
+
+\begin{proposition}[Fresh Context Dominance]
+\label{thm:fresh}
+Let $\{S_1, \ldots, S_T\}$ be a task sequence with \emph{diversity} $d = \mathbb{E}_{i \neq j}[1 - \cos(v_i, v_j)] > 0$, where $v_t$ is the vector of item relevance values for task $S_t$. Under accumulated context, the relevance density $\rho_t$ decays monotonically: each $\Delta_i$ (context generated for task $S_i$) has high value for $S_i$ but low expected value for $S_t$ ($t \neq i$), so the numerator $\sum v_t(f_i)$ grows slowly while the denominator $|C_t|$ grows by at least $|\Delta_t|$ per step. Under fresh context, $\rho_t$ is constant (re-selected each time). The per-task advantage $V_{\text{eff}}(C_t^{\text{fresh}}) - V_{\text{eff}}(C_t^{\text{acc}})$ grows with $t$ (as accumulated context degrades), while the selection cost $c_{\text{select}}$ is constant. Thus fresh context dominates in total effective information for $T > T^* = c_{\text{select}} / \mathbb{E}[\Delta V_t]$.
+\end{proposition}
+
+Production harnesses set $T^* = 1$ in practice: GSD never accumulates, Codex tears down containers per task, and RAPID isolates agents in separate worktrees. This suggests $c_{\text{select}}$ is small relative to degradation costs.
+
+\citet{jetbrains2025complexity}'s observation masking is a partial-freshness operator: a deterministic projection that removes low-value items while preserving high-value ones. Their key finding (deterministic masking outperforms LLM summarization on solve rate, cost, and trajectory length) supports the principle that compaction should be a projection function, not a generative model.
+
+
+% ================================================================
+\section{The Reuse Discovery Problem}
+\label{sec:reuse}
+
+Context blindness causes the most common AI code quality issue: duplicate logic proliferation. An agent asked to format a date will write a new \texttt{formatDate()} even when one exists three directories away. This is not a reasoning failure; it is an information failure.
+
+\subsection{Formal Statement}
+
+\begin{definition}[Functional Similarity]
+Given candidate function $g$ and existing function $f_j$, define:
+$$\text{sim}(g, f_j) \triangleq \frac{I(g; f_j)}{H(g, f_j)}$$
+This normalized mutual information takes values in $[0,1]$: 0 for independent functions, 1 for functionally equivalent ones.
+\end{definition}
+
+\begin{definition}[Reuse Detection Problem]
+Given threshold $\tau$ and candidate specification $\sigma_g$, find all $f_j$ with $\text{sim}(\sigma_g, f_j) > \tau$.
+\end{definition}
+
+Under a code embedding $\phi$ that is approximately sufficient for functional semantics, this reduces to approximate nearest-neighbor search: $\{j : \|\phi(\sigma_g) - \phi(f_j)\| < r(\tau)\}$.
+
+\subsection{State of the Art in Code Embeddings}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Model} & \textbf{POJ-104 MAP@R} & \textbf{Architecture} \\
+\midrule
+CodeBERT \citep{feng2020codebert} & 82.67 & Encoder-only \\
+GraphCodeBERT \citep{guo2021graphcodebert} & 85.16 & + data flow \\
+UniXcoder \citep{guo2022unixcoder} & 90.52 & Cross-modal \\
+CodeT5+ \citep{wang2023codet5plus} & +3.2 MRR & Enc-dec \\
+\bottomrule
+\end{tabular}
+\caption{Code similarity benchmarks. UniXcoder leads on POJ-104.}
+\label{tab:embeddings}
+\end{table}
+
+Traditional clone detection tools (NiCad, SourcererCC) achieve near-perfect recall on Type 1--2 clones but degrade sharply on Type 3--4 (semantic) clones \citep{svajlenko2015bigclonebench}. Deep learning approaches close the gap: CodeBERT achieves F1 92.2\% on BigCloneBench; contrastive pre-training improves AUROC by 39\% on adversarial benchmarks. \citet{saieva2024reinforest} achieves 44.7\% improvement on cross-language code search.
+
+\subsection{The Missing Decision Gate}
+
+No published work formalizes the ``should I reuse or create?'' decision as a gate in the agent's action space. Existing tools provide \emph{context retrieval} (presenting similar code), not \emph{reuse enforcement} (requiring justification for creating duplicates). We propose:
+
+\begin{enumerate}[nosep]
+    \item Extract the proposed function's signature, AST structure, and semantic embedding
+    \item Search all three tiers in parallel (type-signature, AST-structural, semantic)
+    \item If any match exceeds $\tau$: require explicit justification for creation
+    \item Log the decision for audit
+\end{enumerate}
+
+\subsection{The Reuse Map as Compression}
+
+A \emph{reuse map} $R = \{(n_j, \sigma_j, \ell_j)\}$ (name, signature, location) compresses the codebase for reuse decisions at roughly 1000$\times$ compression ratio while retaining approximate sufficiency. For a 500-file codebase with 50 reusable components: $|R| \approx 1{,}000$ tokens versus $|\text{codebase}| \approx 1.5$M tokens. This extreme density makes $R$ an ideal Tier 1 item.
+
+
+% ================================================================
+\section{Empirical Calibration from Production Harnesses}
+\label{sec:empirical}
+
+\subsection{Convergent Patterns}
+
+Production harnesses have independently converged on five patterns that our framework predicts:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Pattern} & \textbf{Harnesses} & \textbf{Formal Basis} \\
+\midrule
+Context as budget & GSD (30--40\%), ACE-FCA (40--60\%) & Theorem~\ref{thm:budget}: $|C^*| < W$ \\
+Fresh per task & GSD, RAPID, Codex & Theorem~\ref{thm:fresh}: fresh dominates \\
+Structural enforcement & Spotify, Codex, RAPID & Theorem~\ref{thm:compliance}: $(1-\epsilon)^T$ decay \\
+Minimal instructions & Codex ($\sim$100 lines), ETH ($<60$ lines) & the bimodal gap observation (\S\ref{sec:bimodal}): prior handles common patterns \\
+Deterministic compaction & JetBrains masking & Curation theorem: projection $>$ generation \\
+\bottomrule
+\end{tabularx}
+\caption{Production harness patterns and their formal justifications.}
+\label{tab:harness-patterns}
+\end{table}
+
+\subsection{Cognitive Load Theory Connection}
+
+\citet{kim2024working} showed transformers exhibit working memory capacity limits analogous to human cognition: attention entropy increases with the number of items to track, even within the context window. This maps directly onto \citet{sweller1988cognitive}'s framework:
+
+\begin{itemize}[nosep]
+    \item \textbf{Intrinsic load} $\leftrightarrow$ cross-file dependencies to track
+    \item \textbf{Extraneous load} $\leftrightarrow$ distractor tokens, verbose tool outputs, stale context
+    \item \textbf{Germane load} $\leftrightarrow$ attention allocated to task-relevant tokens
+\end{itemize}
+
+\citet{guo2024cognitive} demonstrated this analogy is operationally exploitable: stacking irrelevant cognitive tasks before a target prompt achieved 99.99\% attack success on Claude-3-Opus, with models defaulting to pretraining knowledge under cognitive overload. This is an adversarial demonstration that extraneous load overwhelms transformer attention, just as it overwhelms human working memory.
+
+\subsection{Why Naive RAG Fails for Code}
+
+\citet{byterover2025vectorrag} tested vector RAG on a 1,300-file TypeScript codebase and found 94.7\% of retrieved chunks were irrelevant (precision 0.053). \citet{factory2025context} explains the structural reason: vector embeddings ``flatten rich structure into undifferentiated chunks, destroying critical relationships between components.'' \citet{polpichai2026graphrag} showed deterministic AST-derived graphs outperform both naive RAG and LLM-extracted knowledge graphs for code retrieval. The industry has already shifted from vector similarity to structural navigation (grep, AST parsing, dependency graph traversal).
+
+
+% ================================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Context Engineering.} \citet{anthropic2025context} established the ``smallest set of high-signal tokens'' principle with four functional components (system prompts, tools, examples, message history). \citet{spotify2025honk} contributed the ``static over dynamic'' philosophy. \citet{humanlayer2025skillissue} distinguished structural from instructional enforcement and coined ``success should be silent.''
+
+\paragraph{Submodular Optimization for NLP.} \citet{lin2011submodular} proved submodularity for document summarization functions. \citet{jina2025submodular} applied submodular optimization to LLM context engineering. Our work extends this to the degradation-adjusted setting, which breaks monotonicity and requires different algorithmic treatment.
+
+\paragraph{Long-Context Evaluation.} \citet{liu2024lost}, \citet{chroma2025contextrot}, \citet{du2025context}, \citet{kuratov2024babilong}, and \citet{hsieh2024ruler} collectively establish the empirical degradation landscape. Our contribution is formalizing these findings into a unified degradation function with fitted parameters.
+
+\paragraph{Code Intelligence.} \citet{hindle2012naturalness} established code entropy measurements. \citet{feng2020codebert}, \citet{guo2022unixcoder}, and \citet{wang2023codet5plus} provide the embedding models for reuse discovery. Our contribution is framing the reuse problem as a formal decision gate, not merely retrieval.
+
+\paragraph{Value of Information.} The context selection problem (which information to acquire before acting) is an instance of the \emph{value of information} problem from decision theory, studied since Howard (1966). Our submodular formalization connects to this literature: the greedy algorithm for submodular VoI was analyzed by Krause and Guestrin (2005). The degradation penalty is our novel addition, absent from the classical VoI setting where acquiring more information is never harmful.
+
+\paragraph{Information Bottleneck.} \citet{tishby2000information} introduced the information bottleneck method. The context window can be viewed as an information bottleneck between the full codebase and the generated code, providing an alternative formalization with a concave information curve characterizing the compression-prediction tradeoff.
+
+
+% ================================================================
+\section{Design Principles}
+\label{sec:design}
+
+The formal framework motivates six design principles for information architecture in coding agent harnesses:
+
+\begin{enumerate}
+    \item \textbf{Budget context, do not accumulate it.} The optimal context size is $0.15W$ to $0.40W$ (Theorem~\ref{thm:budget}). Every token added must justify its inclusion against the attention dilution cost. Target 30--40\% window utilization for orchestrators.
+
+    \item \textbf{Classify before contextualizing.} The abstraction gap is bimodal (the bimodal gap observation (\S\ref{sec:bimodal})). Estimate task novelty before allocating context retrieval effort. Common patterns need project conventions only; novel logic needs aggressive context provision.
+
+    \item \textbf{Enforce tier boundaries structurally.} Instructional compliance decays exponentially with trajectory length (Theorem~\ref{thm:compliance}). Implement Tier 3 boundaries through filesystem isolation, tool restriction, and output filtering, not system prompt directives.
+
+    \item \textbf{Prefer fresh context to managed accumulation.} Fresh context dominates for diverse task sequences (Theorem~\ref{thm:fresh}). When sessions exceed 35 minutes or 50K tokens, the accumulated degradation outweighs continuity benefits. Checkpoint and restart with curated summaries.
+
+    \item \textbf{Navigate structure, do not search semantics.} For code, traverse the dependency graph rather than searching by similarity. Vector RAG yields 94.7\% irrelevance; structural navigation via AST/dependency graphs preserves the relationships that make code comprehensible.
+
+    \item \textbf{Place high-value items at boundaries.} Position dominates relevance by a factor of approximately 1.18$\times$ (Proposition~\ref{prop:position}). The rearrangement inequality dictates placing highest-relevance items at context boundaries (beginning and end), lowest in the middle.
+\end{enumerate}
+
+
+% ================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have presented an information-theoretic framework for reasoning about context flow through coding agent harnesses. The central insight is that context selection is a well-structured optimization problem: submodular relevance under a degradation penalty, with a provable interior optimum strictly less than window capacity. The abstraction gap decomposes exactly into three estimable terms, revealing a bimodal structure that explains when context engineering matters and when it does not. Production harnesses have independently converged on architectures that our framework predicts, providing empirical validation.
+
+Several open problems remain. The submodularity ratio $\gamma_f$ needs empirical measurement on real codebases to determine how well greedy algorithms perform in practice. The degradation function $\delta$ needs per-model calibration against Chroma's 18-model dataset to determine whether the exponent $\alpha$ is model-dependent or approximately universal. The reuse discovery problem, formalized here as a decision gate, lacks any published evaluation of its impact on duplicate logic prevention. Most fundamentally, the abstraction gap decomposition ($H(P|S) = H(P|S,C,\theta) + I(P;C|S,\theta) + I(P;\theta|S)$) has never been empirically instantiated: measuring all three terms from LLM log-probabilities would provide the first quantitative map of where context engineering effort should be allocated.
+
+
+% ================================================================
+\bibliography{information_architecture}
+
+\end{document}

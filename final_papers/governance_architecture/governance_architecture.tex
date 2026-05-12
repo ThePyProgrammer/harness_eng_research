@@ -1,0 +1,749 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{wrapfig}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{arydshln}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{minitoc}
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\usepackage{pifont}
+\usepackage{afterpage}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{titletoc}
+\usepackage{siunitx}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{conjecture}{Conjecture}[section]
+\newtheorem*{remark}{Remark}
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\definecolor{baselinecolor}{gray}{.95}
+\newcommand{\grayrow}{\rowcolor[gray]{.9}}
+\newcommand{\graycell}[1]{\cellcolor{baselinecolor}{#1}}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+\renewcommand{\today}{}
+
+% Paper Title
+\title{Governance Architecture for AI Coding Agent Harnesses}
+
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\begin{abstract}
+\vspace{-0.2in}
+AI coding agents now generate over 50\% of committed code on major platforms, yet architectural governance remains designed for human-speed development. Analysis of 211 million changed lines shows an 8$\times$ increase in code duplication and a 60\% collapse in refactoring activity following mass AI adoption. We present a formal framework for governance architecture in AI coding harnesses, grounding it in three mathematical pillars: (1)~information-theoretic bounds on theory externalization, connecting Naur's ``programming as theory building'' to rate-distortion theory and establishing that tacit knowledge components have divergent description length; (2)~a control-theoretic model of multi-granularity governance as a cascade control system, with Nyquist-like sampling requirements and a transcritical bifurcation separating self-correcting regimes from coherence collapse; and (3)~survival analysis of decision validity with competing risks, providing empirically calibrated decay rates for architectural decisions across domains. We prove a \emph{governance capacity bound}: when the rate of architectural drift exceeds governance channel capacity, no governance scheme can prevent unbounded divergence, regardless of sophistication. We formalize the ``ratchet'' enforcement pattern as a closure operator on a lattice of constraints, prove its convergence, and identify the ossification conditions under which it becomes pathological. Five contrarian positions (governance as overhead, ADRs as documentation theater, Naur's unsolvability thesis, Conway's Law futility, ratchet rigidity) are engaged with empirical evidence rather than dismissed. The framework synthesizes results from information theory, control theory, survival analysis, and the tacit knowledge literature into a unified governance information budget that quantifies the fundamental tensions facing AI-accelerated software development.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+
+The velocity problem in AI-assisted software development is not a management challenge; it is an information-theoretic one. When AI agents modify codebases faster than humans can evaluate the implications, architectural coherence degrades not because of carelessness but because of a fundamental mismatch between the rate at which drift is injected and the rate at which governance can correct it.
+
+The empirical evidence is stark. GitClear's analysis of 211 million changed lines (2020--2024) found that copy-pasted code rose from 8.3\% to 12.3\% of changes, code blocks with five or more duplicated lines increased approximately 8$\times$, and refactoring dropped from 25\% to under 10\% of changed lines~\citep{gitclear2025}. The DORA 2025 report confirmed that while individual task completion increased 21\% with AI adoption, organizational-level throughput stayed flat and software delivery stability showed a \emph{negative} correlation~\citep{dora2025}. \citet{sylvester2026} calls this ``context drift'': the agent's working model diverges from the actual architecture with every generation.
+
+The core tension is temporal. Human architects think in trajectories (where is this system heading?). AI agents think in snapshots (what does this prompt need right now?). Drift is the integral of that gap over time.
+
+This paper presents a formal framework for governance architecture in AI coding harnesses. Our contributions are:
+
+\begin{enumerate}
+    \item An \textbf{information-theoretic formalization} of theory loss, connecting Naur's ``programming as theory building''~\citep{naur1985} to rate-distortion theory and establishing formal bounds on the extractability of program theory from execution logs (\S\ref{sec:info-theory}).
+
+    \item A \textbf{governance capacity bound} (Theorem~\ref{thm:capacity}): an analog of Shannon's channel coding theorem showing that when drift rate exceeds governance channel capacity, no governance scheme prevents unbounded divergence (\S\ref{sec:capacity}).
+
+    \item A \textbf{cascade control model} of multi-granularity governance with stability analysis and Nyquist-like sampling requirements, including a transcritical bifurcation at the critical governance capacity (\S\ref{sec:control}).
+
+    \item A \textbf{lattice-theoretic formalization} of the ratchet enforcement pattern as a closure operator, with convergence proofs and ossification conditions (\S\ref{sec:ratchet}).
+
+    \item A \textbf{competing-risks survival model} for decision validity with empirically calibrated decay rates across architectural domains (\S\ref{sec:survival}).
+
+    \item Honest engagement with five \textbf{contrarian positions}, evaluating what the evidence actually supports rather than constructing strawmen (\S\ref{sec:contrarian}).
+\end{enumerate}
+
+We frame this as a theory and position paper. The formal results are novel in their \emph{application} to governance architecture; the underlying mathematical machinery (rate-distortion theory, control theory, survival analysis, lattice theory) is established. Where we conjecture rather than prove, we say so explicitly.
+
+
+% ====================================================================
+% 2. PRELIMINARIES
+% ====================================================================
+\section{Preliminaries and Definitions}
+\label{sec:prelim}
+
+\subsection{Program Theory (Naur)}
+
+\citet{naur1985} argues that programming is an activity of theory building, where ``theory'' is drawn from \citet{ryle1949}: the knowledge a person must have ``in order not only to do certain things intelligently but also to explain them, to answer queries about them, to argue about them.'' Naur identifies three capabilities that resist documentation: (1)~mapping between code and reality, (2)~design justification (``the justification is and must always remain the programmer's direct, intuitive knowledge or estimate''), and (3)~modification intelligence, which depends on recognizing similarities that ``are not, and cannot be, expressed in terms of criteria.''
+
+\begin{definition}[Program Theory]
+\label{def:theory}
+A \emph{program theory} $T$ is a random variable over a measurable space $(\mathcal{T}, \Sigma_{\mathcal{T}})$ representing the totality of a developer's (or agent's) mental model of a program, including the mapping from problem domain to code, design rationale, rejected alternatives, and the causal model of change propagation.
+\end{definition}
+
+\subsection{Tacit Knowledge Taxonomy}
+
+\citet{collins2010} advances beyond \citet{polanyi1966} by taxonomizing tacit knowledge into three types with distinct externalization properties:
+
+\begin{itemize}
+    \item \textbf{Relational tacit knowledge (RTK):} Knowledge that \emph{could} be made explicit but has not been, due to social contingency. ADRs and governance tools operate effectively in this domain.
+    \item \textbf{Somatic tacit knowledge (STK):} Knowledge residing in embodied practice, partially capturable through instrumentation but not transmissible through text.
+    \item \textbf{Collective tacit knowledge (CTK):} Knowledge ``embodied in society,'' acquired only through enculturation. Resistant to externalization by any known means.
+\end{itemize}
+
+\citet{tsoukas2003} critiques the assumption (from \citealt{nonaka1995}) that tacit knowledge is simply ``knowledge not yet articulated,'' arguing that tacit and explicit knowledge are two dimensions of \emph{all} knowing, not two pools that can be converted back and forth.
+
+\subsection{Architectural State and Drift}
+
+\begin{definition}[Architectural Drift]
+\label{def:drift}
+Let $P$ denote the intended architecture (a distribution over architectural states $\mathcal{S}$) and $Q_t$ the actual architecture at time $t$. The \emph{architectural drift} is:
+\begin{equation}
+    \Delta(t) = D_{\mathrm{KL}}(P \,\|\, Q_t) = \sum_{s \in \mathcal{S}} P(s) \log \frac{P(s)}{Q_t(s)}
+\end{equation}
+Drift is zero when intended and actual architectures coincide and grows as they diverge.
+\end{definition}
+
+\subsection{Reflexion Models}
+
+\citet{murphy1995, murphy2001} introduced reflexion models for architectural conformance checking. Given a high-level model $HM = (E_H, R_H)$, a source model $SM = (E_S, R_S)$, and a mapping $M \subseteq E_S \times E_H$, the reflexion model classifies each high-level relationship as a \emph{convergence} (intended and present), \emph{divergence} (present but not intended), or \emph{absence} (intended but not present).
+
+
+% ====================================================================
+% 3. INFORMATION-THEORETIC FOUNDATIONS
+% ====================================================================
+\section{Information-Theoretic Foundations}
+\label{sec:info-theory}
+
+\subsection{Theory Loss as a Rate-Distortion Problem}
+
+\begin{definition}[Extraction Channel]
+An \emph{extraction channel} is a conditional distribution $p(\hat{T} \mid T)$ representing the process of externalizing theory $T$ into an artifact $\hat{T}$ (documentation, ADRs, structured logs). A \emph{distortion function} $d: \mathcal{T} \times \hat{\mathcal{T}} \to [0, \infty)$ measures reconstruction loss, with $d(t, \hat{t}) = 0$ iff $\hat{t}$ perfectly reconstructs $t$.
+\end{definition}
+
+\begin{theorem}[Theory Extraction Bound]
+\label{thm:extraction}
+The process of extracting program theory into documentation is a lossy source coding problem. For any extraction mechanism achieving average distortion $D$, the extraction must produce at least $R(D)$ bits of structured output, where:
+\begin{equation}
+    R(D) = \min_{p(\hat{T} \mid T): \, \mathbb{E}[d(T, \hat{T})] \leq D} I(T; \hat{T})
+\end{equation}
+is the rate-distortion function~\citep{shannon1959, cover2006}.
+\end{theorem}
+
+\begin{proof}
+Direct application of Shannon's rate-distortion theorem. The extraction channel $p(\hat{T} \mid T)$ is a (possibly stochastic) encoder; the artifact $\hat{T}$ is the compressed representation; reconstruction is whatever a future reader infers from $\hat{T}$.
+\end{proof}
+
+The key claim, connecting Naur and Polanyi, is that program theory contains components for which this function diverges.
+
+\begin{conjecture}[Tacit Divergence]
+\label{conj:tacit}
+Decompose the program theory as $T = (T_{\mathrm{explicit}}, T_{\mathrm{tacit}})$. For the tacit component:
+\begin{equation}
+    \lim_{D \to 0} R_{\mathrm{tacit}}(D) = \infty
+\end{equation}
+with $R_{\mathrm{tacit}}(D) = \Omega(\log(1/D))$ as $D \to 0$. In contrast, $R_{\mathrm{explicit}}(D)$ remains finite for all $D \geq 0$.
+\end{conjecture}
+
+This conjecture formalizes Naur's observation that theory building cannot be reduced to documentation. Its epistemic status is that of a \emph{philosophically motivated mathematical conjecture}: the divergence claim is supported by the structure of rate-distortion theory and the philosophical arguments of Naur, Polanyi, and Collins, but a rigorous proof would require specifying the source distribution and distortion measure for tacit knowledge, which is itself an open problem.
+
+\textbf{Concrete example.} For a Gaussian source with squared-error distortion, $R(D) = \frac{1}{2}\log(\sigma^2/D)$, which diverges as $D \to 0$ but only logarithmically. Model design rationale as a mixture: 70\% explicit component (finite alphabet, finite $R(D)$) and 30\% tacit component (continuous source with variance $\sigma^2_\tau$). Even under this simple model, the mixture rate-distortion function diverges as $D \to 0$ because the continuous component cannot be perfectly reconstructed with finite description length. For heavier-tailed sources (modeling the long tail of rare design judgments), the divergence rate exceeds logarithmic.
+
+\subsection{Incompressibility of Tacit Components}
+
+\begin{theorem}[Incompressibility]
+\label{thm:incompress}
+If $T_{\mathrm{tacit}}$ contains components that are Kolmogorov-random relative to any formal documentation language $\mathcal{L}$, then for those components $t_\tau$:
+\begin{equation}
+    K(t_\tau) \geq |t_\tau| - O(1)
+\end{equation}
+where $K$ denotes Kolmogorov complexity. Any documentation artifact is at least as long as the tacit knowledge it captures.
+\end{theorem}
+
+\begin{proof}
+By the incompressibility theorem from algorithmic information theory~\citep{chaitin1974}, a fraction $\geq 1 - 2^{-c}$ of strings of length $n$ satisfy $K(x) \geq n - c$. If tacit components are drawn from a distribution placing non-negligible mass on incompressible strings (relative to $\mathcal{L}$), they cannot be compressed with high probability.
+\end{proof}
+
+\begin{corollary}[Governance Implication]
+\label{cor:governance}
+No governance mechanism based on artifact inspection alone can detect the loss of tacit knowledge components with $K(t_\tau) \geq |t_\tau| - O(1)$. Governance must include mechanisms that probe the theory holder directly (code review, design critique, architectural challenge).
+\end{corollary}
+
+\subsection{Extraction Fidelity and the Double Bottleneck}
+
+AI coding agents produce verbose execution logs $L$ (often 100K+ tokens). A governance system must extract structured knowledge $(D, A, R)$ (decisions, assumptions, rejected alternatives). This forms a Markov chain: $T \to L \to (D, A, R) \to G$, where $G$ represents governance actions.
+
+\begin{theorem}[Double Bottleneck]
+\label{thm:bottleneck}
+By the data processing inequality, applied twice:
+\begin{equation}
+    I(T; G) \leq I(T; (D, A, R)) \leq I(T; L)
+\end{equation}
+Each stage of the governance pipeline loses information. Governance fidelity is bounded above by log richness.
+\end{theorem}
+
+\begin{corollary}[Log Richness Lower Bound]
+For governance to achieve fidelity $I(T; G) \geq F_{\min}$, the agent log must satisfy $I(T; L) \geq F_{\min}$. Terse logs impose an upper bound on governance fidelity regardless of extraction sophistication.
+\end{corollary}
+
+
+% ====================================================================
+% 4. GOVERNANCE CHANNEL CAPACITY
+% ====================================================================
+\section{Governance Channel Capacity}
+\label{sec:capacity}
+
+\begin{definition}[Governance Channel]
+Model governance as a discrete memoryless channel $(X, p(Y \mid X), Y)$ where $X$ represents governance signals (review comments, CI checks, policy violations), $Y$ represents resulting code modifications, and $p(Y \mid X)$ captures transmission noise (missed issues, misinterpreted feedback, false negatives).
+\end{definition}
+
+\begin{definition}[Governance Channel Capacity]
+\begin{equation}
+    C_{\mathrm{gov}} = \max_{p(X)} I(X; Y)
+\end{equation}
+the maximum mutual information between governance signals and resulting changes, optimized over the distribution of governance actions.
+\end{definition}
+
+\begin{theorem}[Governance Capacity Bound]
+\label{thm:capacity}
+Let $R_{\mathrm{drift}}$ be the rate of architectural drift (bits per unit time). Let $C_{\mathrm{gov}}$ be the governance channel capacity. Then:
+\begin{enumerate}
+    \item If $R_{\mathrm{drift}} < C_{\mathrm{gov}}$, there exists a governance coding scheme (combination of reviews, tests, policies, automated checks) maintaining architectural coherence with arbitrarily small residual drift.
+    \item If $R_{\mathrm{drift}} > C_{\mathrm{gov}}$, \textbf{no governance scheme} can prevent architectural drift from growing without bound.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+By structural analogy to Shannon's noisy channel coding theorem~\citep{shannon1948}. Part~(1): when drift rate is below capacity, governance corrections can be encoded with sufficient redundancy. The ``coding scheme'' corresponds to layered governance (linting catches syntactic drift, CI tests catch behavioral drift, human review catches semantic drift, ADRs catch strategic drift). Part~(2): by the converse of the channel coding theorem, when drift rate exceeds capacity, governance failure probability is bounded away from zero.
+\end{proof}
+
+\begin{remark}[Epistemic Status]
+\label{rem:channel-epistemic}
+Theorem~\ref{thm:capacity} is a \emph{structural analogy}, not a direct application of Shannon's theorem. The governance ``channel'' lacks the well-defined input/output alphabets and stationary transition probabilities of a discrete memoryless channel. The theorem's value is in design guidance: it formalizes the intuition that governance systems have finite corrective bandwidth and that exceeding it produces qualitatively different (unbounded) behavior. The analogy is rigorous in structure but the quantities $R_{\mathrm{drift}}$ and $C_{\mathrm{gov}}$ are not directly measurable in the way Shannon's channel capacity is for communication channels. We retain the theorem framing because the structural parallel is exact, while flagging that empirical instantiation requires defining concrete governance scenarios with measurable information rates.
+\end{remark}
+
+\begin{proposition}[Capacity Decomposition]
+\label{prop:decomp}
+For a layered governance system with $L$ independent layers, the combined capacity satisfies:
+\begin{equation}
+    C_{\mathrm{gov}} \leq \sum_{\ell=1}^{L} C_\ell
+\end{equation}
+with equality when layers operate on non-overlapping aspects. When layers overlap, the combined capacity is strictly less than the sum, but error probability decreases exponentially in the number of redundant layers.
+\end{proposition}
+
+\begin{corollary}[AI Velocity Problem]
+\label{cor:velocity}
+When AI agents increase the modification rate $\lambda$ while $C_{\mathrm{gov}}$ remains constant (human review bandwidth is fixed), the condition $R_{\mathrm{drift}} > C_{\mathrm{gov}}$ is eventually satisfied. AI-accelerated development inevitably overwhelms governance systems of fixed capacity.
+\end{corollary}
+
+\begin{corollary}[Automated Governance Necessity]
+Maintaining $R_{\mathrm{drift}} < C_{\mathrm{gov}}$ under increasing $\lambda$ requires increasing $C_{\mathrm{gov}}$ commensurately. Since human review capacity is bounded, automated governance layers (fitness functions, architectural tests, invariant checkers) are \emph{necessary}, not merely convenient.
+\end{corollary}
+
+
+% ====================================================================
+% 5. MULTI-GRANULARITY GOVERNANCE AS CASCADE CONTROL
+% ====================================================================
+\section{Multi-Granularity Governance}
+\label{sec:control}
+
+\subsection{Three Governance Loops}
+
+A governance architecture operates at three temporal granularities, each corresponding to a loop in a cascade control system~\citep{seborg2004, hellerstein2004}:
+
+\begin{itemize}
+    \item \textbf{Inner loop} (synchronous, per-generation): validates each code generation against syntax rules, linting constraints, and file-ownership invariants. Sampling period $T_1$ (fastest).
+    \item \textbf{Middle loop} (asynchronous, per-phase): runs compliance audits, reflexion model checks, and contract verification at phase boundaries. Period $T_2 \gg T_1$.
+    \item \textbf{Outer loop} (deliberative, per-milestone): performs ATAM tradeoff analysis~\citep{kazman2000}, strategic alignment review, and ADR lifecycle management. Period $T_3 \gg T_2$.
+\end{itemize}
+
+Let $D(z)$ denote drift introduced by agent-generated code. Each loop has controller $C_k(z)$ and plant $P_k(z)$. The inner loop's closed-loop transfer function is:
+\begin{equation}
+    G_{\mathrm{inner}}(z) = \frac{C_1(z) P_1(z)}{1 + C_1(z) P_1(z)}
+\end{equation}
+Each outer loop treats the inner loop's output as its plant.
+
+\subsection{Stability}
+
+\begin{theorem}[Cascade Governance Stability]
+\label{thm:cascade}
+The three-loop system is stable if and only if:
+\begin{enumerate}
+    \item Each loop is individually stable (all poles of $G_k(z)$ lie within the unit circle).
+    \item Bandwidth separation holds: $\omega_{\mathrm{bw},1} > \omega_{\mathrm{bw},2} > \omega_{\mathrm{bw},3}$.
+    \item Each outer loop treats the inner as approximately unity gain within its bandwidth.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+Condition~(1) follows from BIBO stability of discrete-time systems. Condition~(2) ensures frequency-domain decoupling; without it, outer loop corrections feed into the inner loop's operating range, creating destructive interference. Condition~(3) ensures the outer loop's model of the inner loop is accurate within its bandwidth. Under these conditions, the combined characteristic polynomial factors approximately into three independent polynomials.
+\end{proof}
+
+Classical cascade control requires a 3:1 to 5:1 bandwidth ratio between adjacent loops. If the inner loop checks every generation (seconds), the middle loop should operate on minutes-to-hours timescales, and the outer loop on days-to-weeks.
+
+\subsection{Nyquist-Like Sampling Requirements}
+
+Let $\omega_d$ be the maximum frequency of architectural drift. Each governance loop must sample at:
+\begin{equation}
+    f_k \geq 2\omega_d^{(k)}
+\end{equation}
+where $\omega_d^{(k)}$ is the drift frequency relevant to loop $k$. If the outer loop samples too slowly, it aliases gradual architectural erosion as apparent stability, missing drift until it becomes catastrophic.
+
+\subsection{Governance Stability Conditions}
+
+Define architectural coherence $C(t) \in [0,1]$ as a scalar conformance measure. The dynamics are:
+\begin{equation}
+    \frac{dC}{dt} = \mu \cdot G(t) \cdot (1 - C)^\beta - \gamma \cdot R(t) \cdot (1 - C)
+\end{equation}
+where $G(t)$ is governance intervention rate, $R(t)$ is agent generation rate, $\mu$ is governance effectiveness, $\gamma$ is agent drift propensity, and $\beta > 1$ captures diminishing governance returns. The asymmetry ($\beta$ appears in the governance term but not the drift term) reflects the empirical observation that governance faces diminishing returns (easy violations are caught first; subtle ones require disproportionate effort) while drift injection is approximately linear in agent activity (each generation has a roughly constant probability of introducing a violation).
+
+\begin{theorem}[Critical Governance Capacity]
+\label{thm:critical}
+The system maintains coherence ($dC/dt \geq 0$) if and only if:
+\begin{equation}
+    G(t) \geq \frac{\gamma}{\mu} \cdot R(t)
+\end{equation}
+Governance intervention rate must scale linearly with agent generation rate.
+\end{theorem}
+
+\begin{theorem}[Governance Bifurcation]
+\label{thm:bifurcation}
+The system undergoes a transcritical bifurcation at $\mu G / \gamma R = 1$:
+\begin{itemize}
+    \item \textbf{Supercritical} ($\mu G > \gamma R$): a stable interior fixed point at $C^* = 1 - (\gamma R / \mu G)^{1/(\beta-1)} > 0$. The system self-corrects.
+    \item \textbf{Subcritical} ($\mu G < \gamma R$): the only stable fixed point is $C^* = 0$ (total coherence collapse).
+\end{itemize}
+Near the bifurcation, recovery time diverges (critical slowing down), and small perturbations in $R(t)$ cause qualitative regime changes.
+\end{theorem}
+
+\begin{remark}
+With $\beta > 1$, the equilibrium coherence is always strictly less than 1: perfect conformance is asymptotically unattainable. The gap shrinks as $G/R$ increases but never closes.
+\end{remark}
+
+
+% ====================================================================
+% 6. THE RATCHET AS A CLOSURE OPERATOR
+% ====================================================================
+\section{The Ratchet}
+\label{sec:ratchet}
+
+\subsection{Lattice of Architectural Constraints}
+
+Let $\mathcal{L} = (2^{\mathcal{R}}, \subseteq)$ be the power-set lattice over a universe of governance rules $\mathcal{R}$. A governance state at time $t$ is an element $S_t \in \mathcal{L}$.
+
+\begin{definition}[Governance Ratchet]
+\label{def:ratchet}
+The ratchet operator $\rho: \mathcal{L} \to \mathcal{L}$ is a \emph{closure operator}, satisfying:
+\begin{enumerate}
+    \item \textbf{Extensivity:} $S \subseteq \rho(S)$ (rules are only added).
+    \item \textbf{Monotonicity:} $S \subseteq S' \implies \rho(S) \subseteq \rho(S')$.
+    \item \textbf{Idempotency:} $\rho(\rho(S)) = \rho(S)$.
+\end{enumerate}
+\end{definition}
+
+The ADR acceptance workflow is literally a closure operation: accepting a decision adds constraints, those constraints may force additional constraints (transitive closure), and the result is stable under re-application.
+
+\begin{theorem}[Ratchet Convergence]
+\label{thm:ratchet}
+Let $\rho$ be a governance ratchet on a finite rule universe $\mathcal{R}$. The sequence $S_0, S_1 = \rho(S_0), S_2 = \rho(S_1), \ldots$ converges to a fixed point $S^* = \rho(S^*)$ in at most $|\mathcal{R}|$ steps.
+\end{theorem}
+
+\begin{proof}
+By extensivity, $S_t \subseteq S_{t+1}$, so the sequence is monotonically non-decreasing. Since $\mathcal{R}$ is finite, $\mathcal{L}$ has finite height $|\mathcal{R}|$. A monotone chain of finite height stabilizes. Alternatively, by the Knaster-Tarski theorem~\citep{tarski1955}, every monotone operator on a complete lattice has a least fixed point.
+\end{proof}
+
+\subsection{Ossification}
+
+\begin{definition}[Governance Ossification]
+A governance state $S$ is \emph{ossified} if $\mathrm{Allowed}(S) = \{c \in \mathcal{C} : c \text{ satisfies all rules in } S\} = \emptyset$.
+\end{definition}
+
+\begin{theorem}[Ossification Risk]
+\label{thm:ossification}
+If $\mathcal{R}$ contains contradictory rules ($\exists\, r_1, r_2 \in \mathcal{R}$ with no code satisfying both) and the ratchet is purely additive, then any trajectory including both $r_1$ and $r_2$ produces an ossified state.
+\end{theorem}
+
+\begin{proof}
+By extensivity, once $r_1 \in S_t$ and $r_2 \in S_{t'}$, both persist in all subsequent states. If $r_1 \wedge r_2$ is unsatisfiable, $\mathrm{Allowed}(S) = \emptyset$.
+\end{proof}
+
+\subsection{Controlled Relaxation}
+
+The ossification theorem provides formal justification for relaxation mechanisms. Define a relaxation operator $\delta: \mathcal{L} \to \mathcal{L}$ with $\delta(S) \subseteq S$. The combined governance operator is:
+\begin{equation}
+    \Gamma(S) = \rho(S \setminus \delta(S))
+\end{equation}
+First remove expired or superseded rules via $\delta$, then apply the ratchet closure $\rho$. Relaxation may be triggered by evidence expiry (a rule's justifying evidence has a validity window), decision supersession (a newer ADR replaces an older one), or explicit deprecation.
+
+\begin{theorem}[Controlled Descent]
+If $\delta$ removes only rules whose justifying evidence has expired, and $\rho$ re-derives still-justified consequences, then $\Gamma$ produces states that are both internally consistent and evidence-backed.
+\end{theorem}
+
+
+% ====================================================================
+% 7. DECISION SURVIVAL ANALYSIS
+% ====================================================================
+\section{Decision Survival Analysis}
+\label{sec:survival}
+
+\subsection{Survival Function}
+
+An architectural decision $d$ (an accepted ADR) has a random lifetime $T_d$. The survival function is $S(t) = P(T_d > t)$, with hazard function $h(t) = -S'(t)/S(t)$. Under exponential decay, $S(t) = e^{-\lambda(t - t_0)}$ with half-life $t_{1/2} = \ln 2 / \lambda$.
+
+More realistically, the Weibull distribution gives $h(t) = (k/\lambda)(t/\lambda)^{k-1}$, where $k > 1$ indicates increasing hazard (decisions become more fragile over time) and $k < 1$ indicates infant mortality~\citep{herraiz2021}.
+
+\subsection{Competing Risks}
+
+Decisions fail for multiple independent reasons~\citep{fine1999, cox1972}. Let $K$ index competing risks:
+
+\begin{center}
+\begin{tabular}{clp{7cm}}
+\toprule
+$k$ & Risk Type & Description \\
+\midrule
+1 & Technology obsolescence & Chosen technology superseded \\
+2 & Requirement change & Business requirements shift \\
+3 & Evidence expiry & Justifying data becomes stale \\
+4 & Organizational change & Team structure or strategy shifts \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The cause-specific hazard for risk $k$ is:
+\begin{equation}
+    h_k(t) = \lim_{\Delta t \to 0} \frac{P(t \leq T_d < t + \Delta t, \; K_d = k \mid T_d \geq t)}{\Delta t}
+\end{equation}
+with overall hazard $h(t) = \sum_k h_k(t)$. The cumulative incidence function is:
+\begin{equation}
+    F_k(t) = \int_0^t h_k(u) \exp\!\left(-\int_0^u h(\tau)\, d\tau\right) du
+\end{equation}
+
+\subsection{Empirical Calibration}
+
+Based on observed patterns in architectural decay~\citep{le2018} and technology obsolescence rates, we propose the following parametric hazard models:
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+Decision Domain & Dominant Risk & Weibull $\alpha$ & Scale $\lambda$ (mo.) & Median Life \\
+\midrule
+Frontend framework & $k=1$ & 1.5--2.5 & 2--5 & 1--4 mo. \\
+API contract & $k=2$ & 1.2--1.8 & 5--12 & 3--9 mo. \\
+Database schema & $k=3$ & 1.0--1.4 & 18--36 & 12--36 mo. \\
+Security policy & $k=4$ & 0.8--1.2 & 12--24 & 8--18 mo. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Epistemic status of calibration data.} These parameter ranges are \emph{illustrative estimates} derived from practitioner experience, ecosystem churn rates, and the qualitative ordering observed in architectural decay studies~\citep{le2018, herraiz2021}. No controlled longitudinal study of decision decay rates exists (\S\ref{sec:gaps}). The ranges are deliberately wide to reflect this uncertainty. The qualitative ordering (frontend decisions decay fastest; database decisions are most durable) is better supported than the specific numerical values. We present ranges rather than point estimates to avoid false precision.
+
+These calibrations connect to the relaxation operator $\delta$ from \S\ref{sec:ratchet}: a decision's evidence expiry window should be proportional to its domain-specific median lifetime.
+
+
+% ====================================================================
+% 8. THE THEORY PRESERVATION PROBLEM
+% ====================================================================
+\section{The Theory Preservation Problem}
+\label{sec:theory}
+
+\citet{naur1985} argues that programs are ``alive'' when the team possessing the theory remains active and ``die'' when that team dissolves. When AI generates a substantial fraction of code, a new failure mode appears: \emph{theoretically orphaned implementations}, code for which the theory was never in anyone's head.
+
+\subsection{Collins's Taxonomy Applied to Governance}
+
+Using \citet{collins2010}'s taxonomy, we can grade the externalizability of governance-relevant knowledge:
+
+\begin{center}
+\begin{tabular}{lp{5cm}p{5cm}}
+\toprule
+Type & What Governance Can Capture & What Resists Capture \\
+\midrule
+RTK & Decision context, rationale, rejected alternatives, advice received & Obvious-to-the-writer context \\
+STK & Checklists, review heuristics, examples (lossy) & Debugging intuition, code quality ``smell'' \\
+CTK & (Nothing) & Team norms, ``good enough'' thresholds \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The Dreyfus model~\citep{dreyfus1986} adds a further constraint: expert knowledge is specifically \emph{less} amenable to externalization than novice knowledge. The more expert a practitioner, the more their knowledge resides in pattern recognition that resists decomposition into rules. AI agents operating at the ``competent'' level of the Dreyfus hierarchy lack the intuitive, holistic perception of proficient and expert practitioners.
+
+\subsection{The False Confidence Problem}
+
+If \citet{naur1985} is correct, then any governance artifact (THEORY.md, structured ADRs, extracted decision logs) is a lossy compression. The map-territory problem applies: documentation is a map, not the territory. The risk: a team possessing documentation may believe it understands the system's theory when it actually possesses only a compressed, lossy representation. This could be worse than having no documentation, because:
+
+\begin{itemize}
+    \item No documentation produces appropriate humility (``we don't know why this is here'').
+    \item Lossy documentation produces false confidence (``THEORY.md says it's for X, so we'll change it accordingly'').
+\end{itemize}
+
+However, this argument has practical limits (\S\ref{sec:contrarian}). Lossy compression is still enormously useful (JPEG images demonstrate this). The question is not whether documentation is perfect but whether it is better than nothing, and whether its limitations are understood.
+
+
+% ====================================================================
+% 9. RELATED WORK
+% ====================================================================
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Architecture Decision Records.} \citet{nygard2011} proposed the lightweight ADR format. The Architecture Advice Process~\citep{harmellaw2023} adds a governance layer: anyone can make architectural decisions, but must first consult affected parties and domain experts. This is not an approval process; the decision-maker is ``in no way obliged to agree with the advice.''
+
+\textbf{Fitness functions.} \citet{ford2017} define an architectural fitness function as ``an objective integrity assessment of some architectural characteristic(s).'' Tools like ArchUnit encode these as executable tests. The gap is in ADR-to-fitness-function automation, which tools like Archgate~\citep{archgate} are beginning to address through the ratchet model.
+
+\textbf{Reflexion models.} \citet{murphy1995, murphy2001} provide the formal foundation for conformance checking. Extensions include behavioral reflexion models for state machines and UML-based variants. The SEI developed a CI-integrated prototype detecting nonconformances ``within minutes, instead of the months or years it takes today.''
+
+\textbf{Agent Decision Records.} The AgDR format~\citep{agdr} extends ADRs with required metadata (agent name, model ID, session, trigger type), addressing traceability gaps when AI agents make architectural choices.
+
+\textbf{Control theory for software.} \citet{hellerstein2004} provided the foundational treatment of feedback control for computing systems. Our contribution is applying cascade control specifically to multi-granularity governance, with stability and sampling analysis.
+
+\textbf{Conway's Law.} \citet{conway1968} established the homomorphism between organizational and system structure. \citet{nagappan2008} found that organizational metrics predict failure-proneness with $\sim$85\% precision and recall, \emph{outperforming all code metrics}. \citet{maccormack2008} validated the ``mirroring hypothesis'' empirically. \citet{skelton2019} operationalized the inverse Conway maneuver through Team Topologies.
+
+
+% ====================================================================
+% 10. EMPIRICAL CALIBRATION
+% ====================================================================
+\section{Empirical Calibration and Gaps}
+\label{sec:gaps}
+
+The formal framework requires calibration data. We assess what exists honestly:
+
+\begin{center}
+\begin{tabular}{lcp{6cm}}
+\toprule
+Data Category & Quality & Key Gap \\
+\midrule
+Code duplication (AI era) & High & 211M lines, 5-year longitudinal~\citep{gitclear2025} \\
+Refactoring decline & High & Same dataset; causal attribution unclear \\
+Delivery stability & High & DORA survey~\citep{dora2025}; self-reported \\
+ADR compliance rates & Very low & No quantitative studies exist \\
+Decision decay rates & Very low & Qualitative only \\
+Drift velocity & Low & Tools exist; no cross-project baseline \\
+Governance effectiveness & Low & Case studies only; no controlled trials \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The most important finding is the gap between the confidence with which governance practices are recommended and the empirical evidence supporting them. Conway's Law is well-validated~\citep{conway1968, nagappan2008, maccormack2008}. The specific governance mechanisms proposed to work within its constraints are supported primarily by practitioner experience and theoretical argument, not controlled empirical studies. This does not make them wrong; it makes them \emph{unvalidated}, a different epistemic status than either ``proven'' or ``disproven.''
+
+\textbf{The measurement problem.} Goodhart's Law~\citep{goodhart1975} applies: when a governance metric becomes a target, it ceases to be a good measure. Coupling targets incentivize restructuring that reduces measured coupling while introducing unmeasured coupling through shared configuration. Coverage targets incentivize trivial fitness functions. The defense is metric rotation, metric triangulation, and cultural alignment.
+
+\textbf{Uncomputability.} ``True'' architectural quality is undecidable: fitness for purpose requires knowing future requirements; optimal decomposition is NP-hard; semantic coupling is undetectable by static analysis. Practical governance metrics are always approximations. The question is whether their failure modes are understood and tolerable.
+
+
+% ====================================================================
+% 11. CONTRARIAN POSITIONS
+% ====================================================================
+\section{Engaging Contrarian Positions}
+\label{sec:contrarian}
+
+We present five contrarian positions in steelmanned form and evaluate what the evidence actually supports.
+
+\subsection{``Governance Is Overhead''}
+
+The strongest version: governance has a cost curve intersecting its benefit curve at a specific scale, and below that scale the cost exceeds the benefit. For a two-person startup, time spent writing ADRs is time not spent shipping features.
+
+\textbf{What the evidence shows:} Governance cost is roughly fixed per mechanism; benefit scales with team size and codebase complexity. The crossover appears at 5--10 developers, or more precisely, at the point where no single person holds the complete mental model. For distributed teams, formal governance becomes valuable earlier because informal channels (hallway conversations) are degraded or absent.
+
+\subsection{``ADRs Are Documentation Theater''}
+
+ADRs can drift from purpose, enable responsibility diffusion, and suffer the staleness problem~\citep{spotify2020}. Despite recommendations from ThoughtWorks, AWS, Microsoft, and Google, \textbf{no published empirical study demonstrates that ADRs improve measurable software quality outcomes} (defect rates, time-to-market, maintenance cost). The evidence is entirely practitioner reports and observational accounts.
+
+\textbf{What the evidence shows:} ADRs provide clear value for onboarding and cross-team alignment. The primary failure mode is absent content (decisions made without ADRs) or bloated content (too many decisions documented), not wrong content.
+
+\subsection{``Naur Is Right and the Problem Is Unsolvable''}
+
+If theory cannot be externalized, THEORY.md is lossy compression creating false confidence. Acting on extracted ``decisions'' may be worse than no documentation.
+
+\textbf{What the evidence shows:} Naur wrote in 1985 about small teams with long tenure. Modern software involves high turnover across time zones. The alternative to lossy documentation is not ``direct contact with theory-holders'' but \emph{no knowledge transfer at all}. Lossy compression is still useful (JPEG). Documentation with explicit uncertainty markers (``confidence: medium,'' ``last validated: 2025-03'') addresses the false confidence risk.
+
+\subsection{``Conway's Law Makes Governance Futile''}
+
+If architecture mirrors org structure~\citep{conway1968}, and org structure predicts quality better than code metrics~\citep{nagappan2008}, then code-level governance treats a symptom.
+
+\textbf{What the evidence shows:} Conway's Law is ``powerful enough that you're doomed to defeat if you try to fight it.'' But it admits an inverse: the inverse Conway maneuver~\citep{skelton2019} deliberately restructures teams to produce desired architecture. Code-level governance and organizational governance are complementary, not substitutes. The novel question for AI agents: if agents mirror the org structures of the teams that build them, then agent governance requires organizational awareness.
+
+\subsection{``The Ratchet Is Too Rigid''}
+
+Monotonically increasing strictness prevents legitimate architectural evolution. The ``greenfield escape'' pattern: the only way to evolve is to start a new project.
+
+\textbf{What the evidence shows:} The tension is real but the strongest governance systems already incorporate relaxation mechanisms (\S\ref{sec:ratchet}). Fitness functions can be deprecated~\citep{ford2017}. Evidence expiry provides a natural clock for rule relaxation. The ratchet critique applies most forcefully to systems that treat rules as permanent rather than contextual, which is precisely what the lattice descent operator $\delta$ addresses.
+
+
+% ====================================================================
+% 12. DESIGN PRINCIPLES
+% ====================================================================
+\section{Design Principles}
+\label{sec:principles}
+
+The formal framework yields the following actionable principles for governance architecture:
+
+\begin{enumerate}
+    \item \textbf{Respect the capacity bound.} If drift rate exceeds governance channel capacity, increasing governance sophistication is futile. The only remedy is increasing capacity (automating governance layers) or decreasing drift rate (improving agent prompting, injecting architectural context).
+
+    \item \textbf{Govern at three granularities.} Synchronous (per-generation) checks prevent individual violations. Asynchronous (per-phase) audits catch emergent drift. Deliberative (per-milestone) reviews address strategic alignment. All three are necessary; each alone is insufficient.
+
+    \item \textbf{Maintain bandwidth separation.} Adjacent governance loops should differ by at least 3:1 in sampling rate. Violating this produces destructive interference (over-aggressive inner loops that create oscillation, or outer loops that alias drift as stability).
+
+    \item \textbf{Provision above the bifurcation.} Organizations should maintain governance capacity with margin above the critical ratio $\mu G / \gamma R = 1$. Operating near the bifurcation point is fragile: a temporary spike in agent activity can push the system into coherence collapse with hysteresis.
+
+    \item \textbf{Close the ratchet with evidence expiry.} Every rule should have an evidence validity window. The relaxation operator $\delta$ prevents ossification while preserving still-valid constraints.
+
+    \item \textbf{Accept residual theory loss.} Perfect externalization is impossible (Conjecture~\ref{conj:tacit}). Design governance to tolerate a non-zero residual, using it as a risk measure. Supplement artifact-based governance with social mechanisms (code review conversations, architecture advice processes) for knowledge that cannot be externalized.
+
+    \item \textbf{Make logs rich.} The double bottleneck (Theorem~\ref{thm:bottleneck}) shows that governance fidelity is bounded by log richness. Agent logs must externalize decisions, assumptions, and rejected alternatives, not just final code.
+
+    \item \textbf{Track decision age, not just decision content.} Survival analysis (\S\ref{sec:survival}) shows that decision validity decays with domain-specific half-lives. Governance should proactively surface decisions approaching their expected half-life.
+
+    \item \textbf{Measure governance, not just architecture.} Monitor governance response time, escalation frequency, and the ratio $\mu G / \gamma R$. Architectural metrics alone cannot detect governance failure; they can only detect its consequences after the fact.
+
+    \item \textbf{Acknowledge the empirical gap.} The strongest evidence is that the \emph{problem} is real (AI accelerates quality degradation). The evidence that \emph{governance solves it} remains largely anecdotal. Design governance systems to be testable: track drift trajectories and decision decay so that future work can validate the framework.
+\end{enumerate}
+
+
+% ====================================================================
+% 13. CONCLUSION
+% ====================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have presented a formal framework for governance architecture in AI coding harnesses, grounding it in information theory, control theory, survival analysis, and lattice theory. The central result, the governance capacity bound (Theorem~\ref{thm:capacity}), establishes that no governance scheme can prevent unbounded architectural drift when the drift rate exceeds governance channel capacity. This is not a statement about governance quality; it is a statement about information-theoretic limits.
+
+The cascade control model shows that multi-granularity governance is not merely a good practice but a necessary architectural pattern, with formal stability conditions and Nyquist-like sampling requirements. The governance bifurcation (Theorem~\ref{thm:bifurcation}) identifies a critical ratio separating self-correcting from collapsing regimes, with practical implications for capacity provisioning.
+
+The ratchet formalization reveals both its power (guaranteed convergence, monotone enforcement) and its pathology (ossification under contradictory rules), motivating the controlled relaxation operator. The survival analysis connects decision lifecycle management to the relaxation mechanism through empirically calibrated decay rates.
+
+Three limitations deserve emphasis. First, the information-theoretic analogy is rigorous in structure but the ``channel'' and ``capacity'' of governance are not directly measurable in the way Shannon's quantities are for communication channels. The framework provides qualitative insight and design guidance rather than computable bounds. Second, the empirical calibration data is sparse: decision decay rates and governance effectiveness remain largely unmeasured. Third, the tacit divergence (Conjecture~\ref{conj:tacit}) remains a conjecture; formalizing it fully would require a theory of tacit knowledge that connects Polanyi's philosophical claims to measurable information-theoretic quantities, which is an open problem.
+
+The framework's honest contribution is in structuring the governance problem formally. Architectural drift is the integral of the trajectory-snapshot gap over time. Evidence has a half-life. The ratchet converges but risks ossification. Governance channel capacity is finite. These are not slogans; they are formal claims with defined conditions, identified limitations, and (where possible) empirical calibration. The gap between these formal results and validated practice is itself the most important finding: governance architecture as a field has sophisticated theory and almost no empirical validation.
+
+\section*{Acknowledgments}
+
+This paper draws on the governance pillar analysis of the HTX Harness Engineering project. The formal framework synthesizes techniques from information theory, control theory, survival analysis, and the philosophy of tacit knowledge into a unified treatment of architectural governance under AI acceleration.
+
+
+% ====================================================================
+% BIBLIOGRAPHY
+% ====================================================================
+\bibliography{governance_architecture}
+
+
+% ====================================================================
+% APPENDIX
+% ====================================================================
+\appendix
+
+\section{Governance Information Budget: Full Statement}
+\label{app:budget}
+
+\begin{theorem}[Governance Information Budget]
+A governance system for AI-accelerated development operates under four simultaneous constraints:
+
+\begin{enumerate}
+    \item \textbf{Extraction constraint:}
+    \begin{equation}
+        I(T; G) \leq I(T; L) \leq H(T) - R_{\mathrm{tacit}}^{-1}(\text{log budget})
+    \end{equation}
+    where the last term reflects that tacit knowledge components cannot be fully captured regardless of log length.
+
+    \item \textbf{Drift constraint:} Stability requires $\mu \bar{c} \geq \lambda \bar{\delta}$; correction rate must match drift injection rate.
+
+    \item \textbf{Capacity constraint:} Coherence requires $R_{\mathrm{drift}} < C_{\mathrm{gov}} = \sum_\ell C_\ell$; drift rate must remain below governance channel capacity.
+
+    \item \textbf{Fidelity constraint:} $I(T; G) \geq F_{\min}$ for some minimum governance fidelity; governance actions must carry enough information about the theory.
+\end{enumerate}
+
+These constraints are in tension: increasing agent velocity $\lambda$ increases $R_{\mathrm{drift}}$ (constraint 3) and the volume of logs requiring extraction (constraint 4), while the human component of $C_{\mathrm{gov}}$ remains fixed and $R_{\mathrm{tacit}}(D)$ diverges (constraint 1).
+\end{theorem}
+
+\section{Notation Summary}
+\label{app:notation}
+
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+Symbol & Meaning \\
+\midrule
+$T$ & Program theory (mental model) \\
+$\hat{T}$ & Reconstructed theory from artifacts \\
+$d(t, \hat{t})$ & Distortion between original and reconstructed theory \\
+$R(D)$ & Rate-distortion function \\
+$K(t)$ & Kolmogorov complexity of theory instance $t$ \\
+$P$ & Intended architecture distribution \\
+$Q_t$ & Actual architecture distribution at time $t$ \\
+$\Delta(t)$ & Architectural drift (KL divergence) \\
+$\lambda$ & Agent modification rate \\
+$\mu$ & Governance effectiveness parameter \\
+$\gamma$ & Agent drift propensity \\
+$\bar{\delta}$ & Expected drift per modification \\
+$\bar{c}$ & Expected drift reduction per correction \\
+$C_{\mathrm{gov}}$ & Governance channel capacity \\
+$R_{\mathrm{drift}}$ & Drift rate (bits per unit time) \\
+$L$ & Executor log \\
+$(D, A, R)$ & Structured extraction (decisions, assumptions, rejected alternatives) \\
+$G$ & Governance actions \\
+$S_t$ & Governance state (rule set) at time $t$ \\
+$\rho$ & Ratchet (closure) operator \\
+$\delta$ & Relaxation operator \\
+$\Gamma$ & Combined governance operator ($\rho$ after $\delta$) \\
+$h_k(t)$ & Cause-specific hazard for risk $k$ \\
+$F_k(t)$ & Cumulative incidence function for risk $k$ \\
+$C(t)$ & Architectural coherence $\in [0,1]$ \\
+$\beta$ & Governance diminishing returns exponent \\
+$F_{\min}$ & Minimum governance fidelity \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Empirical Data Sources}
+\label{app:data}
+
+\begin{center}
+\begin{tabular}{lp{4cm}p{4cm}l}
+\toprule
+Source & Finding & Methodology & Confidence \\
+\midrule
+GitClear 2025 & 8$\times$ duplication increase; refactoring $\downarrow$60\% & 211M lines, 5-year longitudinal & High \\
+DORA 2025 & Individual tasks $\uparrow$ 21\%; org throughput flat; $\downarrow$ stability & Large survey & High \\
+Nagappan et al. & Org metrics predict bugs at 85\% & Windows Vista case study & High \\
+Le et al. 2018 & Constant architectural decay rates & Open-source longitudinal & Medium \\
+Herraiz et al. 2021 & Infant mortality in code elements & PeerJ, fine-grained analysis & Medium \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}

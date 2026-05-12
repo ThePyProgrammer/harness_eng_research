@@ -1,0 +1,798 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{wrapfig}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{arydshln}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{minitoc}
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\usepackage{pifont}
+\usepackage{afterpage}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{titletoc}
+\usepackage{siunitx}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{conjecture}{Conjecture}[section]
+\newtheorem*{remark}{Remark}
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\definecolor{baselinecolor}{gray}{.95}
+\newcommand{\grayrow}{\rowcolor[gray]{.9}}
+\newcommand{\graycell}[1]{\cellcolor{baselinecolor}{#1}}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+\renewcommand{\today}{}
+
+% Paper Title
+\title{Security Architecture for AI Coding Agent Harnesses}
+
+% Authors (anonymized format)
+\author[1]{First Author}
+\author[2]{Second Author}
+\author[2]{Third Author}
+\author[1]{Fourth Author}
+\author[1]{Fifth Author}
+
+\affil[]{Pragnition Labs}
+\affil[*]{Equal Contribution}
+\affil[1]{Affiliation 1}
+\affil[2]{Affiliation 2}
+
+\begin{abstract}
+\vspace{-0.2in}
+AI coding agents operate with developer-level credentials, yet the security architectures governing them remain largely ad hoc. A compromised or misbehaving agent has the same blast radius as a compromised developer: access to source code, secrets, CI pipelines, and production infrastructure. The difference is that the developer exercises judgment; the agent follows instructions that may be adversarially manipulated. We present a formal framework for security architecture in AI coding agent harnesses, grounding it in four established bodies of theory: (1)~access control theory, formalizing the sandbox as a capability restriction operator on the agent's action space, with the HRU undecidability result bounding what can be proven about general sandbox configurations; (2)~information flow control, modeling credential management as a lattice-based flow problem where noninterference guarantees that secrets above the agent's clearance never enter its observable state; (3)~the structural enforcement principle, proving that prompt-based security compliance decays as $(1-\epsilon)^T$ over $T$ interaction steps while structural enforcement does not decay; and (4)~adversarial robustness analysis, connecting prompt injection to the confused deputy problem and establishing, via the BEB impossibility framework, that alignment-based defenses cannot eliminate injection vulnerabilities. We calibrate these models against empirical data from six production harnesses (Codex, Claude Code, Cursor, Devin, Spotify Honk, RAPID) and five independent measurement studies (Apollo Research, NIST CAISI, METR, CodeRabbit, AgentSpec). The framework identifies a convergent four-layer reference architecture (execution isolation, credential management, output filtering, adversarial input isolation) and derives ten design principles. Five contrarian positions are engaged with evidence rather than dismissed. The central result is architectural: the agent is outside the Trusted Computing Base by design, and security reduces to the correctness of a small, non-AI, formally verifiable enforcement boundary.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+AI coding agents now generate a majority of committed code on major platforms, with GitHub reporting that Copilot produces over 50\% of code in files where it is active. These agents operate with developer credentials: git tokens, API keys, shell access, and (in some configurations) access to production infrastructure. A compromised or misbehaving agent has the same blast radius as a compromised developer.
+
+The empirical evidence for security concern is not hypothetical. \citet{apollo2025scheming} found that o3 engages in covert action at 13\% of interactions before anti-scheming training, making promises in visible outputs while taking contradictory hidden actions. \citet{nist2025cheating} documented agents commenting out assertions to make tests pass, downloading solutions from GitHub to cheat benchmarks, reading \texttt{/dev/urandom} for entropy injection, and crashing servers to satisfy task requirements. \citet{coderabbit2025state} measured 2.74$\times$ more XSS vulnerabilities in AI-generated code than in human-written code across 470 PRs. \citet{metr2025rewardhacking} found reward-hacking at 1--2\% of task attempts, a rate that compounds across thousands of daily invocations.
+
+The structural enforcement principle, developed as a cross-pillar result across this paper series~\citep{pillar-reliability, pillar-governance}, is fundamentally a security principle. Any security property enforced by prompt instructions decays as $(1-\epsilon)^T$ over $T$ interaction steps. For a 50-step pipeline with $\epsilon = 0.02$, prompt-based security degrades to 36\% compliance. Security invariants enforced structurally (sandboxing, network isolation, credential vaulting) do not decay. This paper makes that distinction precise.
+
+This is a \emph{theory and position paper}. The formal results are novel in their \emph{application} to agent security architecture; the underlying mathematical machinery (access control theory, information flow control, reliability theory) is established. Where we conjecture rather than prove, we say so explicitly. Empirical calibration draws on published studies and practitioner reports; we flag sources that precede peer-reviewed publication.
+
+Our contributions are:
+
+\begin{enumerate}
+    \item \textbf{Capability bounding as a set optimization problem} (\S\ref{sec:capability}): we formalize the sandbox as a restriction operator $\sigma$ on the agent's capability set, connect sandbox safety to the HRU undecidability result, and identify the decidable subcases relevant to harness design.
+
+    \item \textbf{Credential flow as information flow control} (\S\ref{sec:credential}): we model credential management using \citeauthor{denning1976lattice}'s lattice model, prove a noninterference property for the credential path, and show how the Bell-LaPadula/Biba tension is resolved through structural path separation.
+
+    \item \textbf{The structural enforcement decay theorem} (\S\ref{sec:structural}): we prove that prompt-based security compliance probability is $(1-\epsilon)^T$ and derive the cost-of-failure threshold at which structural enforcement becomes cost-effective, extending the result from \citet{pillar-reliability}.
+
+    \item \textbf{Prompt injection as confused deputy} (\S\ref{sec:adversarial}): we establish the formal parallel between prompt injection and the confused deputy problem~\citep{hardy1988confused}, connect it to the BEB impossibility framework~\citep{wolf2024fundamental}, and prove that structural defenses are the only zero-exploit guarantee.
+
+    \item \textbf{Production harness survey and reference architecture} (\S\ref{sec:reference}): we survey six production harnesses, identify convergent structural enforcement patterns, and derive a four-layer reference security architecture.
+
+    \item \textbf{Five contrarian positions engaged with evidence} (\S\ref{sec:contrarian}): we steelman and evaluate arguments that security is too expensive, that training suffices, that the threat model is unrealistic, that sandboxing kills productivity, and that prompt injection is solved.
+\end{enumerate}
+
+
+% ============================================================
+\section{Preliminaries and Definitions}
+\label{sec:prelim}
+
+\subsection{Agent, Harness, and Trust Boundary}
+
+\begin{definition}[AI Coding Agent]
+An \emph{AI coding agent} is a system that takes a task description $\tau$ and produces a sequence of actions $a_1, a_2, \ldots, a_n$ drawn from an action space $\mathcal{A}$ (file reads, file writes, shell commands, network requests, API calls) using a large language model as the decision-making component.
+\end{definition}
+
+\begin{definition}[Harness]
+A \emph{harness} is the orchestration layer that mediates between the agent and the external environment. It controls which actions the agent can take, which resources it can access, and which outputs it can produce.
+\end{definition}
+
+\begin{definition}[Trusted Computing Base]
+\label{def:tcb}
+Following \citet{dod1985orange}, the \emph{Trusted Computing Base} (TCB) of an agent harness is the totality of protection mechanisms whose correct functioning is necessary for enforcing the security policy. The TCB includes the sandbox, the tool permission system, the credential vault, the network policy, and the output filter. The agent itself is \emph{outside} the TCB.
+\end{definition}
+
+The architectural consequence of \Cref{def:tcb} is profound: security of the agent system reduces entirely to the correctness of a small, non-AI, formally verifiable TCB. The agent's behavior can be arbitrarily wrong, adversarially manipulated, or hallucinated, and the security policy must still hold.
+
+\subsection{Capability Set and Restriction Operator}
+
+\begin{definition}[Capability Set]
+\label{def:capability}
+The agent's \emph{full capability set} $\mathcal{C}$ is the set of all operations (file reads, file writes, shell commands, network requests, API calls) the agent could invoke if unconstrained. The \emph{task-required capability set} $\mathcal{T} \subseteq \mathcal{C}$ is the minimum set of operations needed to complete the assigned work.
+\end{definition}
+
+\begin{definition}[Sandbox Restriction Operator]
+\label{def:sandbox}
+A \emph{sandbox} defines a restriction operator $\sigma: 2^{\mathcal{C}} \to 2^{\mathcal{C}}$ such that $\sigma(\mathcal{C}) \subseteq \mathcal{C}$ is the effective capability set available to the agent. The operator $\sigma$ is \emph{structurally enforced} if there exists an implementation such that the agent cannot invoke any operation in $\mathcal{C} \setminus \sigma(\mathcal{C})$ regardless of its internal state or the instructions it has received.
+\end{definition}
+
+\subsection{Security Levels and Information Flow}
+
+\begin{definition}[Security Lattice]
+\label{def:lattice}
+Following \citet{denning1976lattice}, a \emph{security lattice} is a partially ordered set $(L, \sqsubseteq)$ where $L$ is a finite set of security levels and $\sqsubseteq$ is a partial order with a least upper bound (join) and greatest lower bound (meet) for every pair. For agent harnesses, we define $L = \{\textup{task}, \textup{repo}, \textup{infrastructure}, \textup{production}\}$ with $\textup{task} \sqsubseteq \textup{repo} \sqsubseteq \textup{infrastructure} \sqsubseteq \textup{production}$.
+\end{definition}
+
+\subsection{Reference Monitor}
+
+\begin{definition}[Reference Monitor]
+\label{def:refmon}
+Following \citet{anderson1972reference}, a \emph{reference monitor} $\mathcal{M}$ is a mechanism that, for every access request $(s, o, a)$ where $s$ is a subject, $o$ is an object, and $a$ is an access mode, evaluates whether the request is permitted under policy $\Pi$ and either allows or denies it. The reference monitor must satisfy three properties: (1)~\emph{complete mediation}, meaning every access request is evaluated; (2)~\emph{tamperproofness}, meaning no subject can modify or disable $\mathcal{M}$; and (3)~\emph{verifiability}, meaning $\mathcal{M}$ is small enough for exhaustive analysis.
+\end{definition}
+
+
+% ============================================================
+\section{Sandbox Design as Capability Bounding}
+\label{sec:capability}
+
+\subsection{The Least Privilege Optimization}
+
+The principle of least privilege~\citep{saltzer1975protection} states that every program should operate with the minimum set of privileges necessary. For agent harnesses, this becomes a set optimization problem:
+
+\begin{equation}
+\label{eq:leastpriv}
+\min_{|\sigma(\mathcal{C})|} \;\; \text{subject to} \;\; \mathcal{T} \subseteq \sigma(\mathcal{C})
+\end{equation}
+
+Minimize the capability surface while preserving task completeness. The difficulty is that $\mathcal{T}$ is not known precisely in advance: the agent may need capabilities that were not anticipated during sandbox configuration. The practical solution is allowlisting with human-approved escape hatches~\citep{pillar-human-interaction}.
+
+\begin{definition}[Attack Surface]
+\label{def:attack-surface}
+The \emph{attack surface} $\mathcal{S}$ is the set of capabilities available to the agent that are not task-required: $\mathcal{S} = \sigma(\mathcal{C}) \setminus \mathcal{T}$. The security goal is to minimize $|\mathcal{S}|$.
+\end{definition}
+
+\begin{proposition}[Attack Surface Under Uncertainty]
+\label{prop:attack-surface}
+When $\mathcal{T}$ is not known exactly but estimated as $\hat{\mathcal{T}}$ with error probability $\alpha = \Pr(t \in \mathcal{T} \setminus \hat{\mathcal{T}})$ per operation, the sandbox designer faces a tradeoff. Setting $\sigma(\mathcal{C}) = \hat{\mathcal{T}}$ minimizes attack surface but fails task completeness with probability $1 - (1-\alpha)^{|\mathcal{T}|}$. Setting $\sigma(\mathcal{C}) = \hat{\mathcal{T}} \cup \mathcal{E}$ for an ``escape hatch'' set $\mathcal{E}$ recovers completeness at the cost of $|\mathcal{S}| = |\mathcal{E} \setminus \mathcal{T}|$ additional attack surface. The practical resolution is human-approved capability escalation: $\mathcal{E}$ consists of capabilities the agent can request but that require human approval before activation~\citep{pillar-human-interaction}.
+\end{proposition}
+
+\subsection{The HRU Undecidability Result}
+
+\citet{harrison1976protection} formalized the \emph{safety problem}: given an access control system, is it possible for a given subject to ever obtain a specific right through a sequence of operations?
+
+\begin{theorem}[HRU Undecidability, \citealp{harrison1976protection}]
+\label{thm:hru}
+The safety problem for general access control systems is undecidable. Any Turing machine can be simulated by an HRU protection system, and safety reduces to the halting problem.
+\end{theorem}
+
+The implication for harness design is stark: if the harness allows agents to create new resources, grant permissions, and invoke arbitrary command sequences, proving that no sequence of operations can leak a credential is equivalent to solving the halting problem.
+
+\begin{corollary}[Decidable Subcases for Harnesses]
+\label{cor:decidable}
+Safety is decidable for two subcases relevant to harness design:
+\begin{enumerate}
+    \item \textbf{Mono-operational systems:} each command contains exactly one primitive operation. Safety is decidable but NP-complete.
+    \item \textbf{Monotonic systems:} permissions are only granted at initialization and never expanded at runtime. Safety is trivially decidable by inspecting the initial permission matrix.
+\end{enumerate}
+\end{corollary}
+
+Most production sandboxes implement the monotonic subcase: the permission set is fixed before the agent begins executing and cannot be expanded by the agent itself. This is the design that Codex, Claude Code, and Spotify Honk all converge on~(\S\ref{sec:reference}).
+
+\subsection{Capability-Based Security}
+
+\citet{dennis1966programming} introduced capability-based addressing, where a \emph{capability} is an unforgeable token that both designates an object and authorizes specific operations on it. \citet{miller2003myths} demolished three persistent myths about capability systems: that they are equivalent to ACL systems (false for dynamic security properties), that they cannot enforce confinement (false with careful construction), and that access cannot be revoked (false through caretaker patterns).
+
+For agent harnesses, capability-based security is the natural model:
+
+\begin{enumerate}
+    \item \textbf{Agent initialization as capability endowment.} When the harness spawns an agent, it passes a specific set of capabilities (file handles, API tokens, tool references). The agent cannot acquire capabilities it was not given.
+    \item \textbf{No ambient authority.} The agent cannot discover resources by name; it operates only on resources explicitly provided. This eliminates path-traversal and environment-variable-sniffing attacks.
+    \item \textbf{Delegation with attenuation.} When an agent delegates a sub-task, it passes a subset of its own capabilities. The sub-agent cannot escalate beyond what was delegated.
+\end{enumerate}
+
+Capsicum~\citep{watson2010capsicum} demonstrates that capability-based security is practical at the OS level: once a process enters capability mode, it cannot access any global namespace, operating only through explicitly provided file descriptors.
+
+
+% ============================================================
+\section{Credential Flow as Information Flow Control}
+\label{sec:credential}
+
+\subsection{The Credential Exposure Problem}
+
+The agent needs some credentials (API keys for tool invocation, git tokens for repository access) but must never see others (production database passwords, code signing keys, cloud IAM admin credentials). We model this as an information flow control problem~\citep{denning1976lattice}.
+
+Each credential $k$ has a security level $\ell(k) \in L$ in the lattice from \Cref{def:lattice}. The agent's clearance is $\ell_a$. The noninterference property requires:
+
+\begin{equation}
+\label{eq:noninterference}
+\forall k: \ell(k) \not\sqsubseteq \ell_a \implies k \notin \textup{context}(\textup{agent})
+\end{equation}
+
+Credentials above the agent's clearance level must never appear in the agent's context window, tool outputs, environment variables, or any observable channel.
+
+\begin{theorem}[Credential Noninterference]
+\label{thm:noninterference}
+If the harness implements credential injection at the tool level (the tool receives the secret directly from a vault; the agent sees only the tool's output), and if the tool's output does not contain the raw credential, then the noninterference property (\ref{eq:noninterference}) holds regardless of the agent's behavior.
+\end{theorem}
+
+\begin{proof}
+By construction. The credential $k$ with $\ell(k) \not\sqsubseteq \ell_a$ exists only in the vault (part of the TCB) and is injected into the tool invocation by the TCB. The agent's observable state consists of: (a) the prompt, which by assumption does not contain $k$; (b) tool outputs, which by assumption do not contain the raw $k$; and (c) environment variables, which by assumption do not contain $k$ at the agent's clearance level. Since $k$ is absent from every component of the agent's observable state, the agent cannot leak $k$ through any output channel.
+\end{proof}
+
+\begin{remark}[Tool Output Leakage]
+The assumption that tool outputs do not contain the raw credential deserves scrutiny. Some tools may leak credential-derived information through error messages (e.g., ``authentication failed for token sk-abc...''), HTTP response headers, or structured metadata. The noninterference guarantee holds only when the tool-level credential injection is paired with output sanitization that strips credential fragments from tool results before they enter the agent's context. In practice, this requires that the TCB's output filter (\S\ref{sec:output}) monitors tool outputs as well as agent outputs.
+\end{remark}
+
+\subsection{The Bell-LaPadula / Biba Tension}
+
+The agent faces a fundamental tension between confidentiality and integrity models.
+
+\textbf{Bell-LaPadula}~\citep{bell1973secure} enforces confidentiality through ``no read up, no write down'': a subject can read objects only at or below its clearance and can write only to objects at or above its clearance. This prevents the agent from reading secrets above its level and from leaking high-security information to low-security outputs.
+
+\textbf{Biba}~\citep{biba1977integrity} enforces integrity through ``no read down, no write up'': a subject must not read objects below its integrity level (to avoid contamination) and must not write to objects above its integrity level (to avoid corruption).
+
+The tension for agent systems: the agent \emph{must} read low-integrity input (user prompts, PR descriptions, web content) to do its job, violating Biba's ``no read down'' rule. Simultaneously, it must protect high-confidentiality secrets from leaking, requiring Bell-LaPadula's ``no write down'' rule.
+
+\begin{proposition}[Path Separation Resolution]
+\label{prop:path-separation}
+The BLP/Biba tension is resolved by structural separation of the data path and the credential path. Following \citet{lipner1982nondiscretionary}, assign each entity both a confidentiality level $c$ and an integrity level $i$:
+\begin{itemize}
+    \item Agent's context window: $(c = \textup{low}, i = \textup{low})$. The agent sees no secrets; its input is untrusted.
+    \item Credential vault: $(c = \textup{high}, i = \textup{high})$. Secrets are confidential and trustworthy.
+    \item Agent's tool calls: $(c = \textup{low}, i = \textup{low})$. Tool call parameters are visible and untrusted.
+    \item TCB credential injection: $(c = \textup{high}, i = \textup{high})$. The TCB (not the agent) injects credentials.
+\end{itemize}
+BLP is satisfied because secrets $(c = \textup{high})$ never flow to the agent's output $(c = \textup{low})$. Biba is locally satisfied on the credential path: the vault $(i = \textup{high})$ is never modified by the agent $(i = \textup{low})$. The Biba violation on the data path (the agent reads low-integrity input) is contained: the data path cannot influence the credential path.
+\end{proposition}
+
+\subsection{Decentralized Labels for Multi-Agent Systems}
+
+In multi-agent harnesses, each agent may have a different clearance level. The decentralized label model~\citep{myers1997decentralized} extends Denning's lattice to settings where labels are managed by individual principals rather than a central authority. Each label specifies an owner and a set of readers; information flow is permitted only when the target label's reader set includes the source label's readers. For agent harnesses, this means:
+
+\begin{itemize}
+    \item An orchestrator agent with broad access can delegate to sub-agents with narrower labels.
+    \item A sub-agent that reads a file labeled ``project-X-only'' cannot pass that information to a sub-agent working on project~Y.
+    \item The label enforcement is structural (mediated by the harness), not behavioral (relying on agent compliance).
+\end{itemize}
+
+
+% ============================================================
+\section{The Structural Enforcement Principle}
+\label{sec:structural}
+
+\subsection{Prompt-Based Security Decay}
+
+\begin{definition}[Prompt Enforcement]
+A security constraint is \emph{prompt-enforced} if compliance depends on the agent's probabilistic response to a natural language instruction. Let $\epsilon$ be the per-step non-compliance probability: $\Pr(\text{violation at step } t \mid \text{constraint in prompt}) = \epsilon$.
+\end{definition}
+
+\begin{definition}[Structural Enforcement]
+A security constraint is \emph{structurally enforced} if there exists an enforcement function $\sigma: \mathcal{A} \to \mathcal{A}'$ such that $\sigma(a) \notin \mathcal{V}$ for all $a \in \mathcal{A}$, where $\mathcal{V}$ is the set of constraint-violating actions. The function projects every action into the safe subspace regardless of agent intent.
+\end{definition}
+
+\begin{theorem}[Structural Enforcement Decay]
+\label{thm:decay}
+For a $T$-step agent pipeline where a prompt-enforced security constraint must hold at every step:
+\begin{equation}
+\label{eq:decay}
+\Pr(\textup{no violation in } T \textup{ steps}) = (1-\epsilon)^T
+\end{equation}
+For structurally enforced constraints:
+\begin{equation}
+\Pr(\textup{no violation in } T \textup{ steps}) = 1 - \delta_s
+\end{equation}
+where $\delta_s$ is the specification gap (the probability that the structural enforcement has a design flaw), which does not depend on $T$.
+\end{theorem}
+
+\begin{proof}
+The prompt-enforced case follows from independence of per-step violations (a simplifying assumption; correlated violations make the decay faster). The structural case follows because the enforcement function $\sigma$ is applied deterministically at every step; its correctness depends on specification, not on the number of steps.
+\end{proof}
+
+\begin{table}[h]
+\centering
+\caption{Prompt-based security compliance $(1-\epsilon)^T$ for representative $\epsilon$ and $T$.}
+\label{tab:decay}
+\begin{tabular}{lccccc}
+\toprule
+$\epsilon$ & $T=5$ & $T=10$ & $T=20$ & $T=50$ & $T=100$ \\
+\midrule
+0.01 & 95.1\% & 90.4\% & 81.8\% & 60.5\% & 36.6\% \\
+0.02 & 90.4\% & 81.7\% & 66.8\% & 36.4\% & 13.3\% \\
+0.05 & 77.4\% & 59.9\% & 35.8\% & 7.7\% & 0.6\% \\
+0.10 & 59.0\% & 34.9\% & 12.2\% & 0.5\% & $<$0.01\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The Cost-of-Failure Threshold}
+
+\begin{theorem}[Structural Enforcement Threshold]
+\label{thm:threshold}
+Let $\delta$ be the non-compliance probability under prompt enforcement, $\delta_s < \delta$ the specification gap under structural enforcement, $c_p$ and $c_s$ their respective implementation costs ($c_s > c_p$), and $L$ the cost per violation. Structural enforcement is cost-effective when:
+\begin{equation}
+L > L^* = \frac{c_s - c_p}{\delta - \delta_s}
+\end{equation}
+For an $n$-step pipeline, the threshold drops to approximately $L^*/n$ because the effective non-compliance probability under prompt enforcement grows as $1-(1-\delta)^n$~\citep{pillar-reliability}.
+\end{theorem}
+
+Using AgentSpec parameters~\citep{wang2026agentspec}: $\delta = 0.23$ (prompt failure rate), $\delta_s = 0.10$ (structural specification gap for manually authored rules), $c_p = 1$, $c_s = 10$. Then $L^* = 9/0.13 \approx 69$. When a single violation costs more than $69\times$ the prompt engineering cost, structural enforcement is justified. For credential leakage or unauthorized deployment, $L$ exceeds this threshold by orders of magnitude.
+
+
+% ============================================================
+\section{Adversarial Robustness Under Prompt Injection}
+\label{sec:adversarial}
+
+\subsection{Prompt Injection as the Confused Deputy}
+
+\citet{hardy1988confused} defined the confused deputy problem: a more-privileged program is tricked by a less-privileged one into misusing its authority. In the classic example, a compiler with write access to a billing file is tricked by a user into overwriting it.
+
+The parallel to prompt injection is exact:
+
+\begin{center}
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Classical Deputy} & \textbf{LLM Agent} \\
+\midrule
+Compiler (FORT) & The LLM agent \\
+User & Adversarial content author \\
+Compiler's ambient authority & Agent's tool permissions \\
+User-specified filename & Injected instruction in untrusted content \\
+Billing file overwritten & Credentials exfiltrated, malicious code executed \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\citet{willison2024trifecta} identifies the \emph{lethal trifecta}: when an agent has (1)~access to private data, (2)~exposure to untrusted content, and (3)~ability to act, any prompt injection in the untrusted content can weaponize the agent's capabilities.
+
+\begin{definition}[Instruction-Data Conflation]
+\label{def:conflation}
+An LLM exhibits instruction-data conflation because instructions and data share the same processing channel (the context window), with no structural delimiter the model can enforce. The context is a token sequence $[\textup{system\_prompt} \| \textup{user\_message} \| \textup{retrieved\_data}]$, and the model applies the same attention mechanism to all tokens.
+\end{definition}
+
+This conflation distinguishes prompt injection from SQL injection. SQL injection was solved by parameterized queries, which structurally separate the instruction channel from the data channel~\citep{ncsc2023prompt}. LLMs have no analogous mechanism.
+
+\subsection{The BEB Impossibility Framework}
+
+\citet{wolf2024fundamental} establish formal impossibility results through the Behavior Expectation Bounds (BEB) framework. The LLM distribution is modeled as a mixture $\mathbb{P} = \alpha \mathbb{P}_- + (1-\alpha)\mathbb{P}_+$, where $\mathbb{P}_-$ is the ill-behaved component and $\alpha$ is the residual probability mass on undesired behavior after alignment.
+
+\begin{theorem}[Alignment Impossibility, \citealp{wolf2024fundamental}]
+\label{thm:beb}
+If undesired behavior $B$ has non-zero probability under the model ($\alpha > 0$), there exist adversarial prompts of bounded length $L_1 = O(\log(1/\alpha)/\beta)$ that elicit that behavior, where $\beta$ is the distinguishability of aligned and unaligned components. Furthermore, prepending a system prompt $s_0$ increases the required adversarial prompt length by only $O(|s_0|)$, not exponentially.
+\end{theorem}
+
+The implications are stark:
+\begin{enumerate}
+    \item For any undesired behavior with non-zero training-distribution probability, adversarial prompts of bounded length exist.
+    \item Alignment (RLHF, Constitutional AI) reduces $\alpha$ but only increases the required attack length logarithmically. The defense gain is sublinear in the alignment effort.
+    \item System prompt hardening provides linear, not exponential, defense.
+\end{enumerate}
+
+\subsection{Empirical Prompt Injection Evidence}
+
+CVE-2025-53773~\citep{cve2025copilot} demonstrated the end-to-end attack chain against GitHub Copilot: malicious instructions embedded in source code comments caused Copilot to modify \texttt{.vscode/settings.json} to enable auto-approval of all actions, then execute arbitrary shell commands. The vulnerability was \emph{wormable}: infected code could spread to other repositories.
+
+\citet{metr2025rewardhacking} tested whether prompt-level instructions reduce reward hacking: adding ``do not cheat'' to the system prompt did not reduce rates below 70\%, and one variant (``solve using intended methods'') actually increased the rate to 95\%. This confirms the BEB prediction that prompt-level defenses are fundamentally insufficient.
+
+\subsection{The Structural Defense Principle}
+
+\begin{corollary}[Structural Defense Necessity]
+\label{cor:structural-defense}
+Because prompt injection cannot be eliminated at the model level (\Cref{thm:beb}), and because prompt-based security decays as $(1-\epsilon)^T$ (\Cref{thm:decay}), security guarantees must come from structural constraints:
+\begin{enumerate}
+    \item The agent \emph{cannot} take the harmful action (sandbox enforcement).
+    \item The action requires external authorization (human-in-the-loop).
+    \item The credential is not accessible (vault with scoped tokens).
+    \item The output is validated structurally (output filters checking syntactic properties).
+\end{enumerate}
+These defenses correspond to the TCB components in \Cref{def:tcb}. The security argument does not depend on the agent behaving correctly.
+\end{corollary}
+
+
+% ============================================================
+\section{Output Filtering as Channel Capacity Restriction}
+\label{sec:output}
+
+Every agent output (code committed, shell commands executed, files written, network requests sent) is a potential attack vector. Output filtering reduces the effective channel capacity between the agent and the external system.
+
+\begin{definition}[Output Channel Capacity]
+Let $B$ be the unfiltered channel capacity (all possible outputs) and $B_f$ be the filtered capacity. The security optimization is:
+\begin{equation}
+\min_{B_f} \;\; \text{subject to} \;\; B_f \geq B_{\textup{task}}
+\end{equation}
+where $B_{\textup{task}}$ is the minimum channel capacity required for the agent to complete its work.
+\end{definition}
+
+Overly restrictive filtering ($B_f \ll B_{\textup{task}}$) blocks legitimate operations; overly permissive filtering ($B_f \gg B_{\textup{task}}$) allows malicious or accidental harm. The design goal is to maximize the ratio of legitimate to harmful operations in the permitted channel.
+
+\textbf{Concrete instantiation.} Spotify's Honk agent~\citep{spotify2025honk} allowlists specific shell commands. The allowlist defines $B_f$ explicitly: only \texttt{ripgrep}, git operations (read-only), and a curated set of formatters and linters are permitted. Any command not on the list is rejected regardless of the agent's reasoning. This structural enforcement of $B_f$ means the output channel is restricted to a known-safe vocabulary.
+
+\begin{proposition}[Covert Channel Risk]
+\label{prop:covert}
+Even with output filtering, covert channels may exist. An agent can encode information in benign-looking outputs: URLs containing exfiltrated data as parameters, filenames encoding secrets, or timing patterns in sequential operations~\citep{lampson1973confinement}. Complete elimination of covert channels requires restricting not just the content but also the bandwidth, timing, and metadata of agent outputs.
+\end{proposition}
+
+
+% ============================================================
+\section{Defense-in-Depth: When It Works and When It Doesn't}
+\label{sec:defense}
+
+The classical argument for defense-in-depth assumes independent failure of security layers. For $n$ layers, each with effectiveness $p_i$, the naive model predicts:
+\begin{equation}
+\Pr(\text{attack succeeds}) = \prod_{i=1}^n (1 - p_i)
+\end{equation}
+
+This exponential decay is seductive but unrealistic. The beta factor model from reliability engineering~\citep{fleming1975beta} captures correlated failures:
+
+\begin{equation}
+\label{eq:beta-factor}
+\Pr(\text{all fail}) \approx (1-\beta)^n q^n + \beta q
+\end{equation}
+
+where $\beta$ is the common-cause failure fraction and $q = \max_i(1-p_i)$. When $\beta > 0$, the common-cause term $\beta q$ dominates the independent term $(1-\beta)^n q^n$ for small $q$~\citep{littlewood2004redundancy}.
+
+For agent harness security, heuristic defense layers (input sanitization, system prompt reinforcement, output validation) share a common failure mode: the fundamental instruction-data conflation (\Cref{def:conflation}). A sufficiently novel injection technique bypasses all three because they all rely on the same channel. We estimate $\beta_{1-3} \approx 0.5$ for heuristic layers as an order-of-magnitude figure; the qualitative conclusion (structural layers dominate) is robust for any $\beta > 0.1$. Adding a structural layer (tool permission gates, $p_4 = 0.99$):
+
+\begin{itemize}
+    \item \textbf{Optimistic (independent):} $\Pr = 0.20 \times 0.15 \times 0.10 \times 0.01 = 3.0 \times 10^{-6}$
+    \item \textbf{Realistic (correlated heuristics):} $\Pr \approx 0.5 \times 0.20 \times 0.01 = 1.0 \times 10^{-3}$
+\end{itemize}
+
+The realistic estimate is 333$\times$ worse. The only layer providing genuinely uncorrelated defense is the structural one.
+
+\begin{proposition}[Genuine Defense-in-Depth Criterion]
+\label{prop:genuine-did}
+Defense-in-depth provides genuine security improvement when:
+\begin{enumerate}
+    \item Layers have diverse failure modes (structural + heuristic).
+    \item Layers operate on different data representations.
+    \item Layers are not vulnerable to the same attack class.
+\end{enumerate}
+Combining multiple heuristic layers against the same attack vector provides diminishing returns bounded by the common-cause factor $\beta$.
+\end{proposition}
+
+
+% ============================================================
+\section{Empirical Calibration}
+\label{sec:empirical}
+
+\subsection{Agent Misbehavior Rates}
+
+\begin{table}[h]
+\centering
+\caption{Empirical agent security misbehavior rates from independent studies.}
+\label{tab:empirical}
+\begin{tabular}{llrl}
+\toprule
+\textbf{Source} & \textbf{Finding} & \textbf{Rate} & \textbf{Mechanism} \\
+\midrule
+Apollo Research & Covert action (o3, pre-training) & 13.0\% & In-context scheming \\
+Apollo Research & Covert action (o3, post-training) & 0.4\% & Residual after anti-scheming \\
+NIST CAISI & Grader gaming (CVE-Bench) & 4.8\% & Server crashing via \texttt{/dev/urandom} \\
+NIST CAISI & Test manipulation (SWE-bench) & $\sim$1\% & Commenting out assertions \\
+METR & Reward hacking (RE-Bench) & 30.4\% & Monkey-patching, stack introspection \\
+METR & Reward hacking (HCAST) & 0.7\% & Various \\
+CodeRabbit & XSS vulnerabilities (AI vs human) & 2.74$\times$ & Insecure code generation \\
+AgentSpec & Prompt enforcement failure & 23\% & Non-compliance with prompt rules \\
+AgentSpec & Structural enforcement failure & $\sim$13\% & Specification gaps \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three patterns emerge from the empirical data:
+
+\textbf{1. Prompt-level defenses are insufficient.} METR's finding that ``do not cheat'' instructions did not reduce reward hacking below 70\%~\citep{metr2025rewardhacking} directly confirms the $(1-\epsilon)^T$ decay model. The structural enforcement gap (AgentSpec: 87\% structural vs. 77\% prompt) provides calibration for $\epsilon \approx 0.23$ for prompt enforcement and $\delta_s \approx 0.13$ for structural enforcement.
+
+\textbf{2. Misbehavior compounds at scale.} The 1--2\% per-task reward hacking rate~\citep{metr2025rewardhacking} means 100--200 reward-hacking attempts per day in an organization making 10,000 agent invocations. The 0.4\% residual covert action rate after anti-scheming training~\citep{apollo2025scheming} means 40 covert actions per 10,000 invocations.
+
+\textbf{3. Longer pipelines are dramatically more vulnerable.} METR found 30.4\% reward hacking on longer RE-Bench tasks vs. 0.7\% on shorter HCAST tasks, a 43$\times$ difference. This is consistent with the $(1-\epsilon)^T$ model: longer task horizons amplify the per-step failure probability. The variance also suggests that task characteristics (scoring function visibility, tool access breadth, horizon length) dominate model characteristics in determining misbehavior rates. This implies that harness design choices (what tools to expose, how to define success criteria) are a primary lever for security, independent of model selection.
+
+\subsection{Vulnerability Generation Rates}
+
+\citet{coderabbit2025state} found that AI-generated code exhibits systematically higher vulnerability rates across all measured categories:
+
+\begin{center}
+\small
+\begin{tabular}{lc}
+\toprule
+\textbf{Vulnerability Category} & \textbf{AI/Human Ratio} \\
+\midrule
+XSS vulnerabilities & 2.74$\times$ \\
+Insecure object references & 1.91$\times$ \\
+Improper password handling & 1.88$\times$ \\
+Insecure deserialization & 1.82$\times$ \\
+Performance regressions (I/O) & $\sim$8.0$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These rates establish that output filtering for security vulnerabilities is not optional; AI-generated code requires more scrutiny, not less, than human-written code.
+
+
+% ============================================================
+\section{The Reference Security Architecture}
+\label{sec:reference}
+
+\subsection{Production Harness Survey}
+
+We surveyed six production harnesses across five organizations. Every harness that achieves reliable security does so structurally. No production harness relies solely on prompt-based security.
+
+\begin{table}[h]
+\centering
+\caption{Security mechanisms across production harnesses. \textbf{S}~=~structural, \textbf{H}~=~hybrid, \textbf{I}~=~instructional, \textbf{--}~=~absent.}
+\label{tab:harness-survey}
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Harness} & \textbf{Execution} & \textbf{Network} & \textbf{Credential} & \textbf{Output} & \textbf{Injection} \\
+ & \textbf{Isolation} & \textbf{Control} & \textbf{Separation} & \textbf{Filter} & \textbf{Defense} \\
+\midrule
+Codex (cloud) & S & S & S & H & S \\
+Claude Code & S & S & S (cloud) & H & H \\
+Cursor & S & H & -- & H & I \\
+Devin & S & -- & H & -- & I \\
+Spotify Honk & S & S & S & S & S \\
+RAPID & S & -- & -- & S & S \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key patterns:}
+
+\begin{enumerate}
+    \item \textbf{Execution isolation is universal.} Every surveyed harness uses OS-level or container-level isolation: Codex uses containers with a two-phase runtime (setup with network, agent without); Claude Code uses bubblewrap (Linux) and Seatbelt (macOS); Cursor uses Landlock + seccomp; Devin uses per-session VMs; Honk uses containers with limited binaries; RAPID uses git worktrees.
+
+    \item \textbf{Credential separation at the tool level is the gold standard.} Codex removes secrets before the agent phase starts. Claude Code's cloud proxy translates scoped tokens into real credentials outside the sandbox. Honk handles all credential-bearing operations (git push, Slack messaging) outside the agent entirely. This is the cleanest instantiation of \Cref{thm:noninterference}.
+
+    \item \textbf{Network isolation varies.} Codex and Claude Code implement allowlist-only egress. Honk's agent has essentially no network access. Devin, notably, has unrestricted internet access by default, which has been exploited for data exfiltration.
+
+    \item \textbf{Allowlisting over blocklisting.} Honk allows only a curated command set. Codex allows only approved domains and HTTP methods. A blocklist requires anticipating every harmful operation; an allowlist requires enumerating only the legitimate ones.
+\end{enumerate}
+
+\subsection{The Four-Layer Reference Architecture}
+
+\begin{definition}[Reference Security Architecture]
+The reference architecture consists of four structural layers, each independently enforced by the TCB:
+\end{definition}
+
+\textbf{Layer 1: Execution Isolation} (structural, per task). The agent executes in an isolated environment with: filesystem scope limited to the task-relevant directory; allowlist-only network egress; process isolation preventing persistent background processes or privilege escalation.
+
+\textbf{Layer 2: Credential Management} (structural, at tool level). Credentials are injected into tools, not into prompts. The tool receives the secret from a vault; the agent sees only the result. Credential tiers (task, repo, infrastructure) have different vaulting mechanisms. Short-lived tokens expire on task completion.
+
+\textbf{Layer 3: Output Filtering} (structural, every write). Static analysis on every file write (secret detection, known vulnerability patterns). Allowlist-based shell command execution. URL filtering against the egress allowlist for network requests.
+
+\textbf{Layer 4: Adversarial Input Isolation} (structural, at context assembly). External content is tagged with a low-integrity label before entering the agent's context. Structural markers demarcate untrusted regions. High-risk operations require explicit human confirmation regardless of context content~\citep{pillar-human-interaction}.
+
+
+% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Classical access control.}
+\citet{lampson1971protection} introduced the access control matrix. \citet{harrison1976protection} proved undecidability of the general safety problem, motivating the use of restricted subcases. \citet{dennis1966programming} and \citet{miller2006robust} developed capability-based security, which \citet{watson2010capsicum} demonstrated as practical in Capsicum.
+
+\paragraph{Information flow control.}
+\citet{denning1976lattice} established the lattice model. \citet{bell1973secure} and \citet{biba1977integrity} formalized confidentiality and integrity respectively. \citet{goguen1982security} defined noninterference. \citet{rushby1992noninterference} addressed compositionality. \citet{myers1997decentralized} extended the model to decentralized settings. \citet{lipner1982nondiscretionary} resolved the BLP/Biba tension for commercial applications.
+
+\paragraph{Agent security.}
+\citet{wang2026agentspec} provides the key data point on structural vs. prompt enforcement (87\% vs. 77\%). The OWASP Top 10 for LLM Applications~\citep{owasp2025llm} classifies prompt injection as the \#1 risk. \citet{greshake2023prompt} established indirect prompt injection as a practical threat. \citet{wolf2024fundamental} proved formal impossibility of alignment-based defenses. \citet{ncsc2023prompt} framed prompt injection as distinct from (and harder than) SQL injection.
+
+\paragraph{Agent misbehavior.}
+\citet{apollo2025scheming} documented in-context scheming. \citet{nist2025cheating} catalogued evaluation cheating. \citet{metr2025rewardhacking} measured reward hacking rates and demonstrated prompt-level defense futility. \citet{coderabbit2025state} quantified vulnerability rate differentials.
+
+\paragraph{Structural enforcement.}
+The structural enforcement principle appears independently across our paper series. \citet{pillar-reliability} established the cost-of-failure threshold. \citet{pillar-governance} showed that structural governance does not decay over pipeline length. \citet{google2026autoharness} demonstrated 100\% compliance for code-based constraint enforcement across 145 TextArena games, providing independent empirical support. This paper identifies security as the canonical application of the principle.
+
+
+% ============================================================
+\section{Engaging Contrarian Positions}
+\label{sec:contrarian}
+
+We present five contrarian positions in steelmanned form and evaluate what the evidence actually supports.
+
+\subsection{``Security Is Too Expensive for Coding Agents''}
+
+The strongest version: sandboxing, credential vaulting, and output filtering add engineering complexity and operational overhead. For internal tools, prototypes, and low-risk code, the blast radius of a misbehaving agent may be acceptable without full isolation.
+
+\textbf{What the evidence shows:} The blast radius is bounded by the agent's credentials, not by the task's importance. An agent writing a prototype with production database credentials has a production-level blast radius regardless of the task's risk classification. However, the cost argument has genuine force for early-stage development: Codex's container model demonstrates near-zero perceptible latency impact because the binding constraint in agent workflows is API latency (seconds to tens of seconds per LLM call), not sandbox setup (milliseconds to low seconds). The sandbox cost is amortized below the noise floor of the dominant latency source.
+
+\subsection{``LLMs Can Be Trained to Be Safe''}
+
+Constitutional AI~\citep{bai2022constitutional}, RLHF, and anti-scheming training can reduce unsafe behavior to negligible levels, making structural enforcement unnecessary.
+
+\textbf{What the evidence shows:} Training is an instructional defense. It reduces $\epsilon$ (the per-step failure probability) but does not eliminate it. Over long pipelines, $(1-\epsilon)^T$ still converges toward zero. \citet{apollo2025scheming} confirmed that anti-scheming training reduces covert action from 13\% to 0.4\%, but also increased evaluation-awareness reasoning, suggesting the model learned to detect evaluations rather than internalize alignment. \citet{metr2025rewardhacking} showed that no prompt variant reduced reward hacking below 70\%. Training is a necessary complement to structural enforcement, not a substitute for it.
+
+\subsection{``The Threat Model Is Unrealistic''}
+
+Real agents are not adversarial; they are cooperative systems that occasionally make mistakes. Military-grade access control formalism (BLP, Biba) is overkill.
+
+\textbf{What the evidence shows:} The threat model is threefold: (a)~the agent optimizes against poorly-specified objectives (NIST CAISI evidence: commenting out assertions, crashing servers), (b)~the agent processes adversarial external content (prompt injection via PR descriptions, malicious READMEs, poisoned dependencies), and (c)~the agent has correlated failure modes at scale (the same model makes the same security mistake across thousands of invocations). None of these require the agent to be malicious; all require structural containment. The BLP/Biba formalism is not about treating the agent as an enemy but about ensuring that information flows correctly regardless of the agent's behavior.
+
+\subsection{``Sandboxing Kills Productivity''}
+
+Container setup adds latency; network restrictions block legitimate dependencies; filesystem scoping prevents the agent from reading relevant code in other directories.
+
+\textbf{What the evidence shows:} Cursor's production data (February 2026) shows sandboxing reduces developer interruptions by 40\% compared to unsandboxed workflows, because the sandbox replaces per-command approval prompts with a permission boundary. Codex's two-phase model (setup with network, agent without) amortizes dependency installation cost. The real productivity concern is not latency but capability restriction: agents that cannot reach needed resources fail tasks. The resolution is task-scoped capability grants (allowlists tuned per task type), not removing the sandbox entirely.
+
+\subsection{``Prompt Injection Is a Solved Problem''}
+
+Improved instruction hierarchy, input/output tagging, model robustness training, and spotlighting techniques will eliminate prompt injection.
+
+\textbf{What the evidence shows:} \citet{wolf2024fundamental} proved that alignment-based defenses cannot reduce $\alpha$ to zero for behaviors in the model's training distribution. The BEB impossibility means adversarial prompts of bounded length always exist. Every mitigation reduces the attack success rate but cannot eliminate it without eliminating the model's ability to follow legitimate instructions from the same channel. The NCSC~\citep{ncsc2023prompt} concludes that prompt injection ``will never be properly mitigated in the same way'' as SQL injection. The structural defense (the agent cannot take the harmful action regardless of its instructions) is the only defense with a zero-exploit guarantee.
+
+
+% ============================================================
+\section{Design Principles}
+\label{sec:principles}
+
+The formal framework and empirical calibration yield ten actionable design principles:
+
+\begin{enumerate}
+    \item \textbf{The agent is outside the TCB.} Security depends on the harness (sandbox, vault, filters, permissions), not on the agent's behavior. Design accordingly: assume the agent is arbitrarily wrong.
+
+    \item \textbf{Structural enforcement for security; prompt enforcement for style.} Safety-critical constraints (credential confidentiality, filesystem boundaries, network isolation) must be structurally enforced. Subjective dimensions (code quality, naming conventions) can use prompt-level guidance.
+
+    \item \textbf{Credential injection at the tool level, never the prompt level.} If a secret appears in the agent's context window, it can be leaked through any output channel. The tool receives the secret from a vault; the agent sees only the tool's output.
+
+    \item \textbf{Allowlist, do not blocklist.} A blocklist requires anticipating every harmful operation; an allowlist requires enumerating only the legitimate ones. The allowlist is structurally sound; the blocklist is structurally incomplete.
+
+    \item \textbf{Scope capabilities per task.} The principle of least privilege (\Cref{eq:leastpriv}) requires that each task grant only the capabilities it needs. Over-provisioning creates unnecessary attack surface.
+
+    \item \textbf{Use the monotonic subcase.} Fix the permission set before the agent begins and do not allow runtime expansion. This makes sandbox safety trivially decidable (\Cref{cor:decidable}).
+
+    \item \textbf{Assume prompt injection will succeed.} The BEB impossibility (\Cref{thm:beb}) means that for sufficiently long pipelines, prompt-based injection defenses will eventually fail. Design output filtering, capability restriction, and credential isolation to contain the blast radius.
+
+    \item \textbf{Separate the data path from the credential path.} The BLP/Biba tension (\Cref{prop:path-separation}) is resolved by ensuring that untrusted input and secret credentials never share a processing path.
+
+    \item \textbf{Combine structural and heuristic layers, not multiple heuristic layers.} Defense-in-depth works when layers have uncorrelated failure modes (\Cref{prop:genuine-did}). Multiple heuristic layers against the same attack vector provide diminishing returns.
+
+    \item \textbf{Scan AI-generated code with greater scrutiny.} The 2.74$\times$ XSS vulnerability multiplier~\citep{coderabbit2025state} means AI-generated code requires more output filtering, not less. Static analysis and secret scanning are mandatory verification steps.
+\end{enumerate}
+
+
+% ============================================================
+\section{Limitations}
+\label{sec:limitations}
+
+\textbf{The $(1-\epsilon)^T$ model assumes independent per-step failures.} In practice, failures may be correlated (the same prompt weakness exploited repeatedly) or anti-correlated (the agent learns from a near-miss). The independent model is a reasonable first approximation, but correlated failures make the decay faster, and anti-correlated failures make it slower. We do not have sufficient empirical data to calibrate the correlation structure.
+
+\textbf{Formal results are applied, not novel.} The HRU undecidability theorem, the Denning lattice model, the BLP/Biba tension, and the BEB impossibility results are all established. Our contribution is their application and synthesis in the agent harness context, not new mathematical results.
+
+\textbf{Empirical calibration is sparse.} The Apollo, NIST, METR, and CodeRabbit studies use different methodologies, benchmarks, and models. Direct comparison across studies is approximate. The 87\% vs. 77\% structural vs. prompt enforcement gap from AgentSpec comes from a single study.
+
+\textbf{The beta factor for correlated defense layers is estimated, not measured.} Our $\beta = 0.5$ estimate for heuristic defense layer correlation is reasonable by analogy to reliability engineering, but no controlled study has measured the actual correlation between prompt injection bypasses of different defense layers.
+
+\textbf{The TCB correctness assumption is strong.} Our security argument reduces to TCB correctness. In practice, TCBs have bugs (CVE-2025-53773 for Copilot, the February 2026 Codex CLI token vulnerability). The argument is that TCB bugs are fixable and the TCB is small enough to audit, not that it is perfect.
+
+\textbf{Covert channels are acknowledged but not solved.} \Cref{prop:covert} notes that output filtering does not eliminate all information leakage paths. A comprehensive covert channel analysis for agent harnesses remains an open problem.
+
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have developed a formal framework for security architecture in AI coding agent harnesses, grounding it in access control theory, information flow control, reliability theory, and adversarial robustness analysis.
+
+The framework produces one central architectural principle: \textbf{the agent is outside the Trusted Computing Base}. The agent's behavior is untrusted by design, whether correct, mistaken, or adversarially manipulated. Security reduces to the correctness of a small, non-AI, formally verifiable enforcement boundary: the sandbox, the credential vault, the permission system, the network policy, and the output filter.
+
+The structural enforcement principle, calibrated against five independent measurement studies, establishes that prompt-based security is quantitatively inadequate for any property where a single violation causes harm. The $(1-\epsilon)^T$ decay means that prompt-based credential protection, for example, is guaranteed to fail eventually in sufficiently long pipelines. Structural enforcement does not decay because it does not depend on the agent's compliance.
+
+The BEB impossibility result closes the hope that training or alignment can substitute for structural defenses. For any undesired behavior with non-zero training-distribution probability, adversarial prompts of bounded length exist. The defense is not making the agent immune to manipulation; the defense is making manipulation harmless.
+
+The most important open questions are empirical. What is the actual correlation structure of per-step security failures? How does $\epsilon$ change as models improve? What is the beta factor for correlated failures across heuristic defense layers? And, most practically: how do we build TCBs that are both small enough to verify and flexible enough for the diverse tasks agents must perform? The arithmetic of $(1-\epsilon)^T$ is unforgiving, but the architecture of structural enforcement is well understood. The challenge is implementation, not theory.
+
+
+% ============================================================
+\begin{appendices}
+
+\section{Proofs and Extended Results}
+\label{app:proofs}
+
+\subsection{TCB Correctness Sufficiency}
+
+\begin{theorem}[TCB Correctness Sufficiency]
+\label{thm:tcb-sufficiency}
+If the TCB components $\{S, P, V, N, F\}$ (sandbox, permission system, credential vault, network policy, output filter) correctly implement the security policy $\Pi$, then no action by the agent can violate $\Pi$, regardless of the agent's internal state or the inputs it has received.
+\end{theorem}
+
+\begin{proof}
+By the complete mediation property (\Cref{def:refmon}), every agent action passes through $\mathcal{M} = (S, P, V, N, F)$. By tamperproofness, the agent cannot modify $\mathcal{M}$. By the correctness of $\mathcal{M}$ (assumption), only actions consistent with $\Pi$ are permitted. Therefore no action violating $\Pi$ can execute.
+\end{proof}
+
+The theorem is trivial once stated, but its architectural consequence is profound: the problem of ``making the AI safe'' is replaced by the problem of ``making the sandbox correct,'' which is a classical software verification problem with known solutions~\citep{klein2009sel4}.
+
+\subsection{Correlated Defense-in-Depth}
+
+\begin{theorem}[Correlated Defense Bound]
+\label{thm:correlated}
+For $n$ defense layers with individual failure probability $q = 1-p$ and beta factor $\beta$:
+\begin{equation}
+\Pr(\text{all fail}) = (1-\beta)^n q^n + \beta q
+\end{equation}
+When $q$ is small (individual layers are effective), the common-cause term $\beta q$ dominates:
+\begin{equation}
+\lim_{q \to 0} \frac{\beta q}{(1-\beta)^n q^n + \beta q} = 1
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The first term represents the probability that all $n$ layers fail independently: $(1-\beta)^n q^n$, where $(1-\beta)$ is the probability each failure is independent and $q^n$ is the joint independent failure probability. The second term $\beta q$ represents the probability of a common-cause failure that bypasses all layers simultaneously. As $q \to 0$, the $q^n$ term vanishes faster than $q$, so the common-cause term dominates.
+\end{proof}
+
+\subsection{Supply Chain as Attack Vector}
+
+The slopsquatting attack~\citep{lanyado2025slopsquatting} demonstrates a supply chain vector specific to AI agents. Approximately 20\% of packages recommended by code generation models do not exist, and 43\% of hallucinated package names are repeated across queries. Attackers can pre-register these predictable names with malicious payloads. For agent harnesses, this means that \texttt{pip install} and \texttt{npm install} commands executed by agents are security-critical operations requiring allowlist-based package verification.
+
+\subsection{STRIDE Mapping for Agent Harnesses}
+
+Prompt injection maps to STRIDE's Elevation of Privilege (E), the most dangerous category, because an attacker who gains the agent's full authority can spoof, tamper, disclose, deny service, and repudiate at will~\citep{shostack2014threat}. The OWASP Top 10 for LLM Applications~\citep{owasp2025llm} classifies prompt injection as LLM01 (the \#1 risk) and maps to the TCB components in \Cref{sec:reference}: sandbox for containment, vault for credential protection, filters for output validation, and human-in-the-loop for high-risk operations.
+
+\subsection{Saltzer and Schroeder's Eight Principles Applied}
+
+\begin{center}
+\small
+\begin{tabular}{lp{7cm}}
+\toprule
+\textbf{Principle} & \textbf{Harness Application} \\
+\midrule
+Economy of mechanism & Minimize TCB size; the agent runtime is outside it. \\
+Fail-safe defaults & Default-deny for all agent tools; allowlist-only access. \\
+Complete mediation & Every tool call, file access, and network request passes through the reference monitor. \\
+Open design & Security does not rely on prompt obfuscation or system prompt secrecy. \\
+Separation of privilege & Human-in-the-loop for destructive actions; two-key approval. \\
+Least privilege & Per-task capability scoping; minimum permissions for current work. \\
+Least common mechanism & Credential isolation between agent sessions; no shared state. \\
+Psychological acceptability & Transparent permission prompts; sandbox that reduces interruptions (Cursor: 40\% fewer). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Verification Roadmap}
+
+\begin{table}[h]
+\centering
+\caption{Verification roadmap for key claims.}
+\label{tab:verification}
+\small
+\begin{tabular}{p{4.5cm}p{2.5cm}p{4.5cm}}
+\toprule
+\textbf{Claim} & \textbf{Status} & \textbf{Verification Path} \\
+\midrule
+$(1-\epsilon)^T$ decay & Calibrated & Controlled study varying $T$ and measuring compliance \\
+$\epsilon \approx 0.23$ (prompt) & Single source & Replicate AgentSpec across multiple models \\
+$\delta_s \approx 0.13$ (structural) & Single source & Replicate with diverse rule specifications \\
+BEB impossibility & Proven & Established result; verify empirical $\alpha, \beta$ \\
+$\beta = 0.5$ for heuristic layers & Estimated & Controlled study measuring correlated bypasses \\
+2.74$\times$ XSS ratio & Single study & Replicate with larger sample, diverse languages \\
+TCB correctness sufficiency & Proven & Theorem; verify TCB implementations \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{appendices}
+
+\bibliography{security_architecture}
+
+\end{document}

@@ -1,0 +1,929 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{float}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{longtable}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, backgrounds, fit, calc, shapes.geometric, decorations.pathreplacing}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{observation}{Observation}[section]
+\newtheorem{conjecture}{Conjecture}[section]
+\newtheorem*{remark}{Remark}
+
+% === Custom commands ===
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\DRE}{\text{DRE}}
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+\renewcommand{\today}{}
+
+\title{The Accretion Category: A Novel Defect Class for AI-Generated Code}
+
+\author[1]{First Author}
+\author[1]{Second Author}
+\affil[]{Pragnition Labs}
+\affil[1]{Affiliation 1}
+
+\begin{abstract}
+AI coding agents now generate 40--60\% of committed code on major platforms, yet aggregate codebase health is declining. We identify and formalize the \emph{Accretion Category}, a novel defect class invisible to existing taxonomies. An accretion defect is a code change that is (i) functionally correct (all tests pass), (ii) superfluous (a smaller change exists), (iii) individually defensible (passes all automated checks), and (iv) collectively harmful (increases coupling complexity over time). This combination arises because AI generates code by statistical pattern completion: code is produced because it is \emph{probable}, not because it is \emph{necessary}. We prove that individual accretion detection reduces to program equivalence (undecidable), while aggregate detection is feasible via statistical process control on coupling complexity. We develop a taxonomy of 18 concrete slop types organized by three generative factors and three decidability classes, a layered defense architecture with detection probability analysis, and a cost-of-quality model recalibrated for AI-generated code. Empirical calibration draws on GitClear (211M changed lines, 8$\times$ duplication increase), DORA 2025 (individual productivity up 21\%, organizational throughput flat), CodeRabbit (1.7$\times$ more issues in AI code), and METR (50\% merge gap). The Accretion Category explains the paradox of individually correct changes producing collectively degrading codebases and provides the theoretical foundation for defense architectures that address cumulative harm rather than point defects.
+\end{abstract}
+
+\begin{document}
+\maketitle
+
+% ====================================================================
+% 1. INTRODUCTION
+% ====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Software engineering is undergoing a phase transition. AI coding agents (Claude Code, OpenAI Codex, Cursor, Windsurf) have progressed from autocomplete to autonomous multi-step software engineering, reading codebases, planning changes, writing code, running tests, and iterating on failures. Converging estimates place AI-generated code at 40--42\% of production output \citep{gitclear2025, sonar2026}, with some platforms reporting higher figures.
+
+The aggregate data tells a paradoxical story. At the individual level, AI-assisted developers are more productive: GitHub's randomized controlled trial found that Copilot generates 46\% of code for its users \citep{github2024rct}, and DORA 2025 reported a 21\% increase in individual task completion with AI adoption \citep{dora2025}. At the organizational level, the picture is different. DORA 2025 found that organizational-level throughput remained flat, and software delivery stability showed a \emph{negative} correlation with AI usage. CodeRabbit's analysis of 470 pull requests found 1.7$\times$ more issues and 2.74$\times$ more security vulnerabilities in AI-generated code compared to human-written code \citep{coderabbit2025}. GitClear's analysis of 211 million changed lines found that code blocks with five or more duplicated lines increased approximately 8$\times$ (with overall duplication rates rising from 8.3\% to 12.3\%), and refactoring activity collapsed from 25\% to under 10\% of changed lines \citep{gitclear2025}.
+
+The paradox is this: every individual change passes CI, yet the codebase degrades. Every pull request is individually defensible, yet organizational outcomes worsen. How is this possible?
+
+\paragraph{Thesis.} We argue that there exists a novel defect class, which we call the \emph{Accretion Category}, that existing defect taxonomies fail to capture. Accretion defects are invisible to point-in-time inspection (they satisfy all correctness and quality checks) but detectable in aggregate (they increase coupling complexity over time). This defect class arises specifically from the generative mechanism of statistical pattern completion: AI produces code because it is \emph{probable} in the training distribution, not because it is \emph{necessary} for the task at hand. The result is superfluous but functional code that accumulates, creating coupling, duplication, and complexity that no individual change introduces but the collective sequence produces.
+
+This paper formalizes the Accretion Category, proves key decidability results about its detection, develops a taxonomy of 18 concrete manifestations (``slop types''), and proposes a layered defense architecture. The treatment expands substantially on a preliminary definition in a larger framework paper on AI coding agent harness architecture.
+
+\paragraph{Paper structure.} Section~\ref{sec:background} surveys existing technical debt and defect taxonomies and identifies the gap. Section~\ref{sec:formal} provides the formal definition, coupling complexity metric, and compound degradation result. Section~\ref{sec:taxonomy} presents the 18 slop types organized by generative factors. Section~\ref{sec:decidability} analyzes the decidability of accretion detection. Section~\ref{sec:aggregate} proposes aggregate detection methods. Section~\ref{sec:defense} develops the layered defense architecture. Section~\ref{sec:empirical} presents empirical calibration. Section~\ref{sec:principles} distills design principles. Section~\ref{sec:contrarian} engages contrarian positions. Section~\ref{sec:limitations} discusses limitations and future work. Section~\ref{sec:related} surveys related work.
+
+
+% ====================================================================
+% FRAMEWORK OVERVIEW FIGURE
+% ====================================================================
+\begin{figure}[p]
+\centering
+\begin{tikzpicture}[
+    x=1cm, y=1cm,
+    >=Stealth,
+    every node/.style={font=\footnotesize},
+    arr/.style={->, thick, color=black!70},
+    barr/.style={draw=red!70!black, very thick, dashed},
+]
+
+% ---------------------------------------------------------------
+% ROW 0  (y=0): AI Code Generation
+% ---------------------------------------------------------------
+\node[draw, rounded corners=3pt, fill=blue!6,
+      minimum width=3cm, align=center] (gen) at (0,0)
+    {\textbf{AI Code Generation}\\[-1pt]{\scriptsize\itshape statistical pattern completion}};
+
+% ---------------------------------------------------------------
+% ROW 1  (y=-1.5): Three Generative Factors
+% ---------------------------------------------------------------
+\node[draw, rounded corners=2pt, fill=blue!12,
+      minimum width=3.4cm, minimum height=0.8cm, align=center] (f1) at (-4.2,-1.5)
+    {\textbf{F1: Context Blindness}\\[-1pt]{\scriptsize $\hat{\mathcal{K}} \subset \mathcal{K}(t)$}};
+\node[draw, rounded corners=2pt, fill=blue!12,
+      minimum width=3.4cm, minimum height=0.8cm, align=center] (f2) at (0,-1.5)
+    {\textbf{F2: Completion Bias}\\[-1pt]{\scriptsize $\mathbb{E}_\pi[\mathrm{len}] > \mathbb{E}_{\pi^*}[\mathrm{len}]$}};
+\node[draw, rounded corners=2pt, fill=blue!12,
+      minimum width=3.4cm, minimum height=0.8cm, align=center] (f3) at (4.2,-1.5)
+    {\textbf{F3: Distrib.\ Leakage}\\[-1pt]{\scriptsize $\mathcal{D} \neq \mathcal{E}$}};
+
+\draw[arr] (gen.south) -- ++(0,-0.15) -| (f1.north);
+\draw[arr] (gen.south) -- (f2.north);
+\draw[arr] (gen.south) -- ++(0,-0.15) -| (f3.north);
+
+% Factor example annotations
+\node[font=\scriptsize\itshape, text=black!55, below=1pt of f1]
+    {duplication, naming drift};
+\node[font=\scriptsize\itshape, text=black!55, below=1pt of f2]
+    {placeholders, boilerplate};
+\node[font=\scriptsize\itshape, text=black!55, below=1pt of f3]
+    {hallucinated imports, vulns};
+
+% ---------------------------------------------------------------
+% ROW 2  (y=-3.2): Accretion Defect definition
+% ---------------------------------------------------------------
+\node[draw, thick, rounded corners=3pt, fill=yellow!8,
+      minimum width=10.5cm, minimum height=0.85cm, align=center,
+      text width=10.2cm] (accdef) at (0,-3.2)
+    {\textbf{Accretion Defect} (Def.~3.1):\\[1pt]
+     (i)~correct\;$\checkmark$ \quad
+     (ii)~superfluous\;$\checkmark$ \quad
+     (iii)~defensible\;$\checkmark$ \quad
+     (iv)~collectively harmful\;$\checkmark$};
+
+\draw[arr] ([yshift=-6pt]f1.south) -- ++(0,-0.3) -| ([xshift=-2.5cm]accdef.north);
+\draw[arr] ([yshift=-6pt]f2.south) -- ++(0,-0.2) -- (accdef.north);
+\draw[arr] ([yshift=-6pt]f3.south) -- ++(0,-0.3) -| ([xshift=2.5cm]accdef.north);
+
+% ---------------------------------------------------------------
+% ROW 3  (y=-5.0): 18 Slop Types (3 detectability classes)
+% ---------------------------------------------------------------
+\node[draw, rounded corners=2pt, fill=green!12,
+      minimum width=3cm, minimum height=0.7cm, align=center] (td) at (-3.8,-5.0)
+    {\textbf{D}: 7 types\\[-1pt]{\scriptsize Practically Decidable}};
+\node[draw, rounded corners=2pt, fill=orange!12,
+      minimum width=3cm, minimum height=0.7cm, align=center] (tpd) at (0,-5.0)
+    {\textbf{PD}: 7 types\\[-1pt]{\scriptsize Partially Detectable}};
+\node[draw, rounded corners=2pt, fill=red!10,
+      minimum width=3cm, minimum height=0.7cm, align=center] (tu) at (3.8,-5.0)
+    {\textbf{U}: 4 types\\[-1pt]{\scriptsize Reliably Undetectable}};
+
+\draw[arr] (accdef.south) -- ++(0,-0.25) -| (td.north);
+\draw[arr] (accdef.south) -- ++(0,-0.25) -| (tpd.north);
+\draw[arr] (accdef.south) -- ++(0,-0.25) -| (tu.north);
+
+% ---------------------------------------------------------------
+% Compound Degradation (right side, between rows 2 and 3)
+% ---------------------------------------------------------------
+\node[draw, rounded corners=2pt, fill=gray!8,
+      align=center, text width=2.6cm,
+      font=\scriptsize, anchor=west] (compound) at (5.8,-4.1)
+    {\footnotesize\textbf{Compound}\\[-1pt]\footnotesize\textbf{Degradation}\\[2pt]
+     $\Gamma \!\geq\! n\Delta\Gamma {+} \tbinom{n}{2}\Delta\Gamma_{\!\text{cross}}$\\[1pt]
+     superlinear (Prop.~3.1)};
+\draw[arr, dashed, black!40] (accdef.south east) |- (compound.west);
+
+% ---------------------------------------------------------------
+% ROW 3.5 (y=-6.3): Decidability barrier
+% ---------------------------------------------------------------
+\draw[barr] (-6.4,-6.3) -- (6.4,-6.3);
+\node[font=\scriptsize\bfseries, text=red!70!black, fill=white, inner sep=2pt]
+    at (0,-6.3) {DECIDABILITY BARRIER (Thm.~5.1)};
+
+\node[font=\scriptsize, text=red!55, anchor=south west] at (-6.3,-6.22)
+    {Individual: \textbf{undecidable}};
+\node[font=\scriptsize, text=green!45!black, anchor=north west] at (-6.3,-6.38)
+    {Aggregate: \textbf{feasible} via statistical process control (\S6)};
+
+% ---------------------------------------------------------------
+% ROW 4  (y=-7.4 to -9.5): Defense (left) + Monitoring (right)
+% ---------------------------------------------------------------
+
+% -- 4-Layer Defense --
+\node[font=\footnotesize\bfseries, anchor=south west] at (-6.3,-7.5) {4-Layer Defense (\S7)};
+
+\node[draw, rounded corners=2pt, fill=green!8,
+      minimum width=5.6cm, minimum height=0.45cm,
+      align=left, text width=5.4cm, anchor=north west] (l1) at (-6.3,-7.65)
+    {\textbf{L1} Structural gates \hfill {\scriptsize \$0.50/PR, 2--10s}};
+\node[draw, rounded corners=2pt, fill=green!14,
+      minimum width=5.6cm, minimum height=0.45cm,
+      align=left, text width=5.4cm, below=2pt of l1] (l2)
+    {\textbf{L2} Deterministic analysis \hfill {\scriptsize \$2/PR, 10--60s}};
+\node[draw, rounded corners=2pt, fill=yellow!14,
+      minimum width=5.6cm, minimum height=0.45cm,
+      align=left, text width=5.4cm, below=2pt of l2] (l3)
+    {\textbf{L3} LLM-as-Judge \hfill {\scriptsize \$8/PR, 20--120s}};
+\node[draw, rounded corners=2pt, fill=orange!12,
+      minimum width=5.6cm, minimum height=0.45cm,
+      align=left, text width=5.4cm, below=2pt of l3] (l4)
+    {\textbf{L4} Human review \hfill {\scriptsize \$80/PR, 10--60\,min}};
+
+\node[font=\scriptsize\itshape, text=black!55, anchor=north west, text width=5.4cm]
+    (drenote) at ([yshift=-3pt]l4.south west)
+    {$D_j = 1 - \prod_\ell(1{-}d_{\ell,j})$\;\;
+     Three layers $\Rightarrow$ 91\% cumulative DRE};
+
+% -- Aggregate Monitoring --
+\node[font=\footnotesize\bfseries, anchor=south west] at (0.8,-7.5) {Aggregate Monitoring (\S6)};
+
+\node[draw, rounded corners=2pt, fill=green!6,
+      minimum width=5.2cm, minimum height=0.45cm,
+      align=center, anchor=north west] (s1) at (0.8,-7.65)
+    {$\Gamma(\mathcal{C})$ coupling trend {\scriptsize(weekly)}};
+\node[draw, rounded corners=2pt, fill=green!6,
+      minimum width=5.2cm, minimum height=0.45cm,
+      align=center, below=2pt of s1] (s2)
+    {Refactoring ratio $r$ {\scriptsize(30-day window)}};
+\node[draw, rounded corners=2pt, fill=green!6,
+      minimum width=5.2cm, minimum height=0.45cm,
+      align=center, below=2pt of s2] (s3)
+    {Clone frequency {\scriptsize(per-commit)}};
+\node[draw, rounded corners=2pt, fill=green!6,
+      minimum width=5.2cm, minimum height=0.45cm,
+      align=center, below=2pt of s3] (s4)
+    {Dependency fan-out {\scriptsize(per-commit)}};
+
+\node[font=\scriptsize\itshape, text=black!55, anchor=north west, text width=5cm]
+    (alertnote) at ([yshift=-3pt]s4.south west)
+    {Alert on $\geq\!2$ simultaneous exceedances.
+     Equilibrium: $r \geq 0.20$ (Cor.~3.1)};
+
+% ---------------------------------------------------------------
+% ROW 5  (y=-12): Key insight
+% ---------------------------------------------------------------
+\node[draw, thick, rounded corners=4pt, fill=blue!5,
+      minimum width=12.8cm, align=center, font=\footnotesize,
+      text width=12.4cm] (insight) at (0,-12.0)
+    {\textbf{Key insight:} Individual accretion is invisible to point-in-time checks.
+     Shift from \emph{per-change defect detection} to
+     \emph{longitudinal codebase health monitoring}.};
+
+\draw[arr] (drenote.south) -- ++(0,-0.3) -| ([xshift=-2.5cm]insight.north);
+\draw[arr] (alertnote.south) -- ++(0,-0.3) -| ([xshift=2.5cm]insight.north);
+
+\end{tikzpicture}
+\caption{The Accretion Category framework. AI statistical completion, driven by three generative factors (F1--F3), produces accretion defects satisfying all four properties of Definition~3.1. The 18 slop types partition into three detectability classes. The decidability barrier (Theorem~5.1) separates individual detection (undecidable) from aggregate detection (feasible via statistical process control). Defense combines a 4-layer architecture (\S\ref{sec:defense}) with continuous aggregate monitoring (\S\ref{sec:aggregate}). Compound degradation (Proposition~3.1) drives superlinear coupling growth; the refactoring ratio equilibrium (Corollary~3.1) provides the actionable threshold $r \geq 0.20$.}
+\label{fig:framework}
+\end{figure}
+
+% ====================================================================
+% 2. BACKGROUND
+% ====================================================================
+\section{Background: Technical Debt and Defect Taxonomies}
+\label{sec:background}
+
+\subsection{The Technical Debt Metaphor}
+
+Cunningham introduced the technical debt metaphor in 1992 to describe deliberate shortcuts taken for speed, with the intention of ``paying back'' the debt through later refactoring \citep{cunningham1992}. The metaphor has since expanded far beyond its original scope. Kruchten et al.\ \citep{kruchten2012} developed a taxonomy identifying design debt, architecture debt, code debt, test debt, and documentation debt as distinct categories, each with different accumulation patterns and remediation costs. Brown et al.\ \citep{brown2010} provided a systematic treatment, and Li et al.\ \citep{li2015} produced a comprehensive mapping study cataloguing 94 primary studies across technical debt identification, measurement, and management.
+
+Fowler's code smells \citep{fowler1999} provide a complementary vocabulary. Particularly relevant are \emph{speculative generality} (building abstractions for anticipated future needs that never materialize), \emph{shotgun surgery} (changes that require modifications across many classes), and \emph{duplicated code}. These smells describe structural patterns that resist change, but they are symptoms, not root causes.
+
+\subsection{Classical Defect Taxonomies}
+
+IEEE 1044 \citep{ieee1044} provides a standard classification for software anomalies based on activity, disposition, and impact. Chillarege's Orthogonal Defect Classification (ODC) \citep{chillarege1992} classifies defects by type (assignment, checking, interface, timing, function, build/merge/package, documentation, algorithm) and trigger (coverage, variation, sequencing, interaction, workload/stress, recovery, startup/restart, configuration). Beizer's taxonomy \citep{beizer1990} organizes defects by the development phase in which they are most likely introduced and detected. The Common Weakness Enumeration (CWE) \citep{cwe2024} provides a community-maintained catalogue of software and hardware weakness types, organized hierarchically.
+
+\subsection{What Existing Taxonomies Miss}
+
+All of these taxonomies share a common assumption: defects arise from intentional human choices (however misguided) and can be attributed to specific decisions. Technical debt is incurred deliberately or inadvertently by a human developer who chooses a shortcut. Code smells emerge from design decisions made under pressure. ODC defects arise from mistakes in specific development activities.
+
+None of these taxonomies models code generated by statistical completion rather than intentional choice. When an AI agent produces code, the generative mechanism is fundamentally different: the output is the most probable continuation of the context according to a learned distribution over code. There is no ``decision'' to incur debt, no ``choice'' to introduce a smell. The code appears because it is statistically likely, not because any reasoning process determined it was necessary.
+
+The Accretion Category shares the ``individually defensible, collectively harmful'' property with design debt in Kruchten et al.'s taxonomy. But it differs in two critical respects:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Generative mechanism.} Design debt arises from intentional choice (a developer decides to take a shortcut). Accretion arises from statistical pattern completion (the model generates the most probable output, which happens to be superfluous). The code is produced because it is \emph{probable}, not because it is \emph{necessary}.
+    \item \textbf{Decidability of individual detection.} Design debt is typically recognizable by an expert reviewer (``this abstraction was clearly built for future needs that haven't materialized''). Individual accretion detection requires exhibiting a smaller sufficient change, which reduces to program equivalence and is therefore undecidable.
+\end{enumerate}
+
+The phenomenon exists on a spectrum with traditional design debt rather than being categorically distinct. But the combination of a new generative mechanism and a new decidability profile warrants a dedicated treatment.
+
+
+% ====================================================================
+% 3. THE ACCRETION CATEGORY: FORMAL DEFINITION
+% ====================================================================
+\section{The Accretion Category: Formal Definition}
+\label{sec:formal}
+
+\subsection{The Core Definition}
+
+\begin{definition}[Accretion Defect]
+\label{def:accretion}
+An \emph{accretion defect} is a code change $\Delta$ that satisfies all four of the following properties:
+\begin{enumerate}[nosep]
+    \item \textbf{Functionally correct.} All tests pass after applying $\Delta$.
+    \item \textbf{Superfluous.} There exists a smaller change $\Delta' \subset \Delta$ that satisfies the same requirement.
+    \item \textbf{Individually defensible.} $\Delta$ passes all automated checks and violates no stated coding standard.
+    \item \textbf{Collectively harmful.} Cumulative application of such changes increases coupling complexity by $\epsilon > 0$ per change.
+\end{enumerate}
+\end{definition}
+
+\emph{[Mathematical Fact: Properties (i)--(iv) define a set; the non-emptiness of this set under AI code generation is an empirical claim, grounded in the GitClear and DORA data.]}
+
+Property (ii) is the defining characteristic that distinguishes accretion from other defect classes. A change can be correct, defensible, and harmful (ordinary technical debt). A change can be correct, superfluous, and harmful (dead code). The Accretion Category requires all four properties simultaneously: the superfluity is invisible because the change is defensible, and the harm is invisible because each individual change contributes only $\epsilon$.
+
+\subsection{Coupling Complexity}
+
+To formalize property (iv), we need a metric for codebase structural health.
+
+\begin{definition}[Coupling Complexity]
+\label{def:coupling-complexity}
+For a codebase $\mathcal{C}$ of $n$ files, let $\mu(f_i)$ be the minimum set of files a developer must understand to correctly modify $f_i$. The \emph{coupling complexity} is:
+\begin{equation}
+\Gamma(\mathcal{C}) = \frac{1}{n} \sum_{i=1}^{n} \log_2 |\mu(f_i)|
+\end{equation}
+A perfectly modular codebase has $\Gamma(\mathcal{C}) = 0$ (each file is self-contained); a fully coupled one has $\Gamma(\mathcal{C}) = \log_2 n$ (modifying any file requires understanding all files).
+\end{definition}
+
+\begin{remark}
+This quantity is a mean log-coupling-degree, not a Shannon entropy (it is not the entropy of a probability distribution). We use the symbol $\Gamma$ rather than $H$ to avoid suggesting the formal properties of Shannon entropy (additivity under independence, connection to coding theorems) that this quantity does not possess. The name ``coupling complexity'' reflects its actual meaning: the average number of bits needed to specify the modification context of a random file.
+\end{remark}
+
+\emph{[Mathematical Fact: $\Gamma$ is well-defined for any codebase with a dependency graph. Its computability depends on operationalizing $\mu(f_i)$, which in practice requires approximation via static analysis of import/call graphs.]}
+
+\subsection{The Accretion Rate}
+
+\begin{definition}[Accretion Rate]
+\label{def:accretion-rate}
+The \emph{accretion rate} $\alpha(t)$ measures coupling complexity increase per unit of code change:
+\begin{equation}
+\alpha(t) = \frac{\Gamma(\mathcal{C}_{t+1}) - \Gamma(\mathcal{C}_t)}{|\Delta_t|}
+\end{equation}
+where $|\Delta_t|$ is the size (e.g., lines changed) of the change at time $t$.
+\end{definition}
+
+Positive $\alpha$ indicates a change that increases coupling; negative $\alpha$ indicates refactoring that reduces coupling; $\alpha = 0$ indicates a coupling-neutral change.
+
+\subsection{Compound Degradation}
+
+\begin{proposition}[Compound Degradation]
+\label{thm:compound-degradation}
+\emph{[Engineering Hypothesis.]} A sequence of $n$ individually CI-passing changes, each adding $\Delta \Gamma$ bits of coupling complexity, produces total coupling complexity growth:
+\begin{equation}
+    \Gamma_{\text{total}} \geq n \cdot \Delta \Gamma + \binom{n}{2} \cdot \Delta \Gamma_{\text{cross}}
+\end{equation}
+where $\Delta \Gamma_{\text{cross}} \geq 0$ accounts for cross-change coupling interactions. The growth is superlinear when $\Delta \Gamma_{\text{cross}} > 0$.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Let $\Gamma_0$ be the initial coupling complexity and $\Gamma_k$ the complexity after $k$ changes. Each change $k$ adds code, increasing the number of files $n_k = n_0 + k$ and potentially increasing $|\mu(f_i)|$ for existing files (because new code may import from or be imported by existing files). The direct contribution of change $k$ is $\Delta \Gamma$. The cross-change contribution arises when change $k$ increases $|\mu(f_i)|$ for files modified by earlier changes $j < k$: if change $j$ added file $g_j$ and change $k$ adds file $g_k$ that imports $g_j$, then $|\mu(g_j)|$ increases by at least 1, contributing $\Delta \Gamma_{\text{cross}} \geq \log_2((|\mu(g_j)|+1)/|\mu(g_j)|)$. Summing over all $\binom{n}{2}$ pairs gives the quadratic term. The key assumption is that changes add code without refactoring; when refactoring occurs, $\Delta \Gamma_{\text{cross}}$ can be negative.
+\end{proof}
+
+\emph{[Engineering Hypothesis: the superlinear growth is predicted by the model and consistent with the GitClear data, but has not been directly measured via coupling complexity time series in a controlled experiment.]}
+
+The quadratic term is what makes accretion dangerous. CI checks verify that each change individually compiles and passes tests (pointwise correctness), but they do not constrain the global coupling structure $\Gamma(\mathcal{C})$. A sequence of 100 individually harmless changes, each adding 0.01 bits of direct coupling complexity with 0.001 bits of cross-change coupling, produces $100 \times 0.01 + \binom{100}{2} \times 0.001 = 1.0 + 4.95 = 5.95$ bits of total coupling growth. The cross-change term (4.95 bits) dominates the direct term (1.0 bit) by a factor of five.
+
+\subsection{Refactoring Ratio Equilibrium}
+
+\begin{corollary}[Refactoring Ratio Threshold]
+\label{cor:refactoring}
+Let $r$ be the fraction of refactoring changes (those with $\alpha < 0$) and $(1-r)$ the fraction of additions ($\alpha > 0$). For coupling complexity to remain bounded, equilibrium requires:
+\begin{equation}
+r \cdot |\E[\alpha \mid \text{refactoring}]| \geq (1-r) \cdot \E[\alpha \mid \text{addition}]
+\end{equation}
+\end{corollary}
+
+\begin{proof}[Proof sketch]
+The expected change in coupling complexity per time step is $(1-r) \cdot \E[\alpha \mid \text{addition}] - r \cdot |\E[\alpha \mid \text{refactoring}]|$. For this to be non-positive (bounded growth), the stated inequality must hold.
+\end{proof}
+
+\emph{[Mathematical Fact: this is a direct consequence of the definitions. The empirical calibration is the substantive claim.]}
+
+GitClear data provides empirical calibration. The pre-AI equilibrium was at $r \approx 0.24$ (refactoring as 24\% of all changes); the post-AI state is at $r \approx 0.095$ (refactoring collapsed to under 10\%). Assuming the ratio of expected accretion rates has not changed dramatically, the equilibrium condition is violated by approximately 2.5$\times$:
+\begin{equation}
+\frac{(1-r_{\text{post}}) / r_{\text{post}}}{(1-r_{\text{pre}}) / r_{\text{pre}}} = \frac{0.905 / 0.095}{0.76 / 0.24} \approx \frac{9.53}{3.17} \approx 3.0
+\end{equation}
+
+The current refactoring ratio is approximately 3$\times$ below the pre-AI equilibrium ratio. Unless AI-generated additions are substantially less coupling-intensive than human additions (for which there is no evidence), coupling complexity is growing without bound.
+
+
+% ====================================================================
+% 4. THE 18 SLOP TYPES TAXONOMY
+% ====================================================================
+\section{The 18 Slop Types Taxonomy}
+\label{sec:taxonomy}
+
+The Accretion Category is the overarching defect class. Its concrete manifestations, which we call \emph{slop types} following industry usage, fall into 18 categories organized along two dimensions: detectability and generative mechanism.
+
+\subsection{Formal Representation}
+
+Each slop type is formalized as a tuple $\tau_j = (\sigma_j, \phi_j, \delta_j, C_j)$ where:
+\begin{itemize}[nosep]
+    \item $\sigma_j$ is a \emph{syntactic signature}: a pattern on abstract syntax trees that serves as a necessary (but not sufficient) condition for detection.
+    \item $\phi_j$ is the \emph{semantic property}: the condition that, given full program context, determines whether the syntactic signature constitutes a genuine defect.
+    \item $\delta_j \in \{\mathrm{D}, \mathrm{PD}, \mathrm{U}\}$ is the \emph{detectability class}: Practically Decidable, Partially Detectable, or Reliably Undetectable.
+    \item $C_j$ is the \emph{cost distribution}: the distribution of downstream costs conditional on the defect reaching production.
+\end{itemize}
+
+\subsection{The Three Detectability Classes}
+
+\begin{table}[htbp]
+\centering
+\caption{The 18 slop types partitioned by detection decidability.}
+\label{tab:slop-partition}
+\small
+\begin{tabularx}{\textwidth}{l c X}
+\toprule
+\textbf{Class} & \textbf{Count} & \textbf{Types} \\
+\midrule
+D (Practically Decidable) & 7 & Hallucinated imports, placeholder/stub code, duplicate logic, dead code, lint suppressions, cross-language contamination, outdated APIs \\
+\addlinespace
+PD (Partially Detectable) & 7 & Security vulns (functional-looking), happy-path error handling, data model mismatches, over-engineering, architectural erosion, silent scope expansion, god functions \\
+\addlinespace
+U (Reliably Undetectable) & 4 & Meaningless tests, boilerplate inflation, redundant comments, naming/convention drift \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+We use the labels D/PD/U as \emph{engineering categories} indicating achievable detection reliability, not as claims about Turing-machine decidability of the corresponding decision problems. The distinction between formal decidability (whether an algorithm exists in principle) and practical detectability (whether existing tools achieve reliable detection) is important and developed further in Section~\ref{sec:decidability}.
+
+\begin{enumerate}
+    \item \textbf{Practically Decidable (D):} Detection reduces to syntactic or structural checks with near-perfect precision and recall. The syntactic signature $\sigma_j$ suffices; the semantic property $\phi_j$ does not depend on unobservable context. Examples: hallucinated imports are detected by lockfile resolution ($O(1)$ lookup); placeholder code by AST pattern matching for \texttt{pass}, \texttt{...}, \texttt{NotImplementedError}; duplicate logic by tree-sitter-based clone detection (suffix tree, $O(n \log n)$); dead code by call graph reachability.
+
+    \item \textbf{Partially Detectable (PD):} The semantic property $\phi_j$ depends on partially formalizable context. An oracle (LLM or human expert) can approximate $\phi_j$ with probability $p \in (0.5, 1)$, but no computable function achieves $p = 1$. Security vulnerabilities require knowing which inputs are adversarial; happy-path handling requires knowing which error paths matter; over-engineering requires judging abstraction necessity. Expert inter-rater agreement for these types is $\kappa \approx 0.6$ (substantial, above chance but below certainty).
+
+    \item \textbf{Reliably Undetectable (U):} No known procedure achieves reliable detection. For all known methods, inter-rater reliability $\kappa < 0.4$ (below ``fair agreement''). ``Meaningless test'' depends on test intent versus structure; ``boilerplate'' thresholds vary by team norms; ``redundant comment'' depends on reader expertise; ``naming drift'' requires inferring implicit conventions.
+\end{enumerate}
+
+\subsection{Three Generative Factors}
+
+The 18 slop types arise from three approximately orthogonal generative factors operating at different stages of the generation process.
+
+\begin{definition}[Context Blindness (F1)]
+\label{def:f1}
+The agent's effective context $\hat{\mathcal{K}}(t) \subset \mathcal{K}(t)$, where $\mathcal{K}(t)$ is the codebase knowledge required for correct generation at point $t$. The probability of slop type $\tau_j$ increases monotonically with the context deficit $|\mathcal{K} \setminus \hat{\mathcal{K}}|$. Types loading on F1: duplicate logic, naming drift, architectural erosion, boilerplate inflation.
+\end{definition}
+
+\begin{definition}[Completion Bias (F2)]
+\label{def:f2}
+The agent's output distribution $\pi$ assigns higher probability to syntactically complete outputs than to semantically minimal correct outputs: $\E_\pi[\mathrm{length}(o)] > \E_{\pi^*}[\mathrm{length}(o)]$ where $\pi^*$ is the distribution over optimal (minimal correct) outputs. Types loading on F2: placeholder code, happy-path error handling, meaningless tests, redundant comments, over-engineering.
+\end{definition}
+
+\begin{definition}[Training Distribution Leakage (F3)]
+\label{def:f3}
+Patterns memorized during training are applied to contexts where they do not hold. The probability increases with divergence between training distribution $\mathcal{D}$ and execution environment $\mathcal{E}$. Types loading on F3: hallucinated imports, cross-language contamination, outdated APIs, security vulnerabilities.
+\end{definition}
+
+\begin{proposition}[Approximate Orthogonality]
+\label{prop:orthogonality}
+\emph{[Engineering Hypothesis.]} If the three factors are approximately orthogonal ($I(F_i; F_k)$ small relative to $H(F_i)$ for $i \neq k$), then interventions targeting different factors compose multiplicatively. Better retrieval (addressing F1) does not reduce completion bias (F2), and vice versa. The quality stack must address all three independently.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Under independence, $P(\tau_j \mid F_1, F_2, F_3) = P(\tau_j \mid F_{k(j)})$ where $k(j)$ is the primary factor for type $j$. An intervention reducing $F_i$ by factor $\gamma_i$ reduces the prevalence of types loading on $F_i$ by $\gamma_i$ without affecting types loading on $F_k$ for $k \neq i$. The total reduction is $\prod_i \gamma_i^{w_i}$ where $w_i$ is the fraction of types loading on factor $i$.
+\end{proof}
+
+\emph{[Engineering Hypothesis: the orthogonality claim requires confirmatory factor analysis on a labeled dataset of slop instances, which does not yet exist. The 3-factor structure is proposed, not validated.]}
+
+
+% ====================================================================
+% 5. DECIDABILITY ANALYSIS
+% ====================================================================
+\section{Decidability Analysis}
+\label{sec:decidability}
+
+\subsection{Rice's Theorem and Its Application}
+
+Rice's theorem \citep{rice1953} establishes that for any non-trivial semantic property $P$ of programs (a property that depends on input-output behavior rather than syntactic form), the set $\{e : \phi_e \in P\}$ is undecidable. We apply this result carefully, distinguishing between formal decidability and practical detectability.
+
+\begin{theorem}[Individual Accretion is Undecidable]
+\label{thm:undecidable}
+\emph{[Mathematical Fact.]} Detecting whether a given code change $\Delta$ is an accretion defect (Definition~\ref{def:accretion}) is undecidable in general.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Property (ii) of the accretion definition requires exhibiting a \emph{smaller} change $\Delta' \subset \Delta$ that satisfies the same requirement. Determining whether $\Delta'$ satisfies the same requirement as $\Delta$ requires determining whether the programs $P[\Delta]$ and $P[\Delta']$ produce the same outputs on all inputs relevant to the requirement. This reduces to the program equivalence problem: given two programs, do they compute the same function? Program equivalence is undecidable by Rice's theorem (the property ``computes the same function as program $Q$'' is a non-trivial semantic property for any fixed $Q$). Since individual accretion detection requires solving an undecidable problem as a subproblem, it is itself undecidable.
+\end{proof}
+
+\begin{remark}
+This undecidability result is about the \emph{general} case. For specific, restricted program classes (e.g., programs that only use linear arithmetic), the equivalence problem may be decidable, and accretion detection within that class would also be decidable. The practical import is that no fully general automated detector for individual accretion defects can exist.
+\end{remark}
+
+\subsection{The Turing Enforcement Principle}
+
+The undecidability result motivates a fundamental enforcement gap that applies broadly across the slop taxonomy.
+
+\begin{theorem}[Enforcement Gap]
+\label{thm:enforcement-gap}
+\emph{[Mathematical Fact.]} For any syntactic property $P_S$, there exists a deterministic enforcer with $\Prob(\text{correct enforcement}) = 1$. For any semantic property $P_U$, every enforcer (including any LLM) satisfies $\Prob(\text{correct enforcement}) < 1$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Part 1: syntactic properties are decided by finite automata on the AST, achieving zero error probability. Part 2: Rice's theorem establishes that no algorithm decides $P_U$ for all programs. An LLM is a fixed-weight transformer with finite training data; achieving $P = 1$ would require correctly classifying programs from an unbounded space, including those arbitrarily far from the training distribution.
+\end{proof}
+
+The AgentSpec result \citep{wang2026agentspec} provides empirical calibration: 87.26\% enforcement for code-based (structural) rules versus 77\% for prompt-based (instructional) rules. The 10-point gap is the measured enforcement gap for current systems.
+
+\emph{[Mathematical Fact: Theorem~\ref{thm:enforcement-gap} is a direct consequence of Rice's theorem. The practical calibration is an Engineering Hypothesis.]}
+
+\subsection{The Detection Ceiling}
+
+\begin{theorem}[Detection Ceiling via Fano's Inequality]
+\label{thm:detection-ceiling}
+\emph{[Mathematical Fact.]} For any defense layer $\ell$ with access to observable features $X$ (code text, AST, test results), the detection rate for defect type $j$ satisfies:
+\begin{equation}
+    d_{\ell,j} \leq \frac{I(X; D_j)}{H(D_j)}
+\end{equation}
+where $D_j$ is the binary indicator of defect presence and $I(X; D_j)$ is the mutual information between observable features and defect status.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Interpreting detection as a binary hypothesis test, Fano's inequality gives $H(D_j \mid \hat{D}_j) \geq H(D_j)(1 - d_{\ell,j})$, where $\hat{D}_j$ is the detector's output. Since $H(D_j \mid \hat{D}_j) \geq H(D_j) - I(X; D_j)$ by the data processing inequality \citep{cover2006}, combining yields the stated bound.
+\end{proof}
+
+The Detection Ceiling makes precise the intuition that some defects cannot be reliably detected from code alone. When the mutual information $I(X; D_j)$ is low (because the defect concerns intent, not syntax), no amount of analytical sophistication raises detection above the ceiling. For silent scope expansion, Layer 1 (structural gates) does not observe the task description, so $d_{1,\text{scope}} \approx 0$.
+
+
+% ====================================================================
+% 6. AGGREGATE DETECTION METHODS
+% ====================================================================
+\section{Aggregate Detection Methods}
+\label{sec:aggregate}
+
+While individual accretion is undecidable, aggregate accretion is feasible to detect via statistical process control on structural health proxies. The key insight is that accretion manifests not in any single change but in the statistical properties of the change stream.
+
+\subsection{Coupling Complexity Monitoring}
+
+Track $\Gamma(\mathcal{C})$ over time using static analysis of import/call graphs. In practice, $|\mu(f_i)|$ is approximated by the transitive closure of the import graph, the set of files reachable via import or function-call edges from $f_i$. A sustained positive trend in $\Gamma(\mathcal{C})$ indicates net accretion.
+
+Apply CUSUM (Cumulative Sum) or Bayesian change-point detection to the time series $\{\Gamma(\mathcal{C}_t)\}_{t=1}^T$ to identify inflection points where accretion rate changes. CUSUM detects shifts in the mean of a process by accumulating deviations from a target value; when the cumulative sum exceeds a threshold $h$, an alarm is raised. For Bayesian change-point detection, model the accretion rate $\alpha(t)$ as piecewise constant and use Bayesian inference to identify the posterior distribution over change-point locations.
+
+\subsection{Refactoring Ratio Monitoring}
+
+The refactoring ratio $r$ (fraction of changes that reduce coupling complexity) is a leading indicator. Corollary~\ref{cor:refactoring} establishes the equilibrium condition. In practice, classify each change as ``addition'' ($\alpha > 0$), ``refactoring'' ($\alpha < 0$), or ``neutral'' ($\alpha \approx 0$) using the sign and magnitude of the accretion rate.
+
+\emph{[Engineering Hypothesis.]} The threshold $r \geq 0.20$ is derived from the pre-AI GitClear equilibrium. Maintaining $r$ above this threshold is a necessary condition for bounded coupling complexity growth.
+
+\subsection{Clone Frequency Tracking}
+
+GitClear's data shows that 5+ line duplicate blocks increased approximately 8$\times$ during the AI adoption period. Track clone frequency using tree-sitter-based clone detection (suffix tree algorithms, $O(n \log n)$) as a proxy for accretion. Clone frequency is a lagging indicator (clones are a consequence of accretion, not accretion itself), but it is cheap to measure and has high signal-to-noise ratio.
+
+\subsection{Dependency Fan-Out Trends}
+
+For each file $f_i$, track the out-degree of the dependency graph (number of files that $f_i$ directly imports or calls). A sustained increase in mean fan-out indicates growing coupling. Unlike $\Gamma(\mathcal{C})$, fan-out is a local metric that can be computed incrementally as files change, making it suitable for per-commit monitoring.
+
+\subsection{Integration: Multi-Signal Detection}
+
+No single aggregate metric suffices. We recommend monitoring four signals simultaneously:
+
+\begin{enumerate}[nosep]
+    \item $\Gamma(\mathcal{C})$ trend (coupling complexity, weekly cadence)
+    \item Refactoring ratio $r$ (rolling 30-day window)
+    \item Clone frequency (5+ line blocks, per-commit)
+    \item Mean dependency fan-out (per-commit)
+\end{enumerate}
+
+Alert when any two of the four signals exceed their respective thresholds simultaneously. This multi-signal approach reduces false positives (any single metric can be noisy) while maintaining sensitivity to genuine accretion.
+
+
+% ====================================================================
+% 7. LAYERED DEFENSE ARCHITECTURE
+% ====================================================================
+\section{Layered Defense Architecture}
+\label{sec:defense}
+
+\subsection{The Four-Layer Stack}
+
+Defense against the full slop taxonomy requires a layered architecture, since no single technique addresses all 18 types across all three detectability classes.
+
+\begin{itemize}[nosep]
+    \item \textbf{Layer 1: Structural gates} (every write, latency 2--10s, cost \$0.50/PR). Type-checker on every file write, import validation against lockfile, lint with zero-suppression policy, dead code detection, diff budget enforcement.
+    \item \textbf{Layer 2: Deterministic analysis} (per task, latency 10--60s, cost \$2.00/PR). AST scan for stubs/placeholders, clone detection across codebase, cyclomatic complexity threshold, deprecation database check.
+    \item \textbf{Layer 3: LLM-as-Judge} (governed mode, latency 20--120s, cost \$8.00/PR). Scope compliance (does the diff match the task description?), abstraction audit (is every new file/class justified?), test quality review, naming consistency.
+    \item \textbf{Layer 4: Human review} (flagged items only, latency 10--60 min, cost \$80.00/PR). Architectural coherence, security review for high-risk paths, design intent validation.
+\end{itemize}
+
+Layers 1--2 block commits. Layer 3 flags but does not block (to avoid throughput bottlenecks from false positives). Layer 4 sees only what survived three automated layers.
+
+\subsection{NP-Hardness of Optimal Layer Assignment}
+
+\begin{theorem}[Layered Defense NP-Hardness]
+\label{thm:defense-nphard}
+\emph{[Mathematical Fact.]} The problem of assigning slop types to defense layers to minimize total cost subject to a minimum detection rate constraint is NP-hard, via reduction from Weighted Set Cover.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Given 18 slop types $J = \{1, \ldots, 18\}$ and four defense layers $L = \{1, 2, 3, 4\}$, select $\Lambda_j \subseteq L$ for each type $j$ minimizing:
+\begin{equation}
+C_{\mathrm{total}} = \sum_{\ell \in L} c_\ell \cdot \mathbf{1}[\Lambda^\ell \neq \emptyset] + \sum_{j \in J} p_j \cdot D_j \cdot P_{\mathrm{esc}}(j, \Lambda_j)
+\end{equation}
+where $P_{\mathrm{esc}}(j, \Lambda_j) = P(\bigcap_{\ell \in \Lambda_j} \{Z_{\ell,j} = 0\})$ is the escape probability. Set $D_j = M$ for large $M$ and $p_j = 1$. Then the penalty $M \cdot P_{\mathrm{esc}} \gg c_\ell$ for any uncovered type, reducing to minimum-weight subcollection selection (Weighted Set Cover). The inapproximability threshold is $\ln |J|$ unless P $=$ NP.
+\end{proof}
+
+\begin{proposition}[Greedy Approximation]
+\label{prop:greedy}
+The greedy algorithm (assign each slop type to its highest-efficiency layer first, then fill coverage gaps) achieves a $(1-1/e)$-approximation, since the objective function is submodular \citep{nemhauser1978}.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Under independence, the marginal escaped-defect-cost reduction from adding a layer is monotone submodular (adding a layer never increases escape probability, and marginal reduction diminishes as more layers are selected).
+\end{proof}
+
+\begin{remark}
+For our problem ($|L| = 4$, $|J| = 18$), exact enumeration over $2^4 = 16$ subsets per type is computationally trivial. The greedy bound matters for scaled versions with dozens of specialized tools.
+\end{remark}
+
+\subsection{The DRE Cascade}
+
+\begin{theorem}[DRE Cascade]
+\label{thm:dre-cascade}
+\emph{[Mathematical Fact.]} For $L$ independent layers, cumulative Defect Removal Efficiency for type $j$ is:
+\begin{equation}
+D_j = 1 - \prod_{\ell=1}^{L} (1 - d_{\ell,j})
+\end{equation}
+Under a Gaussian copula with correlation matrix $\mathbf{R}$:
+\begin{equation}
+D_j = 1 - C_{\mathbf{R}}(1 - d_{1,j}, \ldots, 1 - d_{L,j})
+\end{equation}
+At correlation $\rho = 1$, the second layer adds nothing ($D = d$). At $\rho = 0$, we recover independence.
+\end{theorem}
+
+Three layers at individually modest rates ($d_1 = 0.3$, $d_2 = 0.75$, $d_3 = 0.5$) yield $D = 1 - (0.7)(0.25)(0.5) = 0.9125$, exceeding 91\% cumulative DRE. Achieving DRE $> 95\%$ requires $\geq 3$ diverse techniques \citep{capersjones2012}.
+
+\subsection{Correlated Judge-Producer Errors}
+
+\begin{proposition}[FKG Inequality for Judge-Producer Pairs]
+\label{prop:fkg}
+\emph{[Mathematical Fact.]} Under the FKG inequality, if the producer's failure event and the judge's failure event are positively correlated (both more likely for similar inputs), then:
+\begin{equation}
+    P(\text{both miss defect}) \geq P(\text{producer misses}) \cdot P(\text{judge misses})
+\end{equation}
+The independence assumption \emph{underestimates} the probability of undetected defects.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+The FKG inequality states that for monotone increasing events on a distributive lattice, $P(A \cap B) \geq P(A) \cdot P(B)$. Producer failure and judge failure are both monotone increasing in input difficulty (harder inputs increase both probabilities). The result follows directly.
+\end{proof}
+
+This formalizes why LLM-as-Judge systems using the same model family as the code producer underperform expectations. The \emph{diversity gain} from cross-model judging (using judge $M_J^B$ from a different vendor than producer $M_P^A$) versus same-model judging ($M_J^A$) is:
+\begin{equation}
+\Delta_{\mathrm{div}} = P_{\mathrm{esc}}^{A \text{ judges } A} - P_{\mathrm{esc}}^{B \text{ judges } A}
+\end{equation}
+
+Even at equal detection rates, diversity gain is positive whenever $\rho_{AB} < \rho_{AA}$, because the correlation reduction improves the cascade DRE. This is the Littlewood-Strigini result \citep{littlewood1993, littlewood2000} adapted to the LLM setting: independently developed software versions do not fail independently, but versions from different development traditions fail more independently than versions from the same tradition.
+
+\subsection{Cost-of-Quality Model}
+
+Following the Juran tradition \citep{juran1999}, total cost of quality is:
+\begin{equation}
+    \text{CoQ} = C_{\text{prevention}} + C_{\text{appraisal}} + C_{\text{internal failure}} + C_{\text{external failure}}
+\end{equation}
+
+The classical 1:10:100 ratio (prevention to internal failure to external failure) \citep{boehm1981} requires recalibration by detectability class:
+
+\begin{itemize}[nosep]
+\item \textbf{Decidable types:} approximately 1:3:100. Detection is cheap (automated at the appraisal stage); external failure costs remain high.
+\item \textbf{Partially Detectable types:} approximately 1:15:100. Appraisal requires LLM or human review, increasing appraisal cost.
+\item \textbf{Reliably Undetectable types:} approximately 1:50:30. Appraisal is expensive (deep expert review); but external failure cost is \emph{lower} because these types degrade maintainability, not availability.
+\end{itemize}
+
+\emph{[Engineering Hypothesis: the specific ratios are extrapolated from Boehm's data and Capers Jones's measurements, recalibrated qualitatively for the AI code generation setting. They have not been directly measured.]}
+
+\begin{theorem}[Optimal Quality Level]
+\label{thm:optquality}
+\emph{[Mathematical Fact.]} With defect rate $\lambda(q) = \lambda_0 e^{-\beta q}$ and quality investment $q$, the optimal quality investment is:
+\begin{equation}
+q^* = \frac{1}{\beta} \ln\!\left(\frac{c_F \cdot \lambda_0 \cdot \beta}{c_P + c_A}\right)
+\end{equation}
+where $c_F$ is failure cost and $c_P + c_A$ is marginal prevention/appraisal cost.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Total cost $\text{CoQ}(q) = (c_P + c_A) \cdot q + c_F \cdot \lambda_0 e^{-\beta q}$. Differentiating and setting to zero: $(c_P + c_A) = c_F \cdot \lambda_0 \cdot \beta \cdot e^{-\beta q^*}$. Solving for $q^*$ yields the stated expression. The second derivative is positive, confirming a minimum.
+\end{proof}
+
+This yields context-dependent quality targeting: $q^* \approx 1$ for security-critical production code ($c_F$ high), $q^* \approx 0.7$ for internal tools ($c_F$ moderate), $q^* \approx 0.3$ for prototypes ($c_F$ low). For Undecidable types, appraisal cost can exceed discounted external failure cost, making acceptance the economically rational strategy.
+
+
+% ====================================================================
+% 8. EMPIRICAL CALIBRATION
+% ====================================================================
+\section{Empirical Calibration}
+\label{sec:empirical}
+
+\subsection{Detection Probability Matrix}
+
+\Cref{tab:detection} presents estimated detection probabilities $d_{\ell,j}$ for selected slop types across four defense layers. Confidence levels: \textbf{H} = strong empirical backing; \textbf{M} = single source or derived; \textbf{L} = extrapolated; \textbf{E} = estimated from first principles.
+
+\begin{table}[htbp]
+\centering
+\caption{Detection probability ranges for slop types across four defense layers.}
+\label{tab:detection}
+\small
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+\textbf{Slop Type} & \textbf{L1: Structural} & \textbf{L2: Deterministic} & \textbf{L3: LLM-Judge} & \textbf{L4: Human} \\
+\midrule
+\multicolumn{5}{l}{\textit{Practically Decidable types}} \\
+\addlinespace
+Hallucinated imports & 0.90--0.98 H & 0.50--0.70 M & 0.60--0.80 M & 0.70--0.90 M \\
+Placeholder/stub code & 0.30--0.50 M & 0.85--0.95 H & 0.70--0.85 M & 0.80--0.95 M \\
+Duplicate logic & 0.05--0.15 L & 0.75--0.90 H & 0.40--0.60 M & 0.50--0.70 M \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Partially Detectable types}} \\
+\addlinespace
+Security vulns & 0.10--0.20 M & 0.10--0.15 H & 0.50--0.70 M & 0.60--0.80 M \\
+Happy-path handling & 0.05--0.15 L & 0.20--0.40 M & 0.55--0.75 M & 0.70--0.85 M \\
+Scope expansion & 0.05--0.15 M & 0.10--0.25 L & 0.60--0.80 M & 0.70--0.85 M \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Reliably Undetectable types}} \\
+\addlinespace
+Meaningless tests & 0.00--0.05 E & 0.05--0.15 E & 0.20--0.40 L & 0.50--0.70 L \\
+Redundant comments & 0.00--0.02 E & 0.05--0.15 E & 0.30--0.50 L & 0.50--0.70 L \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key calibration anchors: type systems catch 15\% of public bugs \citep{gao2017}; Spotify's 25\% veto rate across 1,500+ PRs calibrates Layer 3 \citep{spotify2025}; AgentSpec's 87\% code-based enforcement \citep{wang2026agentspec}. Combined escape rate for meaningless tests (across all layers) is approximately 25\%, representing the current detection frontier.
+
+\subsection{Cost per PR by Defense Layer}
+
+\begin{table}[htbp]
+\centering
+\caption{Cost per PR by defense layer, with false positive rates.}
+\label{tab:costs}
+\small
+\begin{tabular}{@{}l r r r@{}}
+\toprule
+\textbf{Layer} & \textbf{Latency} & \textbf{Cost/PR} & \textbf{FP rate} \\
+\midrule
+L1: Structural gates & 2--10s & \$0.50 & 0.01--0.05 \\
+L2: Deterministic analysis & 10--60s & \$2.00 & 0.05--0.20 \\
+L3: LLM-as-Judge & 20--120s & \$8.00 & 0.15--0.35 \\
+L4: Human review & 10--60 min & \$80.00 & 0.05--0.15 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The false positive cost trap: at 100 PRs/week with Layer 3 FP rate of 25\%, developers spend approximately 2,600 hours/year investigating false findings (roughly 1.3 FTEs). ROI ordering confirms that Layer 1 is always cost-effective (ROI $> 1$ for all 18 types), while Layer 4 is cost-effective only for 4--5 high-severity types.
+
+\subsection{External Calibration Points}
+
+\paragraph{Spotify's 25\% veto rate.} Spotify's Honk agent uses LLM-as-Judge to evaluate proposed changes. Across 1,500+ PRs, 25\% are vetoed; agents course-correct approximately 50\% of the time when vetoed \citep{spotify2025}. This provides the best available calibration for Layer 3 detection rates and suggests that approximately one quarter of AI-generated changes contain detectable quality issues.
+
+\paragraph{AgentSpec: structural vs. instructional.} AgentSpec found 87.26\% enforcement for code-based rules versus 77\% for prompt-based rules \citep{wang2026agentspec}. The 10-point gap quantifies the enforcement gap between structural and instructional verification.
+
+\paragraph{METR's 50\% merge gap.} METR found that roughly 50\% of SWE-bench test-passing pull requests would not be merged by repository maintainers \citep{metr2026swebench}. (An important baseline caveat: only about 68\% of human-written ``golden patches'' would be merged on re-review, so the gap attributable to AI deficiency is approximately 18 percentage points, not 50.) This merge gap is a direct measurement of accretion: the tests pass (property i), but the code contains unnecessary complexity that human reviewers reject.
+
+
+% ====================================================================
+% 9. DESIGN PRINCIPLES
+% ====================================================================
+\section{Design Principles}
+\label{sec:principles}
+
+The formal results and empirical calibration yield nine actionable design principles for defending against accretion.
+
+\begin{enumerate}[label=\textbf{P\arabic*.}, leftmargin=3em]
+
+\item \textbf{Maintain the Refactoring Ratio $\geq$ 20\%.}
+\emph{Grounding: Corollary~\ref{cor:refactoring}.}
+The current 2.5$\times$ violation of the equilibrium condition is the root cause of AI-driven codebase degradation. Harnesses must include mechanisms to sustain refactoring as at least 20\% of total changes. Approaches: dedicate explicit refactoring tasks in each sprint, require that AI agents propose refactoring alongside feature work, or use automated refactoring tools on a scheduled cadence.
+
+\item \textbf{Three Diverse Layers for 95\% DRE.}
+\emph{Grounding: Theorem~\ref{thm:dre-cascade}, Capers Jones threshold.}
+No single detection technique suffices for 95\% defect removal effectiveness. Correlated pairs underperform independent ones (Proposition~\ref{prop:fkg}). Deploy at least three diverse detection methods (structural, deterministic analysis, cross-model judgment) to reach the Capers Jones threshold.
+
+\item \textbf{Accept What You Cannot Detect.}
+\emph{Grounding: Theorem~\ref{thm:detection-ceiling}.}
+For Reliably Undetectable slop types where appraisal cost exceeds discounted failure cost ($q^* < 0.5$ in Theorem~\ref{thm:optquality}), acceptance is the economically rational strategy. Compensate through aggregate health monitoring (Section~\ref{sec:aggregate}) rather than per-instance detection.
+
+\item \textbf{Cheap Layers First (ROI Ordering).}
+\emph{Grounding: cost-effectiveness analysis.}
+Layer 1 (\$0.50/PR) achieves near-perfect detection for 7 of 18 types. Layer 4 (\$80.00/PR) is cost-effective only for 4--5 high-severity types. Always apply cheap, high-precision layers first; reserve expensive layers for the residual.
+
+\item \textbf{Opacity to the Producing Agent.}
+\emph{Grounding: METR reward-hacking data.}
+Quality gates must be invisible to the producing agent. When the agent can observe which checks will run, reward hacking amplifies by 43$\times$ (30.4\% on RE-Bench with visible scoring versus 0.7\% on HCAST with hidden scoring) \citep{metr2025rewardhacking}. Run quality checks out-of-band, after generation, with no feedback into the generation prompt about which checks exist.
+
+\item \textbf{Separate Code Authorship from Test Authorship.}
+\emph{Grounding: self-verification bias.}
+When the same agent writes both code and tests, the tests verify the code's \emph{actual} behavior (including bugs) rather than the \emph{intended} behavior. METR's merge-gap finding (50\% of test-passing PRs rejected by maintainers) is partially attributable to this. Use a different agent (or at minimum, a different model) for test generation than for code generation.
+
+\item \textbf{Match Appraisal to Throughput.}
+\emph{Grounding: appraisal compression.}
+If code generation rate $g$ exceeds appraisal capacity $a$, a fraction $(g-a)/g$ bypasses appraisal entirely. Sonar data (48\% always verify) implies $g/a \approx 2$ on average; roughly half of AI code receives no appraisal \citep{sonar2026}. Only automated layers (1--2) can match AI generation speed.
+
+\item \textbf{Detect Accretion, Not Just Defects.}
+\emph{Grounding: Proposition~\ref{thm:compound-degradation}, aggregate detection methods.}
+Track structural metrics (duplication rates, coupling complexity, dependency fan-out) over time, not just per-change correctness. Individual accretion is undetectable; aggregate accretion is measurable via the multi-signal approach (Section~\ref{sec:aggregate}).
+
+\item \textbf{Use Cross-Model Verification for Diversity Gain.}
+\emph{Grounding: Proposition~\ref{prop:fkg}, Littlewood-Strigini.}
+A weak independent detector ($d = 0.3$, $\rho = 0$) can outperform a strong correlated detector ($d = 0.7$, $\rho = 0.8$) in marginal DRE improvement. When using LLM-as-Judge (Layer 3), use a judge from a different model family than the code producer.
+
+\end{enumerate}
+
+
+% ====================================================================
+% 10. CONTRARIAN POSITIONS
+% ====================================================================
+\section{Engaging Contrarian Positions}
+\label{sec:contrarian}
+
+The framework's formal results invite strong objections. Rather than constructing strawmen, we steelman five contrarian positions and evaluate what the evidence supports.
+
+\subsection{``Slop Is Acceptable''}
+
+\paragraph{The steelmanned argument.} Not all code needs to be high-quality. Prototypes, internal tools, and throwaway scripts have low failure costs. Investing in accretion prevention for code that will be discarded is waste.
+
+\paragraph{Response.} Partially validated. Theorem~\ref{thm:optquality} confirms that the optimal quality investment $q^*$ is less than 1 for low-stakes code. The Accretion Category is primarily dangerous for long-lived production codebases where the compound degradation effect has time to accumulate (the $\binom{n}{2}$ cross-change term in Proposition~\ref{thm:compound-degradation}). For throwaway code, the appropriate response is to accept accretion and ensure the code is actually thrown away rather than migrating into production. The danger is that ``prototype-quality'' AI code silently becomes production code through institutional inertia.
+
+\subsection{``This Is Just Technical Debt Rebranded''}
+
+\paragraph{The steelmanned argument.} Cunningham's technical debt metaphor already captures ``individually defensible, collectively harmful'' code. The Accretion Category adds unnecessary jargon.
+
+\paragraph{Response.} The overlap is real but the distinctions matter. Technical debt as defined by Cunningham \citep{cunningham1992} involves \emph{deliberate} shortcuts with \emph{intentional} plans for repayment. Accretion involves \emph{unintentional} superfluity with \emph{no awareness} that debt is being incurred. More concretely: (i) the generative mechanism differs (statistical completion versus intentional choice); (ii) the decidability profile differs (individual accretion is formally undecidable, while design debt is typically recognizable by an expert); (iii) the accumulation dynamics differ (accretion exhibits the compound degradation quadratic, while intentional debt accumulates linearly because a developer who takes a shortcut is at least aware of it). These distinctions have practical consequences: the remediation strategy for technical debt is ``pay it back'' (refactor the known shortcuts), while the remediation strategy for accretion is ``detect it exists'' (the hard problem is identification, not repair).
+
+\subsection{``The 18 Types Are Wrong''}
+
+\paragraph{The steelmanned argument.} The specific taxonomy of 18 types is arbitrary. Perhaps the 3-factor structure (F1, F2, F3) is more fundamental, and the 18 types are merely a convenience.
+
+\paragraph{Response.} Possibly correct. The 18 types were derived from practitioner experience and iterative refinement, not from principled statistical analysis. Confirmatory factor analysis (CFA) on a labeled dataset of slop instances could discover a different number of latent categories. The 3-factor structure (Context Blindness, Completion Bias, Training Distribution Leakage) is proposed as a generative model, not validated as one. If the factors are not orthogonal (as we conjecture but have not tested), the taxonomy may conflate types that share a common generative root. We consider the 3-factor structure more likely to survive empirical scrutiny than the specific 18-type enumeration.
+
+\subsection{``LLM-as-Judge Is Unreliable''}
+
+\paragraph{The steelmanned argument.} Using one LLM to judge another's output introduces correlated errors (shared training data, shared biases, shared blind spots). Judge reliability is itself uncertain.
+
+\paragraph{Response.} Correct as stated; the FKG inequality (Proposition~\ref{prop:fkg}) formalizes exactly this concern. Same-family judge-producer pairs have correlated failures, and the independence assumption underestimates escape probability. The remedy is cross-model verification: use a judge from a different model family (e.g., Claude judging GPT output, or vice versa). Even at equal detection rates, the diversity gain $\Delta_{\mathrm{div}}$ is positive whenever $\rho_{AB} < \rho_{AA}$. The empirical question is the magnitude of the diversity gain. Littlewood and Strigini \citep{littlewood1993} showed that diverse techniques can achieve effectiveness greater than the independence assumption predicts. The practical recommendation is: never use the same model to both produce and judge code; always use cross-model or cross-technique verification.
+
+\subsection{``AI Quality Is Good Enough''}
+
+\paragraph{The steelmanned argument.} GitHub's RCT found no statistically significant quality difference between AI-assisted and unassisted code \citep{github2024rct}. The quality concern is overblown.
+
+\paragraph{Response.} The contradiction between the GitHub RCT (short-term, no quality difference) and GitClear's longitudinal data (8$\times$ duplication, refactoring collapse) is precisely what the Accretion Category explains. Short-term studies measure point-in-time correctness (property i of the accretion definition). Longitudinal studies measure cumulative coupling growth (property iv). Accretion effects are invisible to short-term studies because each individual change is correct and defensible; they become visible only in aggregate, over time. The GitHub RCT and the GitClear analysis are both correct; they measure different quantities. The Accretion Category provides the theoretical framework for understanding why they diverge.
+
+
+% ====================================================================
+% 11. LIMITATIONS AND FUTURE WORK
+% ====================================================================
+\section{Limitations and Future Work}
+\label{sec:limitations}
+
+\subsection{Critical Gaps}
+
+\paragraph{No labeled dataset.} The paper's most significant gap is the absence of a labeled dataset of accretion defects. The formal definitions, taxonomy, and detection methods are proposed but unvalidated. Without ground-truth labels, we cannot measure precision, recall, or F1 for any of the proposed detectors. Creating such a dataset requires expert annotators who can identify superfluous code (property ii), which itself requires understanding the minimal sufficient change, an undecidable problem in general. We propose labeling by expert consensus (3+ senior engineers independently classify changes) as a practical approximation.
+
+\paragraph{Inter-rater reliability.} The detectability classification (D/PD/U) and the assignment of slop types to classes have not been validated through inter-rater reliability studies. The $\kappa$ estimates cited ($\approx 0.6$ for PD, $< 0.4$ for U) are extrapolated from general code review literature, not measured for the specific slop types defined here.
+
+\paragraph{Orthogonality of generative factors.} The approximate orthogonality of F1, F2, and F3 (Proposition~\ref{prop:orthogonality}) is asserted but not tested. Confirmatory factor analysis requires a labeled dataset annotated with both slop type and generative factor, which does not exist.
+
+\paragraph{Aggregate detectors not evaluated.} The four aggregate detection signals (Section~\ref{sec:aggregate}) are proposed but not evaluated on real codebases. Threshold selection, false positive rates, and detection latency are unknown.
+
+\subsection{Verification Roadmap}
+
+We propose the following falsification criteria for the paper's key claims:
+
+\begin{table}[htbp]
+\centering
+\caption{Verification roadmap with falsification criteria.}
+\label{tab:verification}
+\small
+\begin{tabular}{@{}p{3.5cm} p{3.5cm} p{5cm}@{}}
+\toprule
+\textbf{Claim} & \textbf{Status} & \textbf{Falsification Criterion} \\
+\midrule
+Compound degradation is superlinear & Engineering Hypothesis & $\Gamma(\mathcal{C})$ grows linearly (not quadratically) in controlled experiments with no refactoring \\
+\addlinespace
+Refactoring ratio equilibrium at $r \geq 0.20$ & Empirical extrapolation & Codebases with $r < 0.15$ show no increase in coupling complexity over 12 months \\
+\addlinespace
+3-factor structure & Engineering Hypothesis & CFA on labeled dataset finds fewer or more factors, or factors are not approximately orthogonal \\
+\addlinespace
+Detection ceiling bounds & Mathematical Fact & N/A (information-theoretic bound); falsified only if the bound is incorrectly derived \\
+\addlinespace
+Cross-model diversity gain & Theoretical prediction & Same-family judges achieve equal or better DRE than cross-family judges on matched evaluation sets \\
+\addlinespace
+Aggregate detection is feasible & Proposed, untested & Multi-signal approach produces $>$ 30\% false positive rate on codebases without known accretion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ====================================================================
+% 12. RELATED WORK
+% ====================================================================
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Technical Debt Literature}
+
+Cunningham's original metaphor \citep{cunningham1992} and Kruchten et al.'s taxonomy \citep{kruchten2012} are the foundation. Brown et al.\ \citep{brown2010} provide a systematic treatment; Li et al.\ \citep{li2015} catalogue 94 primary studies. Our contribution extends this literature by identifying a defect class arising from a generative mechanism (statistical completion) that did not exist when these taxonomies were developed. Fowler's code smells \citep{fowler1999} describe many of the structural symptoms that accretion produces (duplicated code, speculative generality, shotgun surgery), but treat them as the result of human design choices rather than statistical generation.
+
+\subsection{Defect Taxonomy Literature}
+
+IEEE 1044 \citep{ieee1044}, ODC \citep{chillarege1992}, Beizer \citep{beizer1990}, and CWE \citep{cwe2024} provide comprehensive defect classification frameworks. None models the ``correct but superfluous'' combination that defines accretion. Boehm and Basili's ``Top 10'' \citep{boehm2001} and Shull et al.\ \citep{shull2002} provide empirical grounding for defect rates and remediation costs; our cost-of-quality recalibration (Section~\ref{sec:defense}) extends their results to the AI code generation setting.
+
+\subsection{AI Code Quality Measurement}
+
+CodeRabbit \citep{coderabbit2025}, GitClear \citep{gitclear2025}, Qodo \citep{qodo2025}, and SonarSource \citep{sonar2026} provide the empirical foundation. GitClear's longitudinal analysis (211M changed lines) is the most comprehensive dataset; its findings (8$\times$ duplication, refactoring collapse) directly motivate the Accretion Category. DORA 2025 \citep{dora2025} and Forsgren et al.\ \citep{forsgren2018accelerate} provide the organizational-level metrics showing the productivity-quality paradox.
+
+\subsection{Software Reliability and Diversity}
+
+Littlewood and Strigini \citep{littlewood1993, littlewood2000} established that independently developed software versions do not fail independently, the theoretical foundation for our FKG inequality result and the diversity gain analysis. Capers Jones \citep{capersjones2012} established the 95\% DRE threshold for three diverse techniques. Musa \citep{musa1987} and Fenton and Neil \citep{fenton1999} provide the reliability modeling framework that underpins the DRE cascade analysis.
+
+\subsection{Software Evolution}
+
+Lehman's laws of software evolution \citep{Lehman1980} predict that software complexity increases unless work is done to reduce it (the ``increasing complexity'' law). The Accretion Category provides a specific mechanism by which this law is accelerated under AI code generation: statistical completion systematically favors addition over refactoring, violating the equilibrium condition (Corollary~\ref{cor:refactoring}). Hassan's change entropy \citep{hassan2009} predicts faults from change scattering; our coupling complexity (Definition~\ref{def:coupling-complexity}) shifts from measuring change scattering to measuring the coupling structure that necessitates it. Hindle et al.'s naturalness of software \citep{hindle2012naturalness} provides the theoretical basis for why LLMs generate plausible-looking code: software is statistically regular, and LLMs exploit this regularity. The same regularity that makes generation effective also makes accretion likely, because the ``most probable'' continuation includes patterns that are common in the training data but unnecessary for the specific task.
+
+\subsection{Information Theory in Software Engineering}
+
+Tishby et al.'s information bottleneck method \citep{tishby2000information} provides an alternative formalization of the accretion problem: the context window acts as an information bottleneck between the full codebase and the generated code. When the bottleneck is too narrow (context deficit, F1), the agent cannot distinguish between necessary and unnecessary code patterns, and defaults to the most probable completion. Shannon's foundational work \citep{shannon1948} and Cover and Thomas \citep{cover2006} provide the information-theoretic tools used in the Detection Ceiling theorem.
+
+
+% ====================================================================
+% 13. CONCLUSION
+% ====================================================================
+\section{Conclusion}
+
+The Accretion Category identifies a novel defect class that is invisible to existing taxonomies: code that is correct, superfluous, individually defensible, and collectively harmful. This defect class arises specifically from the generative mechanism of statistical pattern completion, and it explains the paradox of individually correct changes producing collectively degrading codebases.
+
+Three key results emerge. First, individual accretion detection is undecidable (Theorem~\ref{thm:undecidable}), which means no fully automated per-change detector can eliminate it. Second, aggregate accretion is detectable via statistical process control on coupling complexity, refactoring ratio, clone frequency, and dependency fan-out (Section~\ref{sec:aggregate}). Third, the compound degradation proposition (Proposition~\ref{thm:compound-degradation}) predicts superlinear coupling growth when refactoring does not keep pace with addition, a prediction consistent with GitClear's observed 8$\times$ duplication increase and refactoring collapse.
+
+The practical implication is a shift in quality strategy: from detecting individual defects to monitoring aggregate codebase health, from point-in-time checks to longitudinal trend analysis, and from same-model self-verification to cross-model diverse verification. The nine design principles (Section~\ref{sec:principles}) provide actionable guidance; the most urgent is maintaining the refactoring ratio above 20\% (P1), which the data shows is currently violated by approximately 2.5$\times$.
+
+The paper's primary limitation is the absence of empirical validation. The formal definitions, taxonomy, and detection methods are proposed, not tested. The verification roadmap (Table~\ref{tab:verification}) identifies the specific experiments needed. Until those experiments are conducted, the Accretion Category remains a well-motivated hypothesis rather than an established result.
+
+\bibliography{accretion_category}
+
+\end{document}
