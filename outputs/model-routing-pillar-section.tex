@@ -1,0 +1,341 @@
+% ====================================================================
+% THE MODEL ROUTING PILLAR
+% ====================================================================
+\section{The Model Routing Pillar}
+\label{sec:routing}
+
+The Model Routing pillar addresses the problem of selecting, configuring, and composing multiple AI models across pipeline stages to optimize cost-quality-latency tradeoffs. Every other pillar in this framework treats the model as a constant; this pillar treats it as a variable. The economics are stark: input token prices span three orders of magnitude (from \$0.03 to \$30 per million tokens), yet capability gaps are sharply task-dependent. Small models achieve 88--90\% of frontier quality on single-function generation but catastrophically fail on complex multi-file tasks. Despite this, every major harness treats the model as a global configuration parameter rather than a per-stage optimization variable.
+
+\subsection{The Model Landscape}
+
+\Cref{tab:model-landscape} summarizes the model landscape as of early 2026, calibrated from published benchmarks and API pricing.
+
+\begin{table}[htbp]
+\centering
+\caption{Model landscape: price, quality, and latency by tier (early 2026).}
+\label{tab:model-landscape}
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Tier} & \textbf{Representative} & \textbf{Input \$/MTok} & \textbf{HumanEval} & \textbf{SWE-bench V.} & \textbf{TTFT (s)} \\
+\midrule
+Budget & DeepSeek V3.2 & \$0.03--0.28 & 85--88\% & 40--50\% & 0.3--0.5 \\
+Haiku-class & Claude Haiku 4.5 & \$1.00 & 90--92\% & 55--60\% & 0.5--1.0 \\
+Sonnet-class & Claude Sonnet 4.6 & \$3.00 & 95--97\% & 75--80\% & 1.0--2.0 \\
+Opus-class & Claude Opus 4.6 & \$5.00 & 97--98\% & 78--81\% & 2.0--5.0 \\
+Premium & Opus 4.6 Fast & \$30.00 & 97--98\% & 78--81\% & 1.0--2.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 1000$\times$ price range between the cheapest and most expensive options, combined with task-dependent quality gaps ranging from 10 to 70+ percentage points, defines the optimization landscape for model routing.
+
+\subsection{Heterogeneous Stage Assignment}
+
+Let $\mathcal{M} = \{m_1, \ldots, m_M\}$ denote the set of available models and $\mathcal{K} = \{1, \ldots, K\}$ the pipeline stages. For each model $m$ and stage $k$: $q_k(m) \in [0,1]$ is the success probability, $c_k(m) > 0$ the expected cost, $l_k(m) > 0$ the expected latency, and $\rho(m_i, m_j) \in [0,1]$ the blind-spot correlation between models.
+
+\begin{definition}[Model Assignment and Pipeline Quality]
+\label{def:model-assignment}
+A \emph{model assignment} $\sigma: \mathcal{K} \to \mathcal{M}$ maps each pipeline stage to a model. The pipeline quality (end-to-end success probability under independence) is $Q(\sigma) = \prod_{k=1}^{K} q_k(\sigma(k))$, cost is $C(\sigma) = \sum_{k=1}^{K} c_k(\sigma(k))$, and serial latency is $L(\sigma) = \sum_{k=1}^{K} l_k(\sigma(k))$.
+\end{definition}
+
+The assignment problem has strikingly different complexity depending on constraints.
+
+\begin{proposition}[Unconstrained Assignment Decomposes]
+\emph{[Mathematical Fact: follows from separability of the objective.]}
+\label{prop:routing-decompose}
+When models have no capacity constraints, minimizing $C(\sigma)$ subject to $Q(\sigma) \geq Q_{\min}$ decomposes into $K$ independent per-stage selections: for each stage $k$, select $\sigma(k) = \arg\min_{m \in \mathcal{F}_k} c_k(m)$, where $\mathcal{F}_k = \{m : q_k(m) \geq Q_{\min}^{1/K}\}$ is the feasible set. Total complexity is $O(MK)$.
+\end{proposition}
+
+This decomposition is the common case: any model can serve any number of stages. The problem becomes non-trivial when capacity constraints bind (e.g., API rate limits restricting concurrent stages per model):
+
+\begin{proposition}[Capacity-Constrained Assignment via Hungarian Algorithm]
+\emph{[Mathematical Fact: reduction to known polynomial-time algorithm.]}
+\label{prop:routing-hungarian}
+When each model $m$ can serve at most $b_m$ stages, the problem becomes a generalized assignment problem. For the special case $b_m = 1$ (each model serves exactly one stage, requiring $M \geq K$), it reduces to the Linear Sum Assignment Problem \citep{kuhn1955, munkres1957}, solvable in $O(n^3)$ where $n = \max(M,K)$.
+\end{proposition}
+
+\begin{proposition}[Multiplicative Objective Reduces to Additive]
+\label{prop:routing-multiplicative}
+Maximizing $Q(\sigma) = \prod_k q_k(\sigma(k))$ subject to $C(\sigma) \leq C_{\max}$ reduces to an additive problem via $\tilde{q}_k(m) = \log q_k(m)$ (excluding zero-probability model-stage pairs from the feasible set).
+\end{proposition}
+
+\begin{conjecture}[Combined Assignment is Hard]
+\emph{[Engineering Hypothesis: formal reduction not yet constructed.]}
+\label{conj:routing-hard}
+The problem of simultaneously minimizing cost, maximizing quality, and bounding latency:
+\begin{equation}
+\min_{\sigma} C(\sigma) \quad \text{s.t.} \quad Q(\sigma) \geq Q_{\min}, \;\; L(\sigma) \leq L_{\max}
+\end{equation}
+is NP-hard in general for the capacity-constrained case, by analogy to the multi-level bottleneck assignment problem. We state this as a conjecture because the formal reduction requires an instance mapping that we do not provide.
+\end{conjecture}
+
+For the model sizes relevant to AI coding harnesses ($M = 3$--$6$ tiers, $K = 4$--$8$ stages), the assignment space is small: $M^K \in [81, 1{,}679{,}616]$. For $M = 3, K = 6$, exhaustive enumeration of all 729 assignments is trivial. For larger instances, \citet{dekoninck2025cascade} provide a principled Lagrangian relaxation:
+
+\begin{proposition}[Lagrangian Scalarization {\citep{dekoninck2025cascade}}]
+\label{prop:routing-lagrangian}
+The optimal routing strategy selects, for each task with features $\mathbf{x}$, the model maximizing:
+\begin{equation}
+\tau_i(\mathbf{x}, \lambda) = \hat{q}_i(\mathbf{x}) - \lambda \cdot \hat{c}_i(\mathbf{x})
+\end{equation}
+where $\hat{q}_i$ and $\hat{c}_i$ are estimated quality and cost, and $\lambda$ is a Lagrange multiplier controlling the cost-quality tradeoff. Sweeping $\lambda$ traces the Pareto frontier.
+\end{proposition}
+
+\subsection{Cross-Model Diversity for Verification}
+
+The qualitative argument for cross-model diversity originates in the FKG inequality \citep{fkg1971}: under a shared-difficulty model, producer and verifier failure probabilities are positively correlated, so independence \emph{underestimates} escape probability. This subsection takes a quantitative approach using the Gaussian copula, which directly models the correlation parameter and yields numerical predictions.
+
+\begin{definition}[Blind-Spot Correlation]
+\label{def:routing-blindspot}
+For models $m_i$ and $m_j$, define the latent Gaussian copula parameter $\rho(m_i, m_j)$ as the correlation of the underlying Gaussian variables in the copula representation of their joint failure distribution. Empirical estimates from \citet{correlatedensemble2026}: same-family models have $\rho \approx 0.7$--$0.9$; cross-family models have $\rho \approx 0.3$--$0.5$.
+\end{definition}
+
+\begin{proposition}[Cross-Model Diversity Gain]
+\emph{[Mathematical Fact: follows from monotonicity of $\Phi_2$ in its correlation parameter.]}
+\label{prop:routing-diversity}
+Let $m_P$ be the producer model and $m_V$ the verifier model, with individual failure rates $\phi_P$ and $\phi_V$. The correlated escape probability under a Gaussian copula \citep{sklar1959} with parameter $\rho$ is:
+\begin{equation}
+P_{\mathrm{esc}}(\rho) = C_\rho(\phi_P, \phi_V) = \Phi_2(\Phi^{-1}(\phi_P), \Phi^{-1}(\phi_V); \rho)
+\end{equation}
+The diversity gain from cross-family ($\rho_{\mathrm{cross}}$) versus same-family ($\rho_{\mathrm{same}}$) verification is:
+\begin{equation}
+\Delta_{\mathrm{div}} = C_{\rho_{\mathrm{same}}}(\phi_P, \phi_V) - C_{\rho_{\mathrm{cross}}}(\phi_P, \phi_V) > 0
+\end{equation}
+This follows directly from the monotonicity of $\Phi_2$ in its correlation parameter \citep{nelsen2006copulas}.
+\end{proposition}
+
+\begin{corollary}[Weak Independent Beats Strong Correlated]
+\emph{[Mathematical Fact: direct numerical consequence of copula monotonicity.]}
+\label{cor:routing-weakbeats}
+A verifier with failure rate $\phi_V^{\mathrm{weak}}$ and $\rho_{\mathrm{cross}} = 0.4$ can achieve lower escape probability than a verifier with $\phi_V^{\mathrm{strong}} < \phi_V^{\mathrm{weak}}$ and $\rho_{\mathrm{same}} = 0.8$, provided $C_{0.4}(\phi_P, \phi_V^{\mathrm{weak}}) < C_{0.8}(\phi_P, \phi_V^{\mathrm{strong}})$.
+\end{corollary}
+
+\paragraph{Concrete example.} With $\phi_P = 0.15$, a cross-family verifier with $\phi_V = 0.40$ and $\rho = 0.4$ yields $P_{\mathrm{esc}} \approx 0.08$. A same-family verifier with $\phi_V = 0.20$ and $\rho = 0.8$ yields $P_{\mathrm{esc}} \approx 0.11$. The weaker cross-family verifier achieves roughly 27\% lower escape probability despite its lower individual detection rate. This result has a sharp design implication: the verification model must be from a different model family than the production model, a structural requirement, not an optimization variable.
+
+\begin{proposition}[Ensemble Saturation]
+\emph{[Engineering Hypothesis: calibrated from empirical correlation data, not derived from first principles.]}
+\label{prop:routing-saturation}
+Under a one-factor Gaussian copula with equicorrelation $\rho$, the probability that all $N$ models simultaneously fail converges to a non-zero floor as $N \to \infty$ whenever $\rho > 0$ \citep{correlatedensemble2026}. Within-family ensembles ($\rho \approx 0.7$--$0.9$) saturate at $N = 3$--$4$; cross-family ensembles ($\rho \approx 0.3$--$0.5$) continue to improve to larger $N$.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Under the equicorrelated Gaussian copula, the joint failure event $\{\text{all } N \text{ models fail}\}$ has probability $P = \Phi_N(\Phi^{-1}(\phi), \ldots, \Phi^{-1}(\phi); \Sigma)$ where $\Sigma_{ij} = \rho$ for $i \neq j$. In the one-factor representation $X_i = \sqrt{\rho}\,Z + \sqrt{1-\rho}\,\epsilon_i$, conditioning on the common factor $Z$ gives $P = \mathbb{E}_Z[\Phi((\Phi^{-1}(\phi) - \sqrt{\rho}\,Z)/\sqrt{1-\rho})^N]$. The integrand is bounded below by its value at $Z = \Phi^{-1}(\phi)/\sqrt{\rho}$, where the inner term approaches 1/2. For $\rho > 0$, this lower bound is strictly positive and independent of $N$, establishing the saturation floor.
+\end{proof}
+
+\subsection{The Pipeline Crossover Theorem}
+
+A fundamental question for model routing is: when should the harness invest in a single expensive-model attempt versus multiple cheap-model attempts? The answer depends critically on pipeline length and the distinction between two success semantics.
+
+\begin{definition}[Pass@$N$ and Pass${}^n$]
+\label{def:routing-pass}
+For a model with per-attempt success probability $q$:
+\begin{align}
+\text{Pass@}N &= 1 - (1-q)^N & \text{(at least one success in $N$ attempts)} \\
+\text{Pass}^n &= q^n & \text{(all $n$ sequential steps succeed)}
+\end{align}
+Pass@$N$ applies when the harness can select the best output from multiple attempts. Pass${}^n$ applies when every step in a multi-step pipeline must succeed.
+\end{definition}
+
+\begin{theorem}[Pipeline Crossover]
+\emph{[Mathematical Fact: follows from monotonicity of exponentials.]}
+\label{thm:routing-crossover}
+Let $q_e$ be the per-step success probability of an expensive model and $q_c < q_e$ that of a cheap model, with cost ratio $r = c_e / c_c > 1$. For a pipeline of $n$ stages with Pass${}^n$ semantics, a single expensive-model attempt dominates $N = r$ independent cheap-model attempts (at equal total cost) when:
+\begin{equation}
+q_e^n > 1 - (1 - q_c^n)^r
+\end{equation}
+The crossover pipeline length $n^*$ is characterized implicitly by $q_e^{n^*} = 1 - (1 - q_c^{n^*})^r$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+A single expensive attempt at $n$ stages succeeds with probability $q_e^n$. Running $N = r$ independent cheap attempts, each succeeding with probability $q_c^n$, gives Pass@$N$ probability $1 - (1 - q_c^n)^N$. The expensive model dominates when the former exceeds the latter. Since $q_e^n$ decays as $\exp(n \ln q_e)$ and $1 - (1 - q_c^n)^r$ decays approximately as $r \cdot q_c^n = r \exp(n \ln q_c)$ for large $n$ (with $\ln q_c < \ln q_e < 0$), the expensive-model probability eventually dominates. The crossover $n^*$ exists and is unique under mild conditions.
+\end{proof}
+
+\paragraph{Concrete example.} For $q_e = 0.85, q_c = 0.60, r = 5$: at $n = 3$, $q_e^3 = 0.614$ versus cheap Pass@5 $= 0.714$ (cheap wins). At $n = 4$: $q_e^4 = 0.522$ versus cheap Pass@5 $= 0.504$ (expensive wins). The crossover occurs between $n = 3$ and $n = 4$.
+
+\begin{corollary}[Stage-Dependent Strategy]
+\label{cor:routing-strategy}
+The optimal model selection strategy depends on pipeline structure: for single-stage or short pipelines ($n \leq n^*$), use cheap models with Pass@$N$ sampling; for long pipelines ($n > n^*$), invest in per-step quality with expensive models. This connects to the budget reallocation evidence of \citet{hassid2024budget}, who showed a 13B model generating 5 outputs outperformed a 70B model generating 1 output by up to 15\% on HumanEval under fixed compute budgets, but only when test-based selection is available. Without a reliable verifier, the Pass@$N$ advantage vanishes.
+\end{corollary}
+
+\subsection{Adaptive Escalation}
+
+During pipeline execution, the harness may encounter tasks that exceed the assigned model's capability. The escalation policy decides when to switch to a more capable (and expensive) model.
+
+\begin{definition}[Escalation Threshold]
+\label{def:routing-escalation}
+Escalate from cheap model $m_c$ to expensive model $m_e$ when the posterior probability that the cheap model's response is adequate falls below:
+\begin{equation}
+p^* = \frac{c_e + s(C)}{c_e + s(C) + c_{\mathrm{rework}}}
+\end{equation}
+where $c_e$ is the expensive model cost, $s(C)$ is the switching cost (KV-cache invalidation for context of length $C$), and $c_{\mathrm{rework}}$ is the expected cost of fixing a failed cheap attempt.
+\end{definition}
+
+The escalation decision maps to Wald's Sequential Probability Ratio Test \citep{wald1945}:
+
+\begin{proposition}[SPRT-Based Escalation]
+\emph{[Mathematical Fact: application of Wald-Wolfowitz optimality.]}
+\label{prop:routing-sprt}
+Formulate $H_0$: cheap model response is adequate; $H_1$: cheap model response is inadequate. Accumulate evidence from quality signals (syntax validity, type-check pass, test results, self-evaluation score). The log-likelihood ratio $\Lambda_k = \sum_{i=1}^k \log(f_1(x_i)/f_0(x_i))$ evolves with each signal. Accept $H_0$ when $\Lambda_k \leq \log A$; accept $H_1$ (escalate) when $\Lambda_k \geq \log B$, with thresholds derived from the cost ratio.
+\end{proposition}
+
+By the Wald-Wolfowitz optimality theorem \citep{waldwolfowitz1948}, the SPRT minimizes the expected number of observations among all sequential tests achieving the same error rates, meaning the SPRT-based escalation policy gathers the minimum amount of evidence before deciding.
+
+The model routing problem is fundamentally contextual: the best model depends on task features. We formalize this as a contextual bandit.
+
+\begin{definition}[Model Routing as Contextual Bandit]
+\label{def:routing-bandit}
+At each task $t$: the harness observes features $\mathbf{x}_t \in \mathbb{R}^d$ (file complexity, task type, edit scope), selects model $a_t \in \mathcal{M}$, and observes reward $r_t(a_t) = q(a_t, \mathbf{x}_t) - \lambda \cdot c(a_t)$.
+\end{definition}
+
+\begin{proposition}[Routing Regret Bounds]
+\emph{[Mathematical Fact: application of known bandit results to the routing setting.]}
+\label{prop:routing-regret}
+The following established regret bounds apply to model routing:
+\begin{enumerate}[label=(\alph*), nosep]
+\item \textbf{Non-contextual}: UCB1 achieves $O\left(\sum_{i: \Delta_i > 0} \frac{\log T}{\Delta_i}\right)$ regret, matching the Lai-Robbins lower bound \citep{auer2002, laiRobbins1985}.
+\item \textbf{Contextual}: LinUCB achieves $O(d\sqrt{T \log T})$ regret for $d$-dimensional task features \citep{li2010linucb}.
+\item \textbf{General policy class}: The reduction to cost-sensitive classification achieves $O(\sqrt{MT})$ regret \citep{agarwal2014monster}.
+\end{enumerate}
+\end{proposition}
+
+Model switching incurs a concrete cost: KV-cache invalidation. When switching from $m_A$ to $m_B$ mid-conversation, the entire KV cache is discarded, forcing recomputation costing $O(C)$ for context length $C$.
+
+\begin{theorem}[Switching-Cost Regret Penalty]
+\emph{[Mathematical Fact: known result from online learning theory.]}
+\label{thm:routing-switching}
+With unit switching costs, the minimax regret for $M$-armed bandits over $T$ rounds is $\Theta(M^{1/3} T^{2/3})$ \citep{dekel2014switching}, strictly worse than the $O(\sqrt{MT})$ rate without switching costs.
+\end{theorem}
+
+\begin{corollary}[Batched Routing]
+\label{cor:routing-batched}
+By \citet{perchet2016batched}, $O(\log \log T)$ policy-update batches suffice to achieve near-optimal regret. In practice, re-evaluating the routing policy 3--5 times per day (rather than per-task) is theoretically near-optimal and eliminates unnecessary model switches.
+\end{corollary}
+
+\begin{proposition}[Budget-Constrained Routing {\citep{badanidiyuru2018bwk}}]
+\emph{[Mathematical Fact: application of Bandits with Knapsacks.]}
+\label{prop:routing-bwk}
+When routing is subject to a budget constraint $B$ (daily or monthly API cost limit), the Bandits with Knapsacks framework achieves regret optimal up to polylogarithmic factors relative to the optimal dynamic allocation policy. This provides a principled answer to: ``Given a \$100/day API budget, how should I allocate tasks across model tiers?''
+\end{proposition}
+
+\begin{proposition}[Learning a Routing Policy]
+\emph{[Engineering Hypothesis: sample counts depend on assumed gap $\Delta$ and feature dimension $d$.]}
+\label{prop:routing-sample}
+The sample complexity for learning an $\epsilon$-optimal routing policy: non-contextual requires $O(M / \Delta^2 \cdot \log(M / \delta))$ tasks (approximately 1,000 for $M = 3$, $\Delta = 0.1$); contextual with $d$ features requires $O(d^2 / \epsilon^2)$ tasks (approximately 10,000 for $d = 10$, $\epsilon = 0.1$). Cold-start mitigation strategies include informative priors from benchmark data \citep{agrawal2012thompson}, warm-start transfer from other codebases, and heuristic initialization (e.g., ``use Sonnet by default, escalate to Opus on failure'').
+\end{proposition}
+
+\subsection{Cascade Routing Architecture}
+
+Inspired by the Viola-Jones cascade \citep{violajones2001, violajones2004}, we propose a cascade routing architecture where tasks flow through models of increasing capability, with early exit when the current model's output is deemed adequate.
+
+\begin{definition}[Model Cascade]
+\label{def:routing-cascade}
+A \emph{model cascade} is a sequence of models $m_1, m_2, \ldots, m_L$ ordered by capability and cost ($c_1 < c_2 < \cdots < c_L$, $q_1 \leq q_2 \leq \cdots \leq q_L$). For each task: query $m_1$; if the quality estimator scores the response above threshold $\tau_1$, return it; otherwise query $m_2$ (optionally with $m_1$'s response as context); continue until $m_L$ (which always returns).
+\end{definition}
+
+\begin{theorem}[Cascade Expected Cost]
+\emph{[Mathematical Fact: follows from the law of total expectation over cascade stages.]}
+\label{thm:routing-cascadecost}
+For a cascade with $L$ stages where stage $i$ has acceptance probability $a_i$, the expected cost per task is:
+\begin{equation}
+\mathbb{E}[\text{cost}] = \sum_{i=1}^{L} c_i \prod_{j=1}^{i-1}(1 - a_j)
+\end{equation}
+When $a_1$ is large (most tasks are easy), the expected cost is dominated by $c_1$, the cheapest model.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The cascade reaches stage $i$ only if all previous stages rejected, with probability $\prod_{j=1}^{i-1}(1 - a_j)$. Each stage incurs cost $c_i$ when reached. The expected total cost is the sum over stages of cost times reach probability. This is the standard Viola-Jones cost decomposition \citep{violajones2004}.
+\end{proof}
+
+\paragraph{Quality estimation: the critical factor.} \citet{dekoninck2025cascade} identify quality estimation as the sine qua non of effective routing. Observable quality signals for coding tasks include syntax validity and type-check pass (binary, fast, deterministic), test suite pass rate (high-signal but requires execution), model self-reported confidence (calibration varies), retry count (more retries signal harder tasks), and diff size and file count (complexity proxy).
+
+\begin{definition}[Routing Collapse]
+\emph{[Engineering Hypothesis: documented empirically but not yet formally characterized.]}
+\label{def:routing-collapse}
+\emph{Routing collapse} occurs when a learned router systematically defaults to the most capable (and expensive) model, even when cheaper models would suffice \citep{routingcollapse2026}. On RouterBench, existing routers send approximately 100\% of queries to the strongest model under loose budgets, while the oracle optimal strategy uses it for fewer than 20\%.
+\end{definition}
+
+The root cause is an \emph{objective-decision mismatch}: routers trained on scalar quality prediction must make discrete ranking decisions at deployment. When 94.9\% of queries have near-identical predicted quality across models (the ``small-margin regime''), minimal perturbations flip routing decisions. Routing collapse is mitigated by cost-penalized routing (the Lagrangian form of Proposition~\ref{prop:routing-lagrangian}), rank-based supervision (directly supervising per-query model rankings rather than scalar quality), and cascading over routing (try cheap first, escalate on evidence of inadequacy, converting a hard pre-routing classification into easier post-hoc quality assessment).
+
+\subsection{Empirical Calibration}
+
+\Cref{tab:routing-savings} summarizes published cost savings from model routing systems.
+
+\begin{table}[htbp]
+\centering
+\caption{Published cost savings from model routing systems.}
+\label{tab:routing-savings}
+\small
+\begin{tabular}{lccl}
+\toprule
+\textbf{System} & \textbf{Cost Reduction} & \textbf{Quality Retained} & \textbf{Source} \\
+\midrule
+RouteLLM (MT Bench) & 85\% & 95\% of GPT-4 & \citet{routellm2025} \\
+RouteLLM (MMLU) & 45\% & 92\% & \citet{routellm2025} \\
+FrugalGPT & up to 98\% & matches GPT-4 & \citet{frugalgpt2023} \\
+MetaLLM & up to 60\% & +1\% accuracy & \citet{metallm2024} \\
+Cascade routing & 14\% perf.\ gain & same cost & \citet{dekoninck2025cascade} \\
+Budget reallocation & 75\% compute & +15\% HumanEval & \citet{hassid2024budget} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{tab:routing-capgaps} quantifies the capability gap by task type, confirming that routing value concentrates in the extremes.
+
+\begin{table}[htbp]
+\centering
+\caption{Capability gap by task type (early 2026 benchmarks).}
+\label{tab:routing-capgaps}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Task Type} & \textbf{Budget Model} & \textbf{Frontier Model} & \textbf{Gap} \\
+\midrule
+Single-function (HumanEval) & 87--88\% & 97--98\% & $\sim$10 pp \\
+Multi-file bugs (SWE-bench V.) & 40--50\% & 78--81\% & $\sim$35 pp \\
+Complex editing (Aider polyglot) & 70\% (\$0.88) & 88\% (\$29) & 18 pp, 33$\times$ cost \\
+Competitive programming (LCB) & 79\% & 92\% & $\sim$13 pp \\
+Merge conflict resolution & LLaMA-8B best & CodeLlama-34B worse & Negative \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The merge conflict result \citep{zhu2024congra} is particularly striking: general-purpose models outperform code-specialized models on a code task, suggesting that routing should consider model \emph{type}, not just model \emph{size}. Production architectures confirm the pattern: Cursor processes over 400 million predictions per day with task-specific routing (custom fine-tuned models for autocomplete, GPT variants for summarization, frontier models for agent tasks). Claude Code provides a two-tier cascade (Opus for architecture and planning, Sonnet for code generation). GitHub Copilot's ``Smart Mode'' routes across 9+ models from three providers.
+
+\subsection{Design Principles for Model Routing}
+
+The formal results yield six design principles:
+
+\begin{enumerate}[nosep]
+\item \textbf{Cascade, don't predict.} \emph{[Philosophical Observation.]} The cascade architecture (cheap model first, escalate on failure) is more robust than pre-routing (predict difficulty, select model). Pre-routing requires accurate difficulty estimation; cascading requires only adequate quality assessment, which is easier. This converts a hard classification problem into an easier verification problem.
+
+\item \textbf{Cross-family verification is a hard constraint.} \emph{[Mathematical Fact: from copula monotonicity.]} The FKG inequality and Gaussian copula analysis make same-family verification systematically biased. The verifier must come from a different model family than the producer (Corollary~\ref{cor:routing-weakbeats}).
+
+\item \textbf{Batch routing decisions.} \emph{[Mathematical Fact: from switching-cost regret theory.]} KV-cache invalidation costs make per-task model switching expensive. Commit to a model for an entire conversation or task phase, re-evaluating only at natural breakpoints. Three to five policy updates per day is near-optimal (Corollary~\ref{cor:routing-batched}).
+
+\item \textbf{Budget-aware allocation.} \emph{[Engineering Hypothesis: depends on reward stationarity.]} Use the Bandits with Knapsacks framework (Proposition~\ref{prop:routing-bwk}) to allocate tasks under API cost budgets. This naturally balances quality and cost without manual threshold tuning.
+
+\item \textbf{Use pipeline length to select strategy.} \emph{[Mathematical Fact: from the Crossover Theorem.]} For short pipelines ($n \leq 3$), use cheap models with Pass@$N$ sampling. For long pipelines ($n > 3$), invest in per-step quality with expensive models (Theorem~\ref{thm:routing-crossover}).
+
+\item \textbf{Monitor for routing collapse.} \emph{[Engineering Hypothesis: threshold is empirically derived.]} Track the fraction of tasks routed to the most expensive model. If it exceeds 80\%, the router has likely collapsed and should be recalibrated or replaced with a cascade.
+\end{enumerate}
+
+\subsection{Contrarian Positions}
+
+We engage three objections to formal model routing in their strongest form.
+
+\paragraph{``Single-model simplicity wins.''} Gabriel's ``worse is better'' principle \citep{gabriel1989} argues that implementation simplicity dominates interface correctness. Model routing is the LLM equivalent of premature microservice decomposition. Prompt format incompatibility across model families (XML for Claude, Markdown for GPT) multiplies maintenance cost. \emph{Response:} The argument is strong for small-scale usage (fewer than 10,000 tokens per day). But the 1000$\times$ price range is not ignorable at scale. RouteLLM achieves 85\% cost reduction using a lightweight BERT classifier; the relevant comparison is not ``monolith vs.\ microservices'' but ``monolith vs.\ monolith with a routing header.'' Abstraction layers (OpenRouter, LiteLLM) further reduce integration burden.
+
+\paragraph{``Frontier models will be cheap enough.''} LLM inference costs have declined approximately 1000$\times$ in three years. If this continues, routing becomes unnecessary. \emph{Response:} The headline decline masks a K-shaped bifurcation: commodity inference is racing to zero while frontier reasoning models are getting \emph{more} expensive. Google's Flash model surged 6.7$\times$ on input pricing between August 2024 and December 2025. Jevons paradox predicts that cheaper inference induces larger contexts, deeper reasoning chains, and more agent steps, maintaining cost pressure.
+
+\paragraph{``Task difficulty prediction is too noisy.''} The routing collapse finding \citep{routingcollapse2026}, where 94.9\% of queries occupy a small-margin regime, is the most damaging empirical evidence against routing. \emph{Response:} We take this objection seriously. However, aggregate cost savings (85\% reduction at 95\% quality) demonstrate that routing works at the portfolio level even when individual decisions are noisy. The cascade architecture partially sidesteps the prediction problem by converting a priori difficulty classification into post-hoc quality assessment.
+
+\subsection{Cross-Pillar Connections}
+
+The Model Routing pillar connects to the other pillars in structured ways:
+
+\begin{itemize}[nosep]
+\item \textbf{Reliability:} The compound error model ($R = p^n$, Theorem~\ref{thm:compound-sensitivity}) determines when per-step quality improvement (via a more expensive model) dominates architectural sophistication. The crossover theorem (Theorem~\ref{thm:routing-crossover}) quantifies this tradeoff precisely.
+\item \textbf{Quality:} Cross-model diversity (Proposition~\ref{prop:routing-diversity}) provides the formal basis for the Structural Separation Theorem's recommendation of different model families for code and test authorship.
+\item \textbf{Coordination:} The ensemble saturation result (Proposition~\ref{prop:routing-saturation}) explains why multi-agent systems face diminishing returns from adding same-family agents: the correlation floor prevents ensemble improvement beyond $N = 3$--$4$ within a family.
+\item \textbf{Governance:} Budget-constrained routing (Proposition~\ref{prop:routing-bwk}) is the resource-allocation complement to governance capacity bounds: the governance pillar bounds the rate of architectural drift, while routing bounds the cost of model consumption.
+\end{itemize}
