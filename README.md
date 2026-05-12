@@ -8,26 +8,26 @@ The main deliverable is a collection of formal papers in [`final_papers/`](final
 
 The canonical top-level synthesis is:
 
-| Paper | Source | PDF | Role |
-|---|---|---|---|
-| **A Formal Framework for AI Coding Agent Harness Architecture** | [`final_papers/science.tex`](final_papers/science.tex) | [`final_papers/science.pdf`](final_papers/science.pdf) | Umbrella framework tying together all eleven architectural dimensions |
+| Paper | Role |
+|---|---|
+| [**A Formal Framework for AI Coding Agent Harness Architecture**](final_papers/science.pdf) | Umbrella framework tying together all eleven architectural dimensions |
 
 The pillar-level papers are:
 
-| Pillar | Source | PDF | Focus |
-|---|---|---|---|
-| **Abstraction Architecture** | [`final_papers/abstraction_architecture/abstraction_architecture.tex`](final_papers/abstraction_architecture/abstraction_architecture.tex) | [`final_papers/abstraction_architecture/abstraction_architecture.pdf`](final_papers/abstraction_architecture/abstraction_architecture.pdf) | Specification-to-code abstraction gaps, refinement, and formal interfaces |
-| **Information Architecture** | [`final_papers/information_architecture/information_architecture.tex`](final_papers/information_architecture/information_architecture.tex) | [`final_papers/information_architecture/information_architecture.pdf`](final_papers/information_architecture/information_architecture.pdf) | Context selection, degradation, tiered memory, and reuse discovery |
-| **Reliability Architecture** | [`final_papers/reliability_architecture/reliability_architecture.tex`](final_papers/reliability_architecture/reliability_architecture.tex) | [`final_papers/reliability_architecture/reliability_architecture.pdf`](final_papers/reliability_architecture/reliability_architecture.pdf) | Compound error, verification scheduling, structural enforcement, and adaptive verification |
-| **Coordination Architecture** | [`final_papers/coordination_architecture/coordination_architecture.tex`](final_papers/coordination_architecture/coordination_architecture.tex) | [`final_papers/coordination_architecture/coordination_architecture.pdf`](final_papers/coordination_architecture/coordination_architecture.pdf) | Multi-agent decomposition, merge conflicts, ownership, and quality-adjusted speedup |
-| **Temporal Architecture** | [`final_papers/temporal_architecture/temporal_architecture.tex`](final_papers/temporal_architecture/temporal_architecture.tex) | [`final_papers/temporal_architecture/temporal_architecture.pdf`](final_papers/temporal_architecture/temporal_architecture.pdf) | Verified iterations per hour, staleness, speculation, caching, and speed-quality tradeoffs |
-| **Quality Architecture** | [`final_papers/quality_architecture/quality_architecture.tex`](final_papers/quality_architecture/quality_architecture.tex) | [`final_papers/quality_architecture/quality_architecture.pdf`](final_papers/quality_architecture/quality_architecture.pdf) | AI code slop, layered defense, detection limits, accretion, and cost of quality |
-| **Governance Architecture** | [`final_papers/governance_architecture/governance_architecture.tex`](final_papers/governance_architecture/governance_architecture.tex) | [`final_papers/governance_architecture/governance_architecture.pdf`](final_papers/governance_architecture/governance_architecture.pdf) | Governance capacity, ratchets, decision survival, and theory preservation |
-| **Economics Architecture** | [`final_papers/economics_architecture/economics_architecture.tex`](final_papers/economics_architecture/economics_architecture.tex) | [`final_papers/economics_architecture/economics_architecture.pdf`](final_papers/economics_architecture/economics_architecture.pdf) | Token budgets, model-tier selection, queueing economics, CVIH, and caching economics |
-| **Human Interaction Architecture** | [`final_papers/human_interaction_architecture/human_interaction_architecture.tex`](final_papers/human_interaction_architecture/human_interaction_architecture.tex) | [`final_papers/human_interaction_architecture/human_interaction_architecture.pdf`](final_papers/human_interaction_architecture/human_interaction_architecture.pdf) | Human attention allocation, autonomy boundaries, trust calibration, and supervision decay |
-| **Model Routing Architecture** | [`final_papers/model_routing_architecture/model_routing_architecture.tex`](final_papers/model_routing_architecture/model_routing_architecture.tex) | [`final_papers/model_routing_architecture/model_routing_architecture.pdf`](final_papers/model_routing_architecture/model_routing_architecture.pdf) | Stage-specific model assignment, cross-model diversity, cascades, and escalation |
-| **Security Architecture** | [`final_papers/security_architecture/security_architecture.tex`](final_papers/security_architecture/security_architecture.tex) | [`final_papers/security_architecture/security_architecture.pdf`](final_papers/security_architecture/security_architecture.pdf) | Sandboxing, credential flow, prompt injection, output filtering, and defense-in-depth |
-| **The Accretion Category** | [`final_papers/accretion_category/accretion_category.tex`](final_papers/accretion_category/accretion_category.tex) | [`final_papers/accretion_category/accretion_category.pdf`](final_papers/accretion_category/accretion_category.pdf) | A defect class for individually plausible but collectively harmful AI-generated code |
+| Pillar | Focus |
+|---|---|
+| [**Abstraction Architecture**](final_papers/abstraction_architecture/abstraction_architecture.pdf) | Specification-to-code abstraction gaps, refinement, and formal interfaces |
+| [**Information Architecture**](final_papers/information_architecture/information_architecture.pdf) | Context selection, degradation, tiered memory, and reuse discovery |
+| [**Reliability Architecture**](final_papers/reliability_architecture/reliability_architecture.pdf) | Compound error, verification scheduling, structural enforcement, and adaptive verification |
+| [**Coordination Architecture**](final_papers/coordination_architecture/coordination_architecture.pdf) | Multi-agent decomposition, merge conflicts, ownership, and quality-adjusted speedup |
+| [**Temporal Architecture**](final_papers/temporal_architecture/temporal_architecture.pdf) | Verified iterations per hour, staleness, speculation, caching, and speed-quality tradeoffs |
+| [**Quality Architecture**](final_papers/quality_architecture/quality_architecture.pdf) | AI code slop, layered defense, detection limits, accretion, and cost of quality |
+| [**Governance Architecture**](final_papers/governance_architecture/governance_architecture.pdf) | Governance capacity, ratchets, decision survival, and theory preservation |
+| [**Economics Architecture**](final_papers/economics_architecture/economics_architecture.pdf) | Token budgets, model-tier selection, queueing economics, CVIH, and caching economics |
+| [**Human Interaction Architecture**](final_papers/human_interaction_architecture/human_interaction_architecture.pdf) | Human attention allocation, autonomy boundaries, trust calibration, and supervision decay |
+| [**Model Routing Architecture**](final_papers/model_routing_architecture/model_routing_architecture.pdf) | Stage-specific model assignment, cross-model diversity, cascades, and escalation |
+| [**Security Architecture**](final_papers/security_architecture/security_architecture.pdf) | Sandboxing, credential flow, prompt injection, output filtering, and defense-in-depth |
+| [**The Accretion Category**](final_papers/accretion_category/accretion_category.pdf) | A defect class for individually plausible but collectively harmful AI-generated code |
 
 The files `final_papers/science-assembled.tex`, `final_papers/science_new.tex`, `final_papers/science_backup.tex`, and `final_papers/science_backup_pre_security.tex` are backup, draft, or assembly artifacts. Treat [`final_papers/science.tex`](final_papers/science.tex) as the canonical umbrella source.
 
