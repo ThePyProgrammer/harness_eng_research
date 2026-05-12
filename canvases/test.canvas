@@ -1,0 +1,6 @@
+{
+	"nodes":[
+		{"id":"harness-session","type":"text","text":"{\"harness\":true,\"sessionId\":\"session-1773650782652-zig9eid\",\"prompts\":[{\"text\":\"hello\",\"timestamp\":\"2026-03-16T08:46:22.656Z\"}]}","x":-9999,"y":-9999,"width":200,"height":200}
+	],
+	"edges":[]
+}
