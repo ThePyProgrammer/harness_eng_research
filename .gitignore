@@ -1,0 +1,42 @@
+# Local Claude/agent state
+.claude/
+
+# Obsidian workspace, plugins, and runtime state
+.obsidian/
+
+# Nested external repository
+latex-document-skill/
+
+# Dependency and runtime folders
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# LaTeX build outputs
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.maf
+*.out
+*.synctex.gz
+*.toc
+
+# Local office/editor locks
+.~lock.*
+*.swp
+*.swo
+.DS_Store
+
+# Intermediate rendered outputs
+main.pdf
+coord-main.pdf
+reliability-main.pdf
+papers/info-arch-coding-agents-working.pdf
+
+# Scratch canvas
+/test.canvas
