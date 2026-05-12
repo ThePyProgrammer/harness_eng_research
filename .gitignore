@@ -33,10 +33,10 @@ __pycache__/
 .DS_Store
 
 # Intermediate rendered outputs
-main.pdf
-coord-main.pdf
-reliability-main.pdf
-papers/info-arch-coding-agents-working.pdf
+/main.pdf
+/coord-main.pdf
+/reliability-main.pdf
+/papers/info-arch-coding-agents-working.pdf
 
 # Scratch canvas
 /test.canvas
