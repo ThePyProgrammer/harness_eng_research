@@ -1,0 +1,507 @@
+% ====================================================================
+% 5. THE COORDINATION PILLAR
+% ====================================================================
+\section{The Coordination Pillar}
+\label{sec:coordination}
+
+The Coordination pillar \citep{pillar-coordination} addresses multi-agent code generation, where multiple LLM instances work concurrently on a shared codebase. The central finding is that naive parallelism amplifies errors far beyond what independence would predict.
+
+\subsection{Error Amplification}
+
+\begin{definition}[Error Amplification Factor]
+\label{def:error-amp}
+For coordination topology $t$ with $k$ agents, each with per-agent error rate $\epsilon = 1 - p$, the error amplification factor is:
+\begin{equation}
+    A_e(t, k) = \frac{P(\text{system error} \mid t, k)}{P(\text{single-agent error})} = \frac{1 - R_{\text{sys}}(t, k)}{\epsilon}
+\end{equation}
+\end{definition}
+
+Under independence, $A_e$ approaches $k$ from below (since $1 - p^k \approx k\epsilon$ for small $\epsilon$). But \citet{kim2025scaling} found empirical amplification of $17.2\times$ for independent agents, far exceeding the theoretical maximum of $k$ under independence. This $\approx 6\times$ discrepancy quantifies the ``correlation multiplier'' from inter-agent error propagation and shared failure modes.
+
+\subsection{Information-Sharing Reduction Factor}
+
+Coordination reduces per-agent error rates by enabling agents to share information (current file ownership, interface changes, partial results). We model this reduction explicitly.
+
+\begin{definition}[Coordination Benefit Function]
+\label{def:coord-benefit}
+For topology $t$ with information-sharing capacity $I(t)$ bits per coordination round, define the effective per-agent error rate under coordination:
+\begin{equation}
+    \epsilon_t = \epsilon \cdot g(I(t))
+\end{equation}
+where $g: \mathbb{R}_+ \to (0, 1]$ is monotonically decreasing with $g(0) = 1$ (no coordination, no benefit) and $\lim_{I \to \infty} g(I) = g_{\min} > 0$ (coordination cannot eliminate intrinsic model errors).
+\end{definition}
+
+A natural parametric choice is the exponential $g(I) = e^{-\alpha I}$ for topology-dependent rate $\alpha > 0$. Under this model, the ratio of centralized to independent error amplification calibrates $\alpha$: from \citet{kim2025scaling}, $4.4/17.2 \approx 0.256$, giving $\alpha \cdot I(\mathrm{central}) \approx 1.36$ nats. The information-sharing capacity $I(t)$ depends on the topology: independent systems have $I = 0$; centralized systems share the coordinator's summary (bounded by the coordinator's context window); hierarchical systems share through tree aggregation with logarithmic depth.
+
+\begin{remark}
+The coordination benefit function $g$ captures two distinct mechanisms: (i) error prevention (agents receive information that prevents them from making mistakes they would otherwise make), and (ii) error detection (agents receive signals that reveal errors in their partial work). Both mechanisms reduce the effective error rate, but they have different scaling properties: prevention improves with the quality of upfront planning, while detection improves with the frequency of synchronization.
+\end{remark}
+
+\subsection{Capability Saturation Crossover}
+
+As single-agent capability improves, the marginal value of additional agents diminishes and eventually becomes negative.
+
+\begin{definition}[Saturation Threshold]
+\label{def:saturation}
+The capability saturation threshold $P^*$ is the single-agent accuracy at which the marginal value of an additional agent transitions from positive to negative:
+\begin{equation}
+    P^* = \inf \left\{ P_{\mathrm{SA}} \in [0,1] : \frac{\partial}{\partial k} S_{\mathrm{eff}}(k, P_{\mathrm{SA}}) \Big|_{k=1} \leq 0 \right\}
+\end{equation}
+\end{definition}
+
+\begin{conjecture}[Saturation Crossover]
+\label{conj:phase}
+For fixed topology $t$ and error model, there exists $P^*(t) \in (0,1)$ such that for $P_{\mathrm{SA}} < P^*$, the optimal agent count $k^* > 1$, and for $P_{\mathrm{SA}} > P^*$, $k^* = 1$. We term this a crossover rather than a phase transition: the regression model of \citet{kim2025scaling} yields a smooth interaction coefficient ($\beta = -0.408$), indicating a gradual shift rather than a sharp discontinuity in the physics sense.
+\end{conjecture}
+
+\citet{kim2025scaling} report $P^* \approx 0.45$ from their regression model ($\beta_{P_{\mathrm{SA}} \times \log(1+n_a)} = -0.408$, $p < 0.001$). Above this threshold, adding agents actively degrades performance. This threshold was derived from general benchmarks (web navigation, quantitative reasoning, planning, tool use), not from code-generation tasks specifically, and may shift for software engineering where coupling is tighter and correctness requirements stricter.
+
+The crossover conjecture has a concrete design implication: as foundation models improve, the optimal number of parallel agents \emph{decreases}. Organizations should expect to transition from multi-agent architectures toward single-agent (or few-agent) workflows as model capability increases, redirecting coordination overhead toward richer context and more thorough verification.
+
+\subsection{Extended Amdahl's Law with Reliability}
+
+Classical Amdahl's Law gives speedup $S(n) = 1/(s + (1-s)/n)$ for serial fraction $s$ and $n$ parallel units. The Coordination pillar extends this with a reliability factor:
+
+\begin{theorem}[Extended Amdahl's Law]
+\label{thm:extended-amdahl}
+For $n$ agents with serial fraction $s$ and per-agent defect injection rate $\delta_a$ (distinct from the context degradation function $\delta$ in Section~\ref{sec:information}):
+\begin{equation}
+    S_{\text{eff}}(n) = \frac{1}{s + (1-s)/n} \cdot (1-\delta_a)^n
+\end{equation}
+The optimal agent count is $n^* \approx 1/\sqrt{\delta_a}$. Beyond $n^*$, adding agents \emph{decreases} effective throughput.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Write $\ln S_{\mathrm{eff}} = -\ln(s + (1-s)/n) + n \ln(1-\delta_a)$.
+Differentiating with respect to $n$ and setting to zero:
+$(1-s)/(n^2 s + n(1-s)) = -\ln(1-\delta_a) \approx \delta_a$ for small $\delta_a$.
+For small $s$, this simplifies to $1/n^2 \approx \delta_a$, giving $n^* \approx 1/\sqrt{\delta_a}$.
+The maximum is unique because $\ln S_{\mathrm{eff}}$ is the sum of a concave function (the Amdahl term) and a linear function with negative slope (the reliability term), hence strictly concave.
+\end{proof}
+
+At $\delta_a = 0.05$, $n^* \approx 4$ to 5 agents. At $\delta_a = 0.01$, $n^* \approx 10$. This provides a principled answer to the practitioner question ``how many agents should I run in parallel?'' and explains \citeauthor{Cursor2026}'s observation that 20 parallel agents with flat coordination collapsed to effective throughput of 2 to 3 agents.
+
+\subsection{Universal Scalability Law Extension}
+
+The Extended Amdahl's Law captures serialization and reliability but omits coherency overhead (the cost of keeping agents consistent with each other). Combining Gunther's Universal Scalability Law \citep{gunther2008usl} with the reliability factor gives a more complete model:
+
+\begin{equation}
+\label{eq:usl-extended}
+    S_{\mathrm{eff}}(n) = \frac{n}{1 + \sigma(n-1) + \kappa \, n(n-1)} \cdot (1-\delta_a)^n
+\end{equation}
+
+where $\sigma$ is the serialization coefficient (fraction of work that must be done sequentially, analogous to $s$ in Amdahl's Law) and $\kappa$ is the coherency (crosstalk) penalty per agent pair.
+
+The USL's $\kappa$ term is quadratic in $n$, producing a characteristic ``retrograde'' curve where throughput decreases beyond an optimal point even without the reliability factor. With the additional exponential decay from $(1-\delta_a)^n$, the optimal $n^*$ is pushed lower still, because the system faces three compounding penalties:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Serialization} ($\sigma$ term): some work cannot be parallelized.
+    \item \textbf{Crosstalk} ($\kappa$ term): agents must synchronize, consuming $O(n^2)$ communication overhead.
+    \item \textbf{Unreliability} ($(1-\delta_a)^n$ term): each agent independently injects defects.
+\end{enumerate}
+
+These three penalties explain why empirical optimal team sizes are small: 3 to 5 agents per practitioner consensus \citep{osmani2025}, consistent with $n^* \approx 3$--$4$ from the model at typical parameter values ($\sigma \approx 0.1$, $\kappa \approx 0.02$, $\delta_a \approx 0.05$).
+
+\subsection{Task Decomposition as Balanced Min-Cut}
+
+The Coordination pillar formalizes task decomposition as a graph partitioning problem:
+
+\begin{definition}[Coupling Graph]
+Given a codebase with file set $\mathcal{F}$, the coupling graph $G = (\mathcal{F}, E, w)$ encodes structural imports, co-change frequency, and semantic similarity as weighted edges.
+\end{definition}
+
+Optimal decomposition for $k$ agents is a balanced $k$-way min-cut on the coupling graph, minimizing cross-partition edges (which become potential merge conflicts and coordination overhead). The Cut-Conflict Bridge lemma connects partition quality directly to expected merge conflict rate:
+
+\begin{proposition}[Cut-Conflict Bridge]
+\label{prop:cut-conflict}
+For a $k$-way partition $\Pi = \{F_1, \ldots, F_k\}$ of the coupling graph, the expected merge conflict count is:
+\begin{equation}
+    \mathbb{E}[\text{conflicts}] = \sum_{(u,v) \in \text{cut}(\Pi)} w(u,v) \cdot p_{\text{conflict}}(u,v)
+\end{equation}
+where $p_{\text{conflict}}(u,v)$ is the probability that simultaneously modifying files $u$ and $v$ produces a conflict. Minimizing cut weight directly minimizes expected conflicts.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Each cross-partition edge $(u,v)$ with weight $w(u,v)$ represents coupling that may cause a conflict. The probability of a conflict arising from this edge is at most proportional to the coupling weight, by construction of the composite coupling metric (calibrated against historical conflict data). Summing over all cut edges yields the bound. The constant of proportionality depends on the calibration of $w$ against actual conflict data and is empirically in the range 0.01 to 0.1 for human-authored code; it has not been validated for agent-generated code specifically.
+\end{proof}
+
+\subsection{Five-Level Merge Conflict Taxonomy}
+
+The Coordination pillar identifies five levels of merge conflict, ordered by detection difficulty. We present each level together with its primary detection mechanism:
+
+\begin{table}[ht]
+\centering
+\caption{Five-level merge conflict taxonomy with detection methods.}
+\label{tab:conflict-taxonomy}
+\begin{tabular}{clll}
+\toprule
+\textbf{Level} & \textbf{Type} & \textbf{Detection Method} & \textbf{Detection Tool} \\
+\midrule
+1 & Textual & Three-way merge & git merge \\
+2 & Structural & AST-level differencing & JDime, GumTree \\
+3 & Dependency & Build-level analysis & Package resolver, compiler \\
+4 & API & Refactoring-aware merge & IntelliMerge (88\% precision) \\
+5 & Semantic & Compositional verification & SafeMerge (75\% of benchmarks) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Without coordination contracts, conflict count grows as $O(k^2)$ in the number of agents (every pair can conflict). With file-ownership contracts ($F_i \cap F_j = \emptyset$), textual, structural, and API conflicts are eliminated by construction (no shared files to conflict on), reducing growth to $O(k)$ through interface-mediated dependency and semantic conflicts only. The reduction from quadratic to linear scaling is the primary formal justification for ownership-based contracts.
+
+\subsection{Database Concurrency Control Analogy}
+
+The Coordination pillar draws a formal analogy between multi-agent code generation and database concurrency control. Agents are transactions; files are data items; merge conflicts are write-write conflicts. The mapping is surprisingly precise:
+
+\begin{table}[ht]
+\centering
+\caption{Database isolation levels mapped to agent coordination mechanisms.}
+\label{tab:isolation-levels}
+\begin{tabular}{llll}
+\toprule
+\textbf{Isolation Level} & \textbf{Agent Mechanism} & \textbf{Anomalies Prevented} & \textbf{Anomalies Permitted} \\
+\midrule
+Read Uncommitted & Shared workspace & None & All \\
+Read Committed & Git branches, periodic pulls & Dirty reads & Non-repeatable reads, \\
+ & & & phantoms, write skew \\
+Snapshot & Git worktrees (frozen at & Dirty reads, non-repeatable & Write skew \\
+ & dispatch) & reads, phantoms & \\
+Serializable & Sequential execution & All & None \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The critical insight is \emph{write skew}: two agents read the same state, make individually valid changes, but the combination is invalid. Agent $A_i$ modifies file $f_a$ based on reading file $f_b$, while agent $A_j$ modifies $f_b$ based on reading $f_a$. Both commits succeed (disjoint write sets), but the combined state is inconsistent. This is the agent analog of the database write-skew anomaly, and it corresponds precisely to Level 5 (semantic) merge conflicts in the taxonomy above.
+
+\begin{remark}
+The key difference between database transactions and agent tasks is cost granularity. Database transactions are millisecond-scale; agent tasks are minute-scale. The retry cost of an aborted agent task (discarding expensive LLM inference) is orders of magnitude higher relative to task cost, shifting the calculus: even rare conflicts make optimistic approaches (detect-and-retry) less attractive compared to pessimistic approaches (prevent-by-contract) unless conflict detection happens before expensive computation.
+\end{remark}
+
+\subsection{Assume-Guarantee Composition}
+
+Each agent $A_i$ operates under a contract $(Asm_i, Guar_i)$ following the assume-guarantee paradigm \citep{meyer1992, henzinger2002}:
+
+\medskip
+\noindent\textbf{Assumptions} $Asm_i$:
+\begin{enumerate}[nosep, label=(A\arabic*)]
+    \item No other agent modifies any file in $F_i$: $\forall j \neq i, \; \mathrm{WriteSet}(A_j) \cap F_i = \emptyset$.
+    \item All interfaces referenced by $A_i$ but owned by other agents remain stable (signatures unchanged).
+    \item The snapshot $S_i$ provided to $A_i$ at dispatch time is consistent (compiles, passes tests).
+\end{enumerate}
+
+\noindent\textbf{Guarantees} $Guar_i$:
+\begin{enumerate}[nosep, label=(G\arabic*)]
+    \item Agent $A_i$ modifies only files in $F_i$: $\mathrm{WriteSet}(A_i) \subseteq F_i$.
+    \item For every interface $I_j$ in files owned by $A_i$, the post-modification signature matches $\mathrm{sig}_j$.
+    \item The modifications, applied to $S_i$, compile and pass all tests scoped to $F_i$.
+\end{enumerate}
+
+\begin{theorem}[Contract Composition]
+\label{thm:composition}
+If every agent $A_i$ satisfies its contract (assuming $Asm_i$ holds, $A_i$ establishes $Guar_i$), then the composed system satisfies:
+\begin{enumerate}[nosep]
+    \item No write-write conflicts (from disjointness and G1).
+    \item All specified interfaces are preserved (from G2).
+    \item For languages with sound separate compilation (e.g., Java, Rust, Go), the merged codebase compiles (from G3 and interface preservation). For dynamically-typed languages (Python, JavaScript), the guarantee weakens to: the merged codebase compiles at all statically checkable call sites.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch, rely-guarantee reasoning]
+\textit{Step 1 (Disjointness).}
+By disjointness of $F_i$ and guarantee G1, each agent's write set is disjoint from every other agent's. This establishes the rely condition: the environment does not modify $A_i$'s files, satisfying A1.
+
+\textit{Step 2 (Interface preservation).}
+By G2, each agent preserves all interfaces in its owned files. Since A2 requires that interfaces outside $F_i$ remain stable, and G2 ensures this for every $F_j$, the circular rely-guarantee discharge holds: $Guar_j$ for $j \neq i$ collectively implies $Asm_i$.
+
+\textit{Step 3 (Compilation).}
+Each agent's modifications compile in isolation (G3) with all consumed interfaces preserved (A2, now discharged). Since the merged codebase preserves all interfaces, every call site remains type-consistent. By compositionality of type checking, the merged result type-checks.
+\end{proof}
+
+\begin{remark}
+This proof is modular: adding agent $A_{k+1}$ with a fresh disjoint $F_{k+1}$ requires only verifying $A_{k+1}$'s contract, not re-verifying existing agents. This modularity is the key advantage of assume-guarantee reasoning over monolithic verification.
+\end{remark}
+
+\subsection{Conway's Law as Graph Containment}
+
+The Coordination pillar formalizes Conway's Law as a graph-theoretic theorem. Define the \emph{communication graph} $G_T = (\mathcal{A}, E_T)$ where an edge $(A_i, A_j) \in E_T$ indicates that agents $A_i$ and $A_j$ can exchange messages under topology $T$. Define the \emph{required communication graph} $G_R = (\mathcal{A}, E_R)$ where $(A_i, A_j) \in E_R$ indicates that agents $A_i$ and $A_j$ manage modules with inter-module dependencies.
+
+\begin{theorem}[Conway's Law, Graph-Theoretic Form]
+\label{thm:conway}
+If $G_R \not\subseteq G_T$ (the required communication graph is not a subgraph of the topology communication graph), then for every edge $(A_i, A_j) \in E_R \setminus E_T$, the agents managing the dependent modules cannot coordinate, producing a semantic conflict with probability proportional to the coupling strength of the underlying module dependency.
+\end{theorem}
+
+The condition for low-overhead coordination is $G_R \subseteq G_T$: every strong coupling between files must be matched by a communication channel between the agents responsible for those files. When this condition fails, the ``topology-module mismatch cost'' is:
+
+\begin{equation}
+    \mathrm{Mismatch}(\alpha, T, G_M) = \sum_{(A_i, A_j) \in E_R \setminus E_T} \sum_{\substack{(M_a, M_b) \in E_M \\ \alpha(M_a)=A_i, \alpha(M_b)=A_j}} w(M_a, M_b)
+\end{equation}
+
+where $\alpha: \mathcal{M} \to \mathcal{A}$ is the module-to-agent assignment. Mismatch $= 0$ when $E_R \subseteq E_T$ (Conway-aligned).
+
+\subsection{Inverse Conway for Agents}
+
+Conway's Law describes how organizational structure constrains system structure. The \emph{Inverse Conway Maneuver} asks: given a desired system structure, how should we organize the agents?
+
+\begin{theorem}[Inverse Conway for Agents]
+\label{thm:inverse-conway}
+The assignment $\alpha^*$ minimizing mismatch for a given topology $T$ is the solution to a constrained balanced min-cut: partition the module graph into $k$ parts minimizing uncovered cross-partition edge weight.
+\end{theorem}
+
+For the independent topology ($E_T = \emptyset$), mismatch equals total cross-partition coupling, reducing to standard balanced min-cut. For mesh topology ($E_T$ is complete), mismatch is zero for any assignment, but communication overhead is $O(k^2)$. For isolated-then-merge with contracts at coverage $\gamma$, the effective mismatch is $(1-\gamma)$ times the full mismatch, since contracts act as static communication channels conveying interface information without runtime message passing.
+
+This connects task decomposition (Section 5.6) to topology selection: the optimal decomposition depends on the topology, and the optimal topology depends on the decomposition. In practice, this joint optimization is solved iteratively: choose a topology, compute the best decomposition for that topology, evaluate QAS, and compare across topologies.
+
+\subsection{Quality-Adjusted Speedup}
+
+\begin{definition}[Quality-Adjusted Speedup]
+\label{def:qas}
+\begin{equation}
+    \text{QAS}(k) = \frac{T_1 \cdot Q_1}{T_k \cdot Q_k}
+\end{equation}
+where $T_k$ is wall-clock time with $k$ agents and $Q_k$ is output quality (e.g., fraction of changes that would pass expert review). QAS $< 1$ means parallelism is net-negative: the quality degradation outweighs the speed improvement.
+\end{definition}
+
+Calibration against DORA 2025 data suggests that naive AI-assisted parallelism frequently yields QAS $< 1$: individual task completion up 21\%, but review time up 91\%, PR size up 154\%, and organizational delivery metrics flat despite individual gains. (The ``bug rates up 9\%'' figure appearing in secondary analyses could not be independently verified from the primary DORA report.)
+
+More precisely, for any topology $t$ and agent count $k > 1$, if the error amplification factor $A_e(t,k)$ satisfies $A_e(t, k) \cdot d(1) \geq 1 - (1 - d(1))/S(k)$ (where $d(1)$ is the single-agent defect rate and $S(k)$ is the raw speedup), then QAS$(k) < 1$. This condition is easily satisfied when $d(1)$ is moderate (0.15 to 0.30), $A_e$ is large (4 to 17), and $S(k)$ is modest (2 to 3). The regime QAS $< 1$ is not a corner case; it is the default outcome for poorly coordinated multi-agent systems.
+
+
+% ====================================================================
+% 6. THE TEMPORAL PILLAR
+% ====================================================================
+\section{The Temporal Pillar}
+\label{sec:temporal}
+
+The Temporal pillar \citep{pillar-temporal} addresses the time dimension of harness architecture: how fast should agents iterate, when should they speculate, and how should they manage information freshness?
+
+\subsection{Context Fidelity Decay: The Channel Model}
+
+We model the agent's context as a noisy channel between the true codebase state $\mathcal{X}$ and the agent's representation $\mathcal{Y}$. At the moment of a fresh context read ($t = t_0$), the channel is noiseless: $I(\mathcal{X}; \mathcal{Y}) = I_{\mathrm{fresh}}$. As time passes, the codebase evolves while the agent's snapshot remains fixed, introducing noise.
+
+\begin{definition}[Context Fidelity]
+\label{def:fidelity}
+The context fidelity $\Phi(t)$ at time $t$ for a context snapshot taken at $t_0$ is:
+\begin{equation}
+    \Phi(t) = \frac{I_{\mathrm{stale}}(t)}{I_{\mathrm{fresh}}} = e^{-\Lambda(t - t_0)}
+\end{equation}
+where $\Lambda = \lambda \alpha$ is the effective decay rate, $\lambda$ is the codebase change rate (changes per unit time), and $\alpha$ is the average information disruption per change.
+\end{definition}
+
+\begin{theorem}[Exponential Staleness Decay]
+\label{thm:staleness}
+Assume: (A1) codebase changes follow a Poisson process with rate $\lambda$; (A2) each change independently invalidates a fraction $\alpha$ of the agent's cached context; (A3) $\alpha$ is constant across change events. Then:
+\begin{equation}
+    I_{\mathrm{stale}}(t) = I_{\mathrm{fresh}} \cdot e^{-\lambda\alpha(t - t_0)}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The number of changes in $[t_0, t]$ is $N \sim \mathrm{Poisson}(\lambda\Delta t)$ where $\Delta t = t - t_0$. After $k$ changes, the surviving information fraction is $(1-\alpha)^k$. Taking the expectation via the Poisson probability generating function:
+\begin{equation}
+    \mathbb{E}[(1-\alpha)^N] = e^{\lambda\Delta t((1-\alpha) - 1)} = e^{-\lambda\alpha\Delta t}
+\end{equation}
+\end{proof}
+
+The context fidelity has half-life $t_{1/2} = \ln 2 / \Lambda$.
+
+The exponential decay model is calibrated against the 17.1\% ``Fresh Eyes'' advantage reported by \citet{suzgun2024metaprompting}: agents with fresh context outperform agents with stale context by this margin. Treating this as an upper bound on fidelity loss (the advantage likely conflates freshness with task decomposition effects):
+\begin{equation}
+    1 - \Phi_{\mathrm{inc}} \leq 0.171 \implies \Phi_{\mathrm{inc}} \geq 0.829
+\end{equation}
+
+With a typical cycle of $\bar{t} \approx 50$ minutes $\approx 0.83$ hours, this gives an upper bound on the effective decay rate of $\Lambda \leq 0.226$ per hour (context half-life $\geq 3$ hours).
+
+\begin{remark}
+Assumptions A2 and A3 are strong. In practice, changes are correlated (a refactor touches many files; a bugfix touches one), and the disruption fraction $\alpha$ varies across changes. The single-rate model should be understood as a first-order approximation. A multi-exponential extension partitions context into strata with different decay rates: $I_{\mathrm{stale}}(t) = \sum_{k=1}^K I_k \cdot e^{-\lambda\alpha_k(t - t_0)}$, capturing the empirical observation that architectural knowledge ($\alpha_k$ small) persists longer than implementation details ($\alpha_k$ large).
+\end{remark}
+
+In multi-agent settings, $\Lambda$ increases with the number of concurrent agents (more agents means faster codebase evolution), creating a feedback loop between parallelism and context staleness. This connects directly to the Coordination pillar's optimal agent count: adding agents increases $\lambda$ (the codebase change rate), which increases $\Lambda$, which decreases $\Phi$, which decreases per-agent quality, which further reduces the effective speedup.
+
+\subsection{Verified Iterations per Hour}
+
+\begin{definition}[Verified Iterations per Hour]
+\label{def:vih}
+\begin{equation}
+    \text{VIH} = \lambda_{\text{raw}} \cdot p_{\text{verify}}
+\end{equation}
+where $\lambda_{\text{raw}}$ is the raw iteration rate (iterations per hour) and $p_{\text{verify}}$ is the probability that an iteration passes all verification gates.\footnote{VIH has not, to our knowledge, been measured in any production harness. It is proposed here as a metric, not reported as an empirical finding.}
+\end{definition}
+
+VIH captures the fundamental speed-quality tradeoff. Skipping verification increases $\lambda_{\text{raw}}$ but decreases $p_{\text{verify}}$. The Temporal pillar proves that VIH is maximized at the unit-elasticity point:
+
+\begin{proposition}[VIH Optimality]
+\label{prop:vih-optimal}
+VIH is maximized when:
+\begin{equation}
+    \frac{\partial \ln \lambda_{\text{raw}}}{\partial v} = -\frac{\partial \ln p_{\text{verify}}}{\partial v}
+\end{equation}
+where $v$ is the verification investment. At this point, the marginal throughput gain from reducing verification exactly equals the marginal quality loss.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Differentiate $\text{VIH}(\lambda) = \lambda \cdot p_{\mathrm{verify}}(\lambda)$ and set to zero: $p_{\mathrm{verify}}(\lambda) + \lambda \cdot p_{\mathrm{verify}}'(\lambda) = 0$. Rearranging: $p_{\mathrm{verify}}'(\lambda^*)/p_{\mathrm{verify}}(\lambda^*) = -1/\lambda^*$, which is the unit-elasticity condition. The optimum occurs where a 1\% increase in raw speed causes exactly a 1\% decrease in verification rate.
+\end{proof}
+
+Under an exponential degradation model $p_{\mathrm{verify}}(\lambda) = p_0 e^{-\beta(\lambda - \lambda_0)}$ (chosen for analytical convenience; the true functional form is unknown), the optimal rate is $\lambda^* = 1/\beta$.
+
+\subsection{Amdahl's Law Bound on VIH}
+
+If verification is a serial fraction $f$ of the cycle (it runs after execution and cannot be overlapped), then even with infinite parallelization of all other stages:
+
+\begin{equation}
+    \text{VIH}^{\max} = \frac{p_{\text{verify}}}{f \cdot \tau_{\text{cycle}}}
+\end{equation}
+
+This is a direct application of Amdahl's Law \citep{amdahl1967validity}: no amount of speedup in non-verification stages can overcome the serial verification bottleneck.
+
+From representative harness data, $f \approx 0.20$ (verification takes roughly 10 of 50 minutes). With $p_{\text{verify}} \approx 0.67$ (using Devin's PR merge rate as a proxy; \citealt{cognition2025devin}), $\text{VIH}^{\max} \approx 4.0$ verified iterations per hour, regardless of non-verification speedups.
+
+\begin{remark}
+The Amdahl bound implies that the highest-leverage temporal optimization is reducing verification time while maintaining verification quality, not speeding up any other pipeline stage. Tiered verification (fast static checks first, expensive dynamic checks only when static checks pass) is the natural strategy.
+\end{remark}
+
+\subsection{The Speculation Ratio Test}
+
+Speculative execution (beginning the next pipeline stage before the current stage's output is verified) has positive expected value when:
+
+\begin{theorem}[Speculation Ratio Test]
+\label{thm:speculation}
+Speculate if and only if:
+\begin{equation}
+    \frac{p}{q} > \frac{R}{B}
+\end{equation}
+where $p$ is the probability that the current stage's output is correct, $q = 1 - p$ is the failure probability, $R$ is the cost of rollback on failure, and $B$ is the benefit of early completion on success.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Expected speculative time: $\mathbb{E}[T_{\mathrm{spec}}] = p \cdot \mathbb{E}[\max(t_i, t_j)] + q(R + \mathbb{E}[t_j])$. Sequential baseline: $\mathbb{E}[T_{\mathrm{seq}}] = \mathbb{E}[t_i] + \mathbb{E}[t_j]$. The saving under success is $B = \mathbb{E}[t_i] + \mathbb{E}[t_j] - \mathbb{E}[\max(t_i, t_j)]$. Speculation is profitable when $p \cdot B > q \cdot R$, which rearranges to the stated condition.
+\end{proof}
+
+For typical agent pipelines with $p \approx 0.85$ to $0.95$ and $R/B \approx 0.3$ to $0.5$, speculation is usually beneficial for the first stage ahead but not for deeper speculation (where rollback costs compound).
+
+\subsection{Speculation Depth Limit}
+
+For multi-stage pipelines, speculation can be applied at multiple depths (speculating two, three, or more stages ahead). However, the probability of a full chain succeeding decays exponentially, while rollback costs grow.
+
+\begin{theorem}[Speculation Depth Limit]
+\label{thm:depth-limit}
+For a homogeneous chain with per-stage success probability $p$, benefit $B_0$, and rollback cost $R_0$, the maximum useful speculation depth is:
+\begin{equation}
+    k^* < \frac{\ln(1 + B_0/R_0)}{\ln(1/p)}
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+At depth $k$, the probability of needing rollback is $1 - p^k$, and the accumulated rollback cost is at most $k \cdot R_0$. The benefit is at most $k \cdot B_0 \cdot p^k$ (all $k$ stages must succeed). Setting the net expected value to zero: $p^k \cdot k B_0 = (1 - p^k) \cdot k R_0$. Solving for $p^k$: $p^k > R_0/(R_0 + B_0)$. Taking logarithms yields the stated bound.
+\end{proof}
+
+For $p = 0.85$ and $B_0/R_0 = 2$: $k^* \leq 6$ stages. For $p = 0.70$ and $B_0/R_0 = 1$: $k^* \leq 1$. The exponential decay of $p^k$ places a natural horizon on useful speculation, consistent with the practical finding that deep speculation chains in agent pipelines are rarely profitable.
+
+\begin{remark}[The Spectre Analogy]
+Speculative execution in CPUs was considered a pure optimization for two decades before Spectre and Meltdown revealed that speculative state changes created security vulnerabilities. In agent pipelines, the analogous risks include: state pollution from discarded speculative work, combinatorial branching complexity, debugging difficulty when causal chains include hypothetical branches, and cognitive overhead for humans monitoring speculative pipelines. These hidden costs suggest that speculation should be applied conservatively, typically at depth 1.
+\end{remark}
+
+\subsection{Three Caching Layers}
+
+Agent harnesses interact with three distinct caching layers, each governed by different dynamics and subject to different staleness tradeoffs:
+
+\begin{enumerate}
+    \item \textbf{KV-Cache} (attention state reuse, LRU-governed): Provider-level caching of computed key-value pairs for shared prompt prefixes. Eviction follows LRU (Least Recently Used) policy at the provider level. Claude Code achieves 92\% hit rate and 81\% cost reduction (vendor-reported; \citealt{anthropic2026agentic}). Hit rate depends on prompt structure: append-only prompts with static prefixes maximize hits.
+
+    \item \textbf{Prompt/Semantic Caching} (token-level, semantic similarity): Server-side caching of prompt computation for repeated or semantically similar prefixes. \citet{liang2026cache} report 41--80\% cost reduction and 13--31\% time-to-first-token improvement across providers. Semantic caching extends exact-match caching by allowing fuzzy retrieval, trading match precision for hit rate.
+
+    \item \textbf{Plan Template Caching} (reasoning-level, persistent): Reuse of structured plan templates across similar tasks. \citet{zhang2025apc} achieve 50\% cost and 27\% latency reduction while maintaining 96.6\% of optimal performance. Templates persist across sessions and are the most durable cache layer, but also the most vulnerable to staleness (a plan template designed for one codebase version may be subtly wrong for the next).
+\end{enumerate}
+
+The Denning working set model \citep{denning1968working} applies to all three layers: cache effectiveness depends on temporal locality in the request stream. The cache TTL must match the agent's task locality window to avoid thrashing.
+
+\subsection{Cache Competitive Analysis}
+
+The Temporal pillar formulates context caching as an inventory problem, where cache entries are ``inventory'' that becomes stale over time:
+
+\begin{theorem}[Optimal Refresh Interval]
+\label{thm:cache-eoq}
+The optimal cache refresh interval balancing refresh cost $R$ against staleness cost is:
+\begin{equation}
+    T^* = \sqrt{\frac{2R}{\lambda \alpha \cdot E_{\text{stale}}}}
+\end{equation}
+where $\lambda$ is the access rate, $\alpha$ is the staleness growth rate, and $E_{\text{stale}}$ is the expected cost per stale access. This is an EOQ (Economic Order Quantity) analog for information freshness.
+\end{theorem}
+
+\begin{proof}
+The amortized cost per unit time is $C(T) = R/T + \frac{1}{2}\lambda\alpha T \cdot E_{\mathrm{stale}}$ (the staleness integral over $[0, T]$ under linear growth averages to $\frac{1}{2}\lambda\alpha T$). Setting $C'(T) = 0$: $-R/T^2 + \frac{1}{2}\lambda\alpha E_{\mathrm{stale}} = 0$, yielding the stated formula.
+\end{proof}
+
+The competitive analysis from the online algorithms literature provides worst-case guarantees for cache refresh policies:
+
+\begin{itemize}[nosep]
+    \item The break-even deterministic policy (refresh after $\lceil R/r \rceil$ incremental steps, where $r$ is the incremental update cost) is 2-competitive against the offline optimal \citep{sleator1985amortized}. That is, its total cost is at most twice the cost of the optimal policy that knows the future request sequence.
+    \item The optimal randomized policy achieves $e/(e-1) \approx 1.58$-competitive \citep{fiat1991competitive}.
+\end{itemize}
+
+The cache introduces a fundamental tension: append-only context maximizes cache hits but accumulates noise, while context reset loses the cache but gains fresh reasoning quality (the 17.1\% advantage). The optimal cycle length is partially determined by when cache savings from continuation are outweighed by quality loss from context accumulation.
+
+\subsection{Bayesian Mode Selection with Bainbridge's Ironies}
+
+The Temporal pillar provides a Bayesian decision framework for selecting between execution modes:
+
+\begin{itemize}[nosep]
+    \item \textbf{Fast mode}: minimal verification, high $\lambda_{\text{raw}}$, low $p_{\text{verify}}$. Optimal for low-risk, well-understood tasks.
+    \item \textbf{Governed mode}: full verification, low $\lambda_{\text{raw}}$, high $p_{\text{verify}}$. Optimal for high-risk, novel tasks.
+\end{itemize}
+
+\begin{theorem}[Bayesian Mode Selection]
+\label{thm:bayesian-mode}
+For the binary simplification (Fast vs.\ Governed), the optimal decision rule is:
+\begin{equation}
+    \text{Choose Governed iff } P(\text{Governed needed} \mid \mathbf{x}) > \frac{c_{\mathrm{GF}}}{c_{\mathrm{FG}} + c_{\mathrm{GF}}}
+\end{equation}
+where $c_{\mathrm{FG}}$ is the cost of choosing Fast when Governed is needed (undetected quality failure, typically 10--100$\times$ the task time in rework) and $c_{\mathrm{GF}}$ is the cost of choosing Governed when Fast suffices (wasted time, typically 2--5$\times$ the task time).
+\end{theorem}
+
+Since $c_{\mathrm{FG}} \gg c_{\mathrm{GF}}$, the threshold is small (typically 0.05--0.10), meaning the harness should choose Governed even when the probability of needing it is quite low. This is the standard asymmetric-cost Bayesian decision rule applied to the mode selection problem.
+
+However, \citet{bainbridge1983ironies} identified a double bind in automated decision-making that complicates this framework: if mode selection rules can be fully specified, a computer can apply them faster than a human monitor can verify; if mode selection requires judgment, automation will fail at boundary cases while the human monitor, deprived of practice, performs even worse. The implication for harness design is threefold:
+
+\begin{enumerate}[nosep]
+    \item The mode selection classifier must be \emph{conservative} (biased toward Governed), because the cost of misclassification is asymmetric.
+    \item The classifier should operate as a \emph{proposal} that the human confirms or overrides, rather than as a fully autonomous decision.
+    \item The feature engineering problem is recursive: deciding how much analysis to do for mode classification requires analysis, consuming the very budget that mode selection is meant to allocate efficiently.
+\end{enumerate}
+
+\subsection{The Speed-Quality Pareto Frontier}
+
+In the space of $(\lambda_{\text{raw}}, p_{\text{verify}})$, achievable operating points form a Pareto frontier. The frontier has an empirically motivated three-regime structure:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Concave at low speed}: redundant checks provide diminishing quality returns; easy to gain speed cheaply by removing the lowest-value verification.
+    \item \textbf{Convex at moderate speed}: each further speed gain requires skipping progressively more important verification, with accelerating quality loss.
+    \item \textbf{Concave again at high speed}: statistical filtering via best-of-$N$ stabilizes quality (running $5\times$ more cheap iterations with majority voting can yield higher effective quality than fewer careful iterations, per SWE-bench data showing Pass@5 substantially exceeding Pass@1; \citealt{sweeffi2025}).
+\end{enumerate}
+
+\subsection{Pareto Frontier Mixing Strategies and Convexification}
+
+\begin{theorem}[Convexification by Mixing]
+\label{thm:convexification}
+In concave frontier regions, the mixed strategy using configuration $c_1$ with probability $\alpha$ and $c_2$ with probability $(1-\alpha)$ achieves:
+\begin{equation}
+    (S_{\mathrm{mix}}, Q_{\mathrm{mix}}) = \alpha(S_1, Q_1) + (1-\alpha)(S_2, Q_2)
+\end{equation}
+which Pareto-dominates every pure strategy in that region. The set of achievable operating points is the \emph{convex hull} of the pure-strategy frontier, not the frontier itself.
+\end{theorem}
+
+This is the direct analogue of the classical result that mixed strategies expand the achievable set to the convex hull of pure-strategy outcomes. The practical implication is that a harness alternating between ``fast mode for 70\% of tasks'' and ``governed mode for 30\% of tasks'' can achieve a speed-quality combination unattainable by any single fixed configuration.
+
+\begin{theorem}[VIH Tangency Condition]
+\label{thm:vih-tangency}
+VIH $= S \cdot Q$ is maximized on the frontier where the iso-VIH hyperbola $Q = \text{VIH}/S$ is tangent to the frontier curve $Q = f(S)$. At this point, the elasticity of quality with respect to speed is exactly $-1$:
+\begin{equation}
+    \varepsilon_{Q,S} = \frac{dQ}{dS} \cdot \frac{S}{Q} = -1
+\end{equation}
+Below this point, speed gains improve VIH; above it, speed gains degrade VIH.
+\end{theorem}
+
+\begin{proof}
+Maximize $\text{VIH}(S) = S \cdot f(S)$. Setting $\text{VIH}'(S) = f(S) + S f'(S) = 0$ gives $f'(S^*) = -f(S^*)/S^* = -Q^*/S^*$, which is the unit-elasticity condition.
+\end{proof}
+
+The convexification theorem implies that the VIH-optimal operating point on the convexified frontier may correspond to a mixing strategy rather than a pure configuration. Specifically, if the VIH-maximizing tangent point lies in a concave region of the original frontier, the optimal policy is to randomize between the two pure strategies at the endpoints of that concave segment. This connects execution mode selection (choosing Fast vs. Governed per task) to Pareto frontier optimization: the Bayesian mode selector is implementing the mixing strategy that achieves the VIH-optimal point on the convexified frontier.

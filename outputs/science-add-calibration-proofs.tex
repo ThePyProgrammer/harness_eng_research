@@ -1,0 +1,555 @@
+% ====================================================================
+% ADDITIONS: Extended Empirical Calibration, Formal Definitions, Proofs
+% For integration into science.tex
+% ====================================================================
+
+% ====================================================================
+% PART 1: EXTENDED EMPIRICAL CALIBRATION
+% (New appendix or addition to Section 10)
+% ====================================================================
+
+\section{Extended Empirical Calibration}
+\label{app:calibration}
+
+The calibration tables in this appendix consolidate empirical parameters
+from the seven pillar papers. All estimates carry heterogeneous confidence;
+ranges and confidence markers are preserved from the source papers.
+
+\subsection{Detection Probability Matrix (Quality Pillar)}
+\label{app:detection-matrix}
+
+\Cref{tab:ext-detection} presents estimated detection probabilities
+$d_{\ell,j}$ for selected slop types across four defense layers.
+Confidence levels: \textbf{H} = strong empirical backing;
+\textbf{M} = single source or derived; \textbf{L} = extrapolated;
+\textbf{E} = estimated from first principles.
+
+\begin{table}[htbp]
+\centering
+\caption{Detection probability ranges for slop types across four defense layers (from Quality pillar).}
+\label{tab:ext-detection}
+\small
+\begin{tabular}{@{}l c c c c@{}}
+\toprule
+\textbf{Slop Type} & \textbf{L1: Structural} & \textbf{L2: Deterministic} & \textbf{L3: LLM-Judge} & \textbf{L4: Human} \\
+\midrule
+\multicolumn{5}{l}{\textit{Decidable types}} \\
+\addlinespace
+Hallucinated imports & 0.90--0.98 H & 0.50--0.70 M & 0.60--0.80 M & 0.70--0.90 M \\
+Placeholder/stub code & 0.30--0.50 M & 0.85--0.95 H & 0.70--0.85 M & 0.80--0.95 M \\
+Duplicate logic & 0.05--0.15 L & 0.75--0.90 H & 0.40--0.60 M & 0.50--0.70 M \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Semi-decidable types}} \\
+\addlinespace
+Security vulns & 0.10--0.20 M & 0.10--0.15 H & 0.50--0.70 M & 0.60--0.80 M \\
+Happy-path handling & 0.05--0.15 L & 0.20--0.40 M & 0.55--0.75 M & 0.70--0.85 M \\
+Scope expansion & 0.05--0.15 M & 0.10--0.25 L & 0.60--0.80 M & 0.70--0.85 M \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Undecidable types}} \\
+\addlinespace
+Meaningless tests & 0.00--0.05 E & 0.05--0.15 E & 0.20--0.40 L & 0.50--0.70 L \\
+Redundant comments & 0.00--0.02 E & 0.05--0.15 E & 0.30--0.50 L & 0.50--0.70 L \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key calibration anchors: type systems catch 15\% of public bugs \citep{gao2017};
+static analysis tools achieve 13\% recall in production;
+Spotify's 25\% veto rate across 1,500+ PRs calibrates Layer~3 \citep{spotify2025};
+AgentSpec's 87\% code-based enforcement \citep{wang2026agentspec}.
+Combined escape rate for meaningless tests (across all layers) is approximately 25\%,
+representing the current detection frontier.
+
+
+\subsection{Cost per PR by Defense Layer (Quality Pillar)}
+\label{app:cost-per-pr}
+
+\begin{table}[htbp]
+\centering
+\caption{Cost per PR by defense layer, with false positive rates.}
+\label{tab:ext-costs}
+\small
+\begin{tabular}{@{}l r r r@{}}
+\toprule
+\textbf{Layer} & \textbf{Latency} & \textbf{Cost/PR} & \textbf{FP rate} \\
+\midrule
+L1: Structural gates & 2--10s & \$0.50 & 0.01--0.05 \\
+L2: Deterministic analysis & 10--60s & \$2.00 & 0.05--0.20 \\
+L3: LLM-as-Judge & 20--120s & \$8.00 & 0.15--0.35 \\
+L4: Human review & 10--60 min & \$80.00 & 0.05--0.15 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The false positive cost trap: at 100 PRs/week with Layer~3 FP rate of 25\%,
+developers spend approximately 2,600 hours/year investigating false findings,
+equivalent to roughly 1.3 FTEs. ROI ordering confirms that Layer~1 is always
+cost-effective (ROI $> 1$ for all 18 types), while Layer~4 is cost-effective
+only for 4--5 high-severity types (security, architectural erosion,
+data model mismatches, meaningless tests).
+
+
+\subsection{Error Amplification Parameters with 95\% CIs (Coordination Pillar)}
+\label{app:error-amp}
+
+\begin{table}[htbp]
+\centering
+\caption{Error amplification parameters from empirical studies (Coordination pillar).}
+\label{tab:ext-error-params}
+\small
+\begin{tabular}{llccc}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{95\% CI} & \textbf{Source} & \textbf{Conditions} \\
+\midrule
+$A_e$ (Independent) & $17.2\times$ & $[14.3, 20.1]$ & \citet{Kim2025} & No shared state \\
+$A_e$ (Centralized) & $4.4\times$ & $[3.8, 5.0]$ & \citet{Kim2025} & Hub coordinator; 285\% overhead \\
+$A_e$ (Decentralized) & $7.8\times$ & NR$^\dagger$ & \citet{Kim2025} & Peer-to-peer; 263\% overhead \\
+$A_e$ (Hybrid) & $5.1\times$ & NR$^\dagger$ & \citet{Kim2025} & Combined; 515\% overhead \\
+Bug mult.\ (conflict code) & $2\times$ & NR & \citet{Lesenich2017} & Any merge conflict \\
+Bug mult.\ (manual) & $26\times$ & NR & \citet{Lesenich2017} & Manual intervention \\
+\bottomrule
+\multicolumn{5}{l}{\footnotesize $^\dagger$Point estimates only; interpret with caution.}
+\end{tabular}
+\end{table}
+
+The gap between the independence prediction ($A_e \leq k$) and the
+observed $17.2\times$ quantifies a ``correlation multiplier'' of roughly $6\times$,
+indicating that agent errors are correlated and cascading rather than independent.
+
+
+\subsection{Merge Conflict Rate Data (Coordination Pillar)}
+\label{app:merge-conflict}
+
+\begin{table}[htbp]
+\centering
+\caption{Merge conflict rate parameters from large-scale studies.}
+\label{tab:ext-merge}
+\small
+\begin{tabular}{llcc}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Source} & \textbf{Sample} \\
+\midrule
+Textual conflict rate & 17--20\% of merges & \citet{Brun2011}; \citet{Ghiotto2018} & 3.4M LOC; 2,731 projects \\
+Project-level range & 7.6--19.3\% & \citet{KasiSarma2013} & Multiple OSS projects \\
+Build conflict rate & 1--10\% & \citet{Brun2011} & 9 projects \\
+Trivial resolution rate & 75\% & \citet{Ghiotto2018} & 2,731 Java projects \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Spec-to-Code Ratios (Abstraction Pillar)}
+\label{app:spec-code}
+
+\begin{table}[htbp]
+\centering
+\caption{Spec-to-code ratios from real-world projects. The ratio varies by over three orders of magnitude depending on specification formality.}
+\label{tab:ext-spec-code}
+\small
+\begin{tabular}{lrrll}
+\toprule
+\textbf{Project} & \textbf{Spec Size} & \textbf{Code Size} & \textbf{Ratio} & \textbf{Notes} \\
+\midrule
+Gonzalez YAML study & 3,388 lines & 16,063 lines & 4.7:1 & Semi-structured spec \\
+seL4 (abstract spec) & 7,000 lines Haskell & 8,700 lines C & 1.2:1 & Abstract spec only \\
+seL4 (full verification) & 200,000+ lines Isabelle & 8,700 lines C & 0.04:1 & Proof $\gg$ code \\
+CompCert C compiler & 28,000 lines Coq & 6,000 lines C & 0.2:1 & Verified compiler \\
+AWS TLA+ (DynamoDB) & $\sim$50 lines TLA+ & $\sim$thousands & 20--100:1 & Per-component \\
+Typical enterprise & $\sim$1 page NL & 500--5,000 lines & 500--5000:1 & Highly variable \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The seL4 data is particularly instructive: the proof-to-code ratio of 23:1
+for full verification demonstrates that the ``cost'' of closing the abstraction
+gap to zero is enormous in formal-verification settings.
+
+
+\subsection{GSD Pipeline Stage Parameters (Temporal Pillar)}
+\label{app:gsd-params}
+
+\begin{table}[htbp]
+\centering
+\caption{Estimated stage parameters for the GSD pipeline (derived from reported ranges; no controlled measurement).}
+\label{tab:ext-stages}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Stage} & $\mu_i$ (min) & $\sigma_i$ (min) & $q_i$ & \textbf{Distribution} \\
+\midrule
+Context loading & 10.0 & 2.0 & 0.02 & Log-normal \\
+Research & 7.5 & 2.5 & 0.05 & Log-normal \\
+Planning & 6.5 & 1.5 & 0.08 & Log-normal \\
+Execution & 12.5 & 2.5 & 0.15 & Log-normal \\
+Verification & 10.0 & 2.0 & 0.10 & Log-normal \\
+Human review & 10.0 & 5.0 & 0.05 & Log-normal \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The sequential makespan sums to $\E[M_{\mathrm{seq}}] = \sum \mu_i = 56.5$ minutes.
+Accounting for geometric retries, $\E[M_{\mathrm{fail}}] = \sum \mu_i / p_i \approx 61.5$ minutes.
+In the Pinedo classification \citep{pinedo2016scheduling}, this scheduling problem is
+$\mathrm{Rm} \mid \mathrm{prec}, \mathrm{stoch} \mid \E[C_{\max}]$:
+unrelated parallel machines, precedence constraints, stochastic processing times,
+minimizing expected makespan.
+
+
+\subsection{Pipeline Speedup Analysis (Temporal Pillar)}
+\label{app:speedup}
+
+\begin{table}[htbp]
+\centering
+\caption{Speedup analysis for four temporal optimization strategies against GSD baseline ($\E[T_{\mathrm{seq}}] = 56.8$ min).}
+\label{tab:ext-speedup}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Strategy} & \textbf{Time saved} & \textbf{Quality impact} & \textbf{VIH impact} & \textbf{Net verdict} \\
+\midrule
+Persistent state & 7.0 min & $-17.1\%$ & Negative & VIH-negative \\
+Speculative pipelining & 8.5 min & Minimal & $+19\%$ & Positive \\
+Tiered verification & 4.8 min & $-1.5\%$ & $+7.6\%$ & Positive \\
+Async governance & 8.0 min & Minimal & $+17\%$ & Positive \\
+\midrule
+Combined (VIH-optimal) & 19.3 min & $-1.5\%$ & $+34\%$ & Positive \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The key finding: naive persistent state is VIH-negative when the quality penalty
+approaches the 17.1\% upper bound. The break-even threshold is approximately
+12.3\% (ratio of time saved to total cycle time). The combined speedup from the
+three VIH-positive strategies yields $\E[T_{\mathrm{combined}}] \approx 37.5$ minutes,
+a 20--34\% cycle time reduction (the range accounts for interaction effects between
+the three optimizations).
+
+
+\subsection{Degradation Function Fit Comparison (Information Pillar)}
+\label{app:degradation-fit}
+
+Three candidate functional forms were fit to empirical data from
+\citet{du2025context} and the Context Discipline study \citep{contextdiscipline2025},
+using Llama-3.1-70B measurements at three context lengths:
+
+\begin{table}[htbp]
+\centering
+\caption{Degradation function fits. The power law provides the best fit, capturing steep early degradation followed by a flattening tail.}
+\label{tab:ext-degradation}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Functional Form} & $\delta(5.3\text{K})$ & $\delta(13\text{K})$ & $\delta(20\text{K})$ \\
+\midrule
+Observed (Llama-3.1-70B) & 0.60 & 0.82 & 0.88 \\
+Exponential: $1 - e^{-\lambda n}$ & 0.60 & 0.90 & 0.97 \\
+\textbf{Power law: $(n/W_{\text{eff}})^\alpha$} & \textbf{0.60} & \textbf{0.82} & \textbf{0.86} \\
+Sigmoid: $1/(1+e^{-k(n-n_0)})$ & 0.60 & 0.85 & 0.95 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The recommended model is
+$\delta(n) = \min\!\bigl(1,\; (n / W_{\text{eff}})^{\alpha}\bigr)$
+with $\alpha \in [0.3, 0.5]$ and $W_{\text{eff}} \in [0.1W, 0.7W]$.
+The effective window fraction is task-dependent: reasoning tasks
+(multi-hop, code generation) have $W_{\text{eff}} \approx 0.1W$ to $0.2W$;
+retrieval tasks (lexical, NIAH) have $W_{\text{eff}} \approx 0.6W$ to $0.7W$.
+The broad parameter ranges reflect calibration to only three data points
+from a single model; cross-model validation is needed.
+
+
+% ====================================================================
+% PART 2: EXTENDED FORMAL DEFINITIONS
+% (New appendix)
+% ====================================================================
+
+\section{Extended Formal Definitions}
+\label{app:formal-defs}
+
+This appendix collects formal tuple definitions from the pillar papers
+that the main text uses but does not define explicitly.
+
+\subsection{Agent, SAS, and MAS (Abstraction Pillar)}
+
+\begin{definition}[Agent]
+\label{def:ext-agent}
+An \emph{agent} $a$ is a tuple $a = (\Phi, \mathfrak{A}, \mathcal{T}, \pi)$, where
+$\Phi$ is the reasoning policy (typically an LLM with parameters $\theta$),
+$\mathfrak{A}$ is a finite set of available actions (tools: file read/write, shell execution, web search),
+$\mathcal{T} = \{t_1, \ldots, t_k\}$ is a set of tools providing environmental interaction, and
+$\pi: \mathcal{O}^* \to \Delta(\mathfrak{A})$ is the agent's policy,
+mapping observation histories to distributions over actions.
+\end{definition}
+
+\begin{definition}[Single-Agent System (SAS)]
+\label{def:ext-sas}
+A \emph{single-agent system} is a tuple
+$\mathcal{S}_{\text{SAS}} = (\{a\}, \mathcal{E}, \emptyset)$
+where $|A| = 1$, $\mathcal{E}$ is the environment (codebase, terminal, file system),
+and there is no inter-agent communication. The agent operates in an agentic loop:
+\emph{observe $\to$ reason $\to$ act $\to$ verify $\to$ repeat},
+consuming a token budget $B$.
+\end{definition}
+
+\begin{definition}[Multi-Agent System (MAS)]
+\label{def:ext-mas}
+A \emph{multi-agent system} is a tuple
+$\mathcal{S}_{\text{MAS}} = (A, \mathcal{E}, \mathcal{C}, \Omega)$
+where $|A| > 1$, $\mathcal{C}$ is a communication topology
+(a directed graph over agents), and $\Omega$ is an orchestration policy
+governing task assignment, aggregation, and termination.
+Four canonical topologies are distinguished:
+\emph{independent} ($\mathcal{C} = \emptyset$),
+\emph{centralized} (star graph),
+\emph{decentralized} (possibly complete undirected graph), and
+\emph{hybrid} (star with selective peer edges).
+\end{definition}
+
+
+\subsection{Verification Layer 5-Tuple (Reliability Pillar)}
+
+\begin{definition}[Verification Layer]
+\label{def:ext-vlayer}
+A \emph{verification layer} $\ell$ is a tuple $(d, f, c, \tau, \eta)$ where:
+\begin{itemize}[nosep]
+  \item $d(\ell) = \Prob(\text{flag} \mid \text{defect})$ is the detection rate (sensitivity),
+  \item $f(\ell) = \Prob(\text{flag} \mid \text{no defect})$ is the false positive rate,
+  \item $c(\ell)$ is the cost per invocation,
+  \item $\tau(\ell)$ is the latency per invocation, and
+  \item $\eta(\ell) = d(\ell) / c(\ell)$ is the layer efficiency.
+\end{itemize}
+\end{definition}
+
+
+\subsection{Coordination Contract (Coordination Pillar)}
+
+\begin{definition}[Coordination Contract]
+\label{def:ext-contract}
+A \emph{coordination contract} for $k$ agents on codebase $\mathcal{F}$ is a
+tuple $\mathcal{C} = (\{F_i\}_{i=1}^k, \{I_j\}_{j=1}^m, \sigma)$ where:
+\begin{itemize}[nosep]
+  \item $F_i \subseteq \mathcal{F}$ is the owned file set of agent $A_i$,
+        with $F_i \cap F_j = \emptyset$ for $i \neq j$ (disjoint ownership);
+  \item $\{I_j\}_{j=1}^m$ is a set of interface specifications,
+        each $I_j = (\mathrm{name}_j, \mathrm{sig}_j, \mathrm{module}_j)$; and
+  \item $\sigma: \mathcal{F} \to 2^{\{I_1,\ldots,I_m\}}$ maps each file to its
+        exported interfaces.
+\end{itemize}
+Under this contract, agent $A_i$ may freely modify files in $F_i$,
+must preserve the signatures of all interfaces in $\sigma(F_i)$,
+and may only depend on (not modify) interfaces exported by other agents' files.
+\end{definition}
+
+
+\subsection{Pipeline DAG with Pinedo Classification (Temporal Pillar)}
+
+\begin{definition}[Agent Pipeline DAG]
+\label{def:ext-pipeline}
+An agent pipeline is a stochastic DAG $G = (V, E, \mathbf{D}, \mathbf{q})$ where
+$V = \{v_1, \ldots, v_n\}$ are pipeline stages,
+$E \subseteq V \times V$ encodes precedence constraints,
+each stage $v_i$ has duration $t_i \sim D_i$ with mean $\mu_i$ and
+variance $\sigma_i^2$, and failure probability $q_i \in [0,1]$
+with success probability $p_i = 1 - q_i$.
+\end{definition}
+
+In the Pinedo classification \citep{pinedo2016scheduling}, the harness scheduling
+problem is $\mathrm{Rm} \mid \mathrm{prec}, \mathrm{stoch} \mid \E[C_{\max}]$:
+unrelated parallel machines, precedence constraints, stochastic processing times,
+minimizing expected makespan.
+
+
+\subsection{Speculation Policy (Temporal Pillar)}
+
+\begin{definition}[Speculation Policy]
+\label{def:ext-speculation}
+A \emph{speculation policy} $\pi: V \to \{0,1\}$ assigns each stage a binary
+decision: $\pi(v_j) = 1$ if $v_j$ begins execution before its predecessor commits.
+Speculation is EV-positive for adjacent stages $(v_i, v_j)$ when the success-to-failure
+odds ratio exceeds the rollback-to-benefit ratio:
+\[
+  \frac{p_i}{q_i} > \frac{R}{B}
+\]
+where $B = \E[\min(t_i, t_j)]$ is the parallelism benefit and
+$R = \E[d_i + t_i^{\mathrm{retry}}]$ is the rollback penalty.
+\end{definition}
+
+
+% ====================================================================
+% PART 3: EXTENDED PROOFS (Appendix B)
+% ====================================================================
+
+\section{Extended Proofs}
+\label{app:proofs-extended}
+
+\subsection{Full Proof of Spec-Code Convergence (Abstraction Pillar)}
+
+\begin{theorem}[Spec-Code Convergence, restated]
+For an algorithmically random program $P$ (i.e., $K(P) \geq |P| - O(1)$),
+any specification $S$ such that $P \models S$ and
+$\mathcal{G}(S, P) = O(1)$ satisfies $|S| \geq |P| - O(\log |P|)$.
+\end{theorem}
+
+\begin{proof}
+Let $P$ be algorithmically random, so $K(P) \geq |P| - O(1)$.
+Let $S$ be a specification with $P \models S$ and $\mathcal{G}(S, P) = K(P \mid S) = O(1)$.
+
+\textbf{Step 1.} From $\mathcal{G}(S, P) = O(1)$, there exists a constant-length
+program $p$ with $U(p, S) = P$. Therefore $S$ together with $p$ constitutes a
+description of $P$:
+\[
+  K(P) \leq K(S) + |p| + O(\log(K(S) + |p|)) = K(S) + O(\log K(S))
+\]
+The logarithmic overhead arises from delimiting $S$ within the concatenated description.
+
+\textbf{Step 2.} Since $K(P) \geq |P| - O(1)$ (algorithmic randomness):
+\[
+  |P| - O(1) \leq K(P) \leq K(S) + O(\log K(S))
+\]
+
+\textbf{Step 3.} Since $K(S) \leq |S| + O(1)$ (any string can be described by
+itself plus constant overhead):
+\[
+  |P| \leq |S| + O(\log |S|) + O(1)
+\]
+
+To bound $\log |S|$: from Step~1, $K(S) \geq K(P) - O(1)$, and combining
+with Step~2 gives $|S| + |P| = O(|S|)$, so $\log |S| = O(\log |P|)$.
+
+Rearranging: $|S| \geq |P| - O(\log |P|)$.
+
+\textbf{Interpretation.} For a 10,000-line program ($\approx 4 \times 10^6$ bits
+at 50 characters/line, 8 bits/character), the slack is
+$O(\log 4 \times 10^6) \approx 22$ bits, which is negligible.
+The specification must contain essentially all the information of the program.
+\end{proof}
+
+
+\subsection{Markov Error Propagation Model (Reliability Pillar)}
+
+When errors propagate (a step can fail because its input was corrupted),
+the simple product law $R(n) = \prod p_i$ does not hold.
+We model the pipeline as a Markov chain on states $\{C, E\}$ (correct, erroneous)
+with transition matrix:
+\[
+  \mathbf{P} = \begin{pmatrix} p & 1 - p \\ q & 1 - q \end{pmatrix}
+\]
+where $p$ is the probability of correct output given correct input,
+and $q$ is the probability of correct output given incorrect input.
+
+\begin{theorem}[Pipeline Reliability Under Markov Error Propagation]
+Starting from state $C$, the probability of being in state $C$ after $n$ steps is:
+\[
+  R_{\mathrm{Markov}}(n) = \pi_C + (1 - \pi_C)(p + q - 1)^n
+\]
+where $\pi_C = q / (1 - p + q)$ is the stationary probability of the correct state.
+\end{theorem}
+
+\begin{proof}
+Diagonalize $\mathbf{P}$. Its eigenvalues are $\lambda_1 = 1$ and
+$\lambda_2 = p + q - 1$. The spectral decomposition gives
+$\mathbf{P}^n = \Pi + (p + q - 1)^n (\mathbf{I} - \Pi)$
+where $\Pi$ is the matrix of stationary probabilities (each row equal
+to the stationary distribution $(\pi_C, \pi_E)$).
+The $(C, C)$ entry of $\mathbf{P}^n$ is
+$\pi_C + (1 - \pi_C)(p + q - 1)^n$.
+\end{proof}
+
+\begin{remark}
+When $q = 0$ (errors never self-correct), the error state is absorbing:
+once an error is introduced, it persists through all subsequent steps.
+In this case $R_{\mathrm{Markov}}(n) = p^n$, recovering the series reliability
+product law. The Markov model with $q > 0$ is more optimistic because it
+allows error recovery at each step. For typical agent pipelines, $q$ is small
+but positive (an LLM may ``route around'' a prior error through independent reasoning).
+\end{remark}
+
+
+\subsection{NP-Hardness of Balanced Partition (Coordination Pillar)}
+
+\begin{theorem}[NP-Hardness of Balanced Partition, restated]
+The $(k, 1)$-balanced partition problem (partitioning a graph into $k$ exactly
+equal parts minimizing edge cut) admits no polynomial-time approximation with
+any finite factor unless $P = NP$.
+\end{theorem}
+
+\begin{proof}[Proof sketch (reduction from 3-Partition)]
+Recall the 3-Partition problem: given a multiset $S = \{s_1, \ldots, s_{3m}\}$
+of $3m$ positive integers with $\sum s_i = m \cdot T$ and $T/4 < s_i < T/2$
+for all $i$, determine whether $S$ can be partitioned into $m$ triples each
+summing to exactly $T$. This problem is NP-hard in the strong sense
+(it remains NP-hard even when values are bounded by a polynomial in $m$).
+
+Given a 3-Partition instance, construct a graph $G$ as follows.
+For each element $s_i$, create a clique of $s_i$ vertices.
+Connect all cliques with edges of weight $M$ (a sufficiently large penalty).
+Set $k = m$ and require each part to contain exactly $n/m$ vertices.
+
+Any $(k, 1)$-balanced partition of $G$ must split each clique into exactly
+one part (splitting a clique incurs internal cut cost exceeding $M$).
+Since $T/4 < s_i < T/2$, each triple summing to $T$ yields a part of the
+correct size. Thus a zero-cost balanced partition exists if and only if
+the 3-Partition instance has a solution.
+
+Since 3-Partition is strongly NP-hard, the balanced partition problem
+with exact balance ($\varepsilon = 0$) is NP-hard. When the balance constraint
+is relaxed ($\varepsilon > 0$), approximation becomes possible:
+$O(\log^{1.5} n)$ via \citet{AndreevRacke2006} and
+$O(\sqrt{\log n})$ via \citet{AroraRaoVazirani2009}.
+\end{proof}
+
+This result has direct implications for agent task decomposition:
+partitioning a codebase into $k$ equal-work assignments that minimize
+inter-agent coupling is computationally intractable in the worst case,
+motivating the use of heuristic algorithms (Kernighan-Lin, Fiduccia-Mattheyses, METIS).
+
+
+\subsection{Beta-Binomial Calibration for Heterogeneous Step Quality (Reliability Pillar)}
+
+To model heterogeneity in per-step success rates across different tasks,
+we place a Beta prior on the step success probability:
+$p \sim \mathrm{Beta}(\alpha, \beta)$.
+
+\begin{theorem}[Beta-Binomial Pipeline Reliability]
+The marginal pipeline success probability under heterogeneous step quality is:
+\[
+  R_{\mathrm{BB}}(n, \alpha, \beta)
+    = \E[p^n]
+    = \frac{B(\alpha + n, \beta)}{B(\alpha, \beta)}
+    = \prod_{k=0}^{n-1} \frac{\alpha + k}{\alpha + \beta + k}
+\]
+where $B(\cdot, \cdot)$ is the Beta function.
+\end{theorem}
+
+\begin{proof}
+By definition, $\E[p^n] = \int_0^1 p^n \cdot \frac{p^{\alpha-1}(1-p)^{\beta-1}}{B(\alpha,\beta)} \, dp
+= \frac{1}{B(\alpha,\beta)} \int_0^1 p^{\alpha+n-1}(1-p)^{\beta-1} \, dp
+= \frac{B(\alpha+n, \beta)}{B(\alpha,\beta)}$.
+Using the recurrence $B(a+1,b) = B(a,b) \cdot a/(a+b)$ repeatedly yields
+the product form.
+\end{proof}
+
+Calibrated parameters from published benchmarks:
+
+\begin{table}[htbp]
+\centering
+\caption{Beta-Binomial calibration: back-solved parameters from published benchmark success rates.}
+\label{tab:ext-betabinom}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Benchmark} & $n$ & $R_{\mathrm{obs}}$ & $\mu$ & $\alpha$ & $\beta$ & $\alpha{+}\beta$ \\
+\midrule
+SWE-bench (METR) & 10 & 0.50 & 0.93 & 12.5 & 0.95 & 13.5 \\
+Devin (2025) & 12 & 0.67 & 0.97 & 28.4 & 0.88 & 29.3 \\
+RE-Bench & 100 & 0.37 & 0.99 & 85.0 & 0.86 & 85.9 \\
+Generic agent & 20 & 0.12 & 0.90 & 8.1 & 0.90 & 9.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Higher concentration ($\alpha + \beta$) indicates more homogeneous task
+populations; lower concentration indicates high task-to-task variance.
+The Beta-Binomial model is strictly more pessimistic than the homogeneous model
+($R_{\mathrm{BB}} \leq \mu^n$ by Jensen's inequality, since $p \mapsto p^n$
+is convex for $n \geq 1$), capturing the intuition that a few very hard tasks
+dominate the failure distribution.

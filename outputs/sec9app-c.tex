@@ -1,0 +1,118 @@
+\section{Cross-Pillar Theorem Index}
+\label{app:theorems}
+
+Table~\ref{tab:theorem-index} provides a comprehensive index of the significant theorems, propositions, definitions, and conjectures across all seven pillar papers. The index is organized by pillar and includes all results that are referenced in cross-pillar arguments or that constitute a pillar's primary formal contributions.
+
+\begin{table}[H]
+\centering
+\caption{Cross-pillar theorem index. Each entry summarizes a key formal result from the corresponding pillar paper. Entries marked with $\dagger$ are referenced in cross-pillar arguments in Section~\ref{sec:synthesis}.}
+\label{tab:theorem-index}
+\small
+\begin{tabular}{p{1.8cm}p{3.8cm}p{7.5cm}}
+\toprule
+\textbf{Pillar} & \textbf{Result} & \textbf{Summary} \\
+\midrule
+
+%% ABSTRACTION
+\multirow{6}{1.8cm}{Abstraction}
+    & Abstraction Gap$^\dagger$ & $\mathcal{G}(S,P) = K(P \mid S)$: conditional Kolmogorov complexity between spec and code. \\
+    & Gap Properties & Minimality ($\mathcal{G} \geq 0$), maximality ($\mathcal{G} \leq K(P)$), monotonicity (refining $S$ can only decrease $\mathcal{G}$), additivity (gap decomposes over independent components). \\
+    & NID Universality & Normalised information distance $d(S,P)$ is a universal metric (Li-Vitanyi). \\
+    & Spec-Code Convergence$^\dagger$ & For incompressible $P$, any $S$ with $K(P \mid S) \leq c$ satisfies $|S| \geq |P| - O(\log |P|)$. \\
+    & Refinement Lattice & Specifications form a complete lattice under refinement; Galois connection $(\alpha, \gamma)$ between spec and program lattices. \\
+    & Agent Decomposition & $\mathcal{G}(S,P) \leq \mathcal{G}(S, \hat{S}) + \mathcal{G}(\hat{S}, P) + O(\log n)$: intermediate specs reduce total gap up to a logarithmic overhead. \\
+
+\midrule
+
+%% INFORMATION
+\multirow{8}{1.8cm}{Information}
+    & Submodularity$^\dagger$ & Context relevance $f(C) = I(C; P \mid S, \theta)$ is submodular under mild conditions; greedy achieves $(1-1/e)$ approximation. \\
+    & Non-Monotonicity & The degradation-adjusted objective $\tilde{f}(C) = f(C) \cdot (1-\delta(|C|))$ is non-monotone; requires randomized greedy with $1/2$-approximation. \\
+    & Gap Decomposition$^\dagger$ & $H(P|S) = H(P|S,C,\theta) + I(P;C|S,\theta) + I(P;\theta|S)$, exact equality via Shannon chain rule. \\
+    & Position Dominance & Context item position dominates item relevance in determining effective contribution; positional recall follows a U-shaped curve. \\
+    & Context Budget$^\dagger$ & $|C^*| < W$; optimal context is sub-capacity, approximately $0.15W$ to $0.40W$. \\
+    & Curation Beats Accumulation & Curated context (active tier) outperforms accumulated context of the same size. \\
+    & Enforcement Dominance$^\dagger$ & Structural compliance $= 1$; instructional compliance $= (1-\epsilon)^T$, exponential decay in pipeline length. \\
+    & Fresh Context Dominance & Agent with fresh context outperforms agent with stale context by $\sim$17\% (``Fresh Eyes'' effect). \\
+
+\midrule
+
+%% RELIABILITY
+\multirow{8}{1.8cm}{Reliability}
+    & Series Reliability & $R(n) = \prod p_i$; for homogeneous pipelines, $R(n) = p^n$. \\
+    & Compound Sensitivity$^\dagger$ & Elasticity $\mathcal{E}(R,p) = n$; 1\% per-step improvement yields $n$\% system improvement. \\
+    & Weakest-Link Priority & Improve the step with lowest $p_i$ first; marginal gain is maximized at the weakest link. \\
+    & Correlated Failure & Under Marshall-Olkin common-cause model: $R_{\text{sys}} = (1-\gamma)\prod(1-\alpha_i)$, where $\gamma$ is shared failure rate. \\
+    & Optimal Checkpoints$^\dagger$ & $k^* \approx \sqrt{n(1-p)c_0/c_v}$; Young-Daly analog. Three rounds capture $>96$\% of detectable errors. \\
+    & Diminishing Returns & Marginal value of the $k$-th checkpoint: $\Delta M(k) = N_0 v(1-v)^{k-1}$, geometric decay. \\
+    & Circular Bias$^\dagger$ & $\beta = \beta_A(1-\beta_{A'})$; self-verification ($A = A'$) yields zero bias reduction on shared blind-spot categories. \\
+    & Structural Boundary$^\dagger$ & Structural enforcement cost-effective when $L > L^* = (c_s - c_p)/\epsilon$; threshold drops as $L^*/n$ for multi-step pipelines. \\
+
+\midrule
+
+%% COORDINATION
+\multirow{10}{1.8cm}{Coordination}
+    & Error Amplification$^\dagger$ & Under independence, $A_e = (1-(1-\epsilon)^k)/\epsilon \to k$; empirical is $17.2\times$ (correlation multiplier). \\
+    & Saturation Crossover & Scaling benefits saturate at approximately $P^* \approx 0.45$ of the task completion rate. (Conjecture.) \\
+    & Extended Amdahl$^\dagger$ & $S_{\text{eff}}(n) = [1/(s+(1-s)/n)] \cdot (1-\delta_a)^n$; optimal $n^* \approx 1/\sqrt{\delta_a}$. \\
+    & NP-Hardness & Balanced $k$-way partition of the coupling graph is NP-hard. \\
+    & Cheeger Inequality & Spectral gap bounds partition quality: $h(G) \leq \sqrt{2\lambda_2}$ (discrete Cheeger). \\
+    & Cut-Conflict Bridge$^\dagger$ & $\mathbb{E}[\text{conflicts}] \leq \alpha \cdot W_{\text{cut}}(\pi)$; merge conflicts bounded by cut weight. \\
+    & Contract Reduction & File-ownership contracts reduce conflict growth from $O(k^2)$ to $O(k)$. \\
+    & Write Skew & Two agents with individually valid changes can produce an invalid combination; requires assume-guarantee contracts. \\
+    & QAS$^\dagger$ & Quality-Adjusted Speedup $= (T_1 Q_1)/(T_k Q_k)$; QAS $< 1$ when quality degradation outweighs speed gain. \\
+    & Conway's Law & Low-overhead coordination requires $G_{\text{coupling}} \subseteq G_{\text{comm}}$; graph containment condition. \\
+
+\midrule
+
+%% TEMPORAL
+\multirow{8}{1.8cm}{Temporal}
+    & Context Fidelity$^\dagger$ & $\Phi(t) = e^{-\Lambda(t-t_0)}$; exponential staleness decay with half-life $t_{1/2} = \ln 2 / \Lambda$. \\
+    & VIH Decomposition$^\dagger$ & $\text{VIH} = \lambda_{\text{raw}} \cdot p_{\text{verify}}$; verified iterations per hour. \\
+    & VIH Optimality & VIH maximized at unit elasticity: $\partial \ln \lambda / \partial v = -\partial \ln p_{\text{verify}} / \partial v$. \\
+    & Speculation Test$^\dagger$ & Speculate iff $p/q > R/B$, where $R$ is rollback cost and $B$ is early-completion benefit. \\
+    & Speculation Depth Limit & $k^* < \ln(1 + B_0/R_0)/\ln(1/p)$; depth beyond this has negative expected value. \\
+    & Cache EOQ$^\dagger$ & $T^* = \sqrt{2R/(\lambda\alpha \cdot E_{\text{stale}})}$; optimal cache refresh interval. \\
+    & Bayesian Mode Selection & Switch from fast to governed mode when $P(\text{Governed} \mid \mathbf{x}) > c_{GF}/(c_{FG} + c_{GF})$. \\
+    & Pareto Convexification & Mixing fast and governed modes convexifies the speed-quality frontier; VIH optimum lies at the tangency of the VIH iso-hyperbola. \\
+
+\midrule
+
+%% QUALITY
+\multirow{12}{1.8cm}{Quality}
+    & Decidability Classes$^\dagger$ & 7 Decidable, 7 Semi-decidable, 4 Undecidable slop types across 18 AI code defect categories. \\
+    & Latent Factor Structure & Three approximately orthogonal generative factors: Context Blindness, Completion Bias, Training Distribution Leakage. \\
+    & Defense NP-Hardness$^\dagger$ & Layered defense optimization is NP-hard (via Weighted Set Cover); greedy achieves $(1-1/e)$ approximation. \\
+    & Detection Ceiling$^\dagger$ & $d_{\ell,j} \leq I(X; D_j)/H(D_j)$ via Data Processing Inequality; information-theoretic limit on detection. \\
+    & No Free Lunch & Context-poor layers cannot exceed the detection ceiling; context access is necessary for high detection rates. \\
+    & FKG Correlation$^\dagger$ & $P(\text{both miss}) \geq P(\text{producer misses}) \cdot P(\text{judge misses})$; independence underestimates escape probability. \\
+    & Diversity Gain & Weakly independent diverse verifiers outperform strongly correlated single-family verifiers. \\
+    & ROI Ordering & Optimal layer ordering: decreasing $r_\ell/c_\ell$ (detection rate per unit cost). \\
+    & Enforcement Gap & Syntactic properties enforceable with $P = 1$; semantic properties strictly less (Rice's theorem). \\
+    & Compound Degradation$^\dagger$ & CI-passing changes yield superlinear entropy growth: $H \geq n\Delta H + \binom{n}{2}\Delta H_{\text{cross}}$. \\
+    & Ratchet Effect & Codebase entropy is monotonically non-decreasing under CI-only governance. \\
+    & Optimal Quality Level & Closed-form $q^* = (1/\beta)\ln(c_F \lambda_0 \beta / (c_P + c_A))$; higher for decidable types, lower for undecidable. \\
+
+\midrule
+
+%% GOVERNANCE
+\multirow{11}{1.8cm}{Governance}
+    & Theory Extraction Bound & Rate-distortion: $R(D) = \min_{p(\hat{T}|T): \mathbb{E}[d(T,\hat{T})] \leq D} I(T;\hat{T})$; minimum description length of program theory. \\
+    & Tacit Divergence & Conjectured: $R(D) \to \infty$ as $D \to 0$ for tacit knowledge components; perfect externalization requires infinite description. \\
+    & Incompressibility & Kolmogorov-random tacit components satisfy $K(t_\tau) \geq |t_\tau| - O(1)$; no lossless compression possible. \\
+    & Double Bottleneck & $I(T;G) \leq I(T;(D,A,R)) \leq I(T;L)$; governance artifacts are twice-bottlenecked. \\
+    & Capacity Bound$^\dagger$ & If $R_{\text{drift}} > C_{\text{gov}}$, no governance scheme prevents unbounded divergence. \\
+    & AI Velocity Corollary & Increasing agent throughput $\lambda$ eventually overwhelms any fixed $C_{\text{gov}}$; governance must co-scale with velocity. \\
+    & Cascade Stability & Three-loop cascade governance is stable iff each loop satisfies Nyquist-like sampling requirement: $f_k \geq 2\omega_d^{(k)}$. \\
+    & Governance Bifurcation & Transcritical bifurcation at $\mu G / \gamma R = 1$; below: self-correcting; above: unbounded drift. \\
+    & Ratchet Convergence$^\dagger$ & Closure operator on constraint lattice converges in $\leq |\mathcal{R}|$ steps. \\
+    & Ossification & When contradictory constraints accumulate, the allowed change set becomes empty; the ratchet becomes pathological. \\
+    & Decision Survival & Competing-risks Weibull model; median lifetimes: technology 2--4y, framework 3--5y, architecture 5--10y. \\
+
+\bottomrule
+\end{tabular}
+\end{table}
+
+The index contains 63 entries across 7 pillars. Of these, 19 (marked with $\dagger$) participate directly in the cross-pillar arguments developed in Section~\ref{sec:synthesis}. The remaining 44 are pillar-internal results that provide the technical foundations for the cross-pillar theorems. The density of cross-references (19 out of 63 results, approximately 30\%) confirms that the pillars are not independent theories but a connected formal network.
+
+\end{appendices}

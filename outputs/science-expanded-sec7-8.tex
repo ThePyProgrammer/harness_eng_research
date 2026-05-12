@@ -1,0 +1,503 @@
+% ====================================================================
+% 7. THE QUALITY PILLAR (EXPANDED)
+% ====================================================================
+\section{The Quality Pillar}
+\label{sec:quality}
+
+The Quality pillar \citep{pillar-quality} addresses the specific defects introduced by AI code generation and the formal structure of defense against them. The central insight is that AI-generated code produces a qualitatively new class of defect: code that is superficially competent, individually defensible, and cumulatively corrosive to codebase health. We call these defects \emph{slop}, following industry usage.
+
+\subsection{Slop Taxonomy: 18 Types in 3 Decidability Classes}
+
+The Quality pillar classifies 18 AI code defect types (``slop types'') into three decidability classes, grounded in Rice's theorem. Each slop type is formalized as a tuple $\tau_j = (\sigma_j, \phi_j, \delta_j, C_j)$ where $\sigma_j$ is a syntactic signature on ASTs, $\phi_j$ is the semantic property determining genuine defect status given full program context, $\delta_j \in \{\mathrm{D}, \mathrm{SD}, \mathrm{U}\}$ is the detection decidability class, and $C_j$ is the cost distribution over deployment contexts.
+
+\begin{table}[htbp]
+\centering
+\caption{The 18 slop types partitioned by detection decidability.}
+\label{tab:slop-partition}
+\small
+\begin{tabularx}{\textwidth}{l c X}
+\toprule
+\textbf{Class} & \textbf{Count} & \textbf{Types} \\
+\midrule
+D (Decidable) & 7 & Hallucinated imports, placeholder/stub code, duplicate logic, dead code, lint suppressions, cross-language contamination, outdated APIs \\
+\addlinespace
+SD (Semi-decidable) & 7 & Security vulns (functional-looking), happy-path error handling, data model mismatches, over-engineering, architectural erosion, silent scope expansion, god functions \\
+\addlinespace
+U (Undecidable) & 4 & Meaningless tests, boilerplate inflation, redundant comments, naming/convention drift \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The three classes are formally distinct:
+
+\begin{enumerate}
+    \item \textbf{Decidable (D):} There exists a total computable function $f_j$ such that $f_j(t) = 1$ iff $t$ contains an instance of $\tau_j$. The syntactic signature $\sigma_j$ suffices; the semantic property $\phi_j$ does not depend on unobservable context. Hallucinated imports are detected by lockfile resolution ($O(1)$ table lookup); placeholder code by AST pattern matching for \texttt{pass}, \texttt{...}, \texttt{NotImplementedError}; duplicate logic by tree-sitter-based clone detection (suffix tree, $O(n \log n)$); dead code by call graph reachability analysis.
+
+    \item \textbf{Semi-decidable (SD):} The semantic property $\phi_j$ depends on partially formalizable context. An oracle (LLM or human) can approximate $\phi_j$ with probability $p \in (0.5, 1)$, but no computable function achieves $p = 1$. Security vulnerabilities require knowing which inputs are adversarial; happy-path handling requires knowing which error paths matter; over-engineering requires judging abstraction necessity. Expert inter-rater agreement is $\kappa \approx 0.6$ (substantial, above chance but below certainty).
+
+    \item \textbf{Undecidable (U):} No known oracle achieves reliable detection. For all known procedures $f$, inter-rater reliability $\kappa < 0.4$ (below ``fair agreement''). ``Meaningless test'' depends on test intent versus structure; ``boilerplate'' thresholds vary by team norms; ``redundant comment'' depends on reader expertise; ``naming drift'' requires inferring implicit conventions.
+\end{enumerate}
+
+This classification has a direct design implication: it is impossible to build a fully automated quality gate that catches all slop types. The four-layer verification architecture (shared with the Reliability pillar) is a necessary response to this computational limitation.
+
+\subsection{Three Generative Factors}
+
+The 18 slop types arise from three approximately orthogonal generative factors operating at different stages of the generation process:
+
+\begin{definition}[Context Blindness (F1)]
+The agent's effective context $\hat{\mathcal{K}}(t) \subset \mathcal{K}(t)$, where $\mathcal{K}(t)$ is the codebase knowledge required for correct generation at point $t$. The probability of slop type $\tau_j$ increases monotonically with the context deficit $|\mathcal{K} \setminus \hat{\mathcal{K}}|$. Types loading on F1: duplicate logic, naming drift, architectural erosion, boilerplate inflation.
+\end{definition}
+
+\begin{definition}[Completion Bias (F2)]
+The agent's output distribution $\pi$ assigns higher probability to syntactically complete outputs than to semantically minimal correct outputs: $\mathbb{E}_\pi[\mathrm{length}(o)] > \mathbb{E}_{\pi^*}[\mathrm{length}(o)]$ where $\pi^*$ is optimal. Types loading on F2: placeholder code, happy-path error handling, meaningless tests, redundant comments, over-engineering.
+\end{definition}
+
+\begin{definition}[Training Distribution Leakage (F3)]
+Patterns memorized during training are applied to contexts where they do not hold. Probability increases with divergence between training distribution $\mathcal{D}$ and execution environment $\mathcal{E}$. Types loading on F3: hallucinated imports, cross-language contamination, outdated APIs, security vulnerabilities.
+\end{definition}
+
+If the three factors are approximately orthogonal ($I(F_i; F_k)$ small relative to $H(F_i)$ for $i \neq k$), then interventions targeting different factors compose multiplicatively. Better retrieval (addressing F1) does not reduce completion bias (F2), and vice versa. The quality stack must address all three independently.
+
+\subsection{Layered Defense Optimization}
+
+Given 18 slop types $J = \{1, \ldots, 18\}$ and four defense layers $L = \{1, 2, 3, 4\}$ (structural gates, deterministic analysis, LLM-as-Judge, human review), the problem is to select $\Lambda_j \subseteq L$ for each type $j$ minimizing total cost:
+\begin{equation}
+C_{\mathrm{total}} = \sum_{\ell \in L} c_\ell \cdot \mathbf{1}[\Lambda^\ell \neq \emptyset] + \sum_{j \in J} p_j \cdot D_j \cdot P_{\mathrm{esc}}(j, \Lambda_j)
+\end{equation}
+where $P_{\mathrm{esc}}(j, \Lambda_j) = P(\bigcap_{\ell \in \Lambda_j} \{Z_{\ell,j} = 0\})$ is the escape probability under correlation, and $\Lambda^\ell = \{j : \ell \in \Lambda_j\}$.
+
+\begin{theorem}[Layered Defense NP-Hardness]
+\label{thm:defense-nphard}
+The problem of assigning slop types to defense layers to minimize total cost subject to a minimum detection rate constraint is NP-hard, via reduction from Weighted Set Cover.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Set $D_j = M$ for large $M$ and $p_j = 1$ for all $j$. Then minimizing the objective forces all types to be covered (the penalty $M \cdot P_{\mathrm{esc}} \gg c_\ell$ for any uncovered type), reducing to minimum-weight subcollection selection, which is Weighted Set Cover. The inapproximability threshold is $\ln |J|$ unless P $=$ NP.
+\end{proof}
+
+\begin{proposition}[Greedy Approximation]
+\label{prop:greedy-defense}
+The greedy algorithm (assign each slop type to its highest-efficiency layer first, then fill coverage gaps) achieves a $(1-1/e)$-approximation, since the objective function is submodular.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+Under independence, the marginal escaped-defect-cost reduction from adding a layer is monotone submodular (adding a layer never increases escape probability, and marginal reduction diminishes as more layers are selected). The result follows from \citet{nemhauser1978}.
+\end{proof}
+
+\begin{remark}
+For our problem ($|L| = 4$, $|J| = 18$), exact enumeration over $2^4 = 16$ subsets per type is computationally trivial. The greedy bound matters for scaled versions with dozens of specialized tools.
+\end{remark}
+
+\subsection{Connection to Littlewood-Strigini and the Diversity Gain}
+
+\citet{littlewood1993, littlewood2000} proved that independently developed software versions do not fail independently, because some inputs are inherently difficult. Their result adapts directly to LLM judge-producer pairs: if producer and judge failure probabilities both increase with difficulty, then $P(\text{defect produced and missed}) > P(\text{produced}) \cdot P(\text{missed})$.
+
+\begin{proposition}[Correlated Judge-Producer Errors]
+\label{prop:fkg}
+Under the FKG inequality, if the producer's failure event and the judge's failure event are positively correlated (both more likely for similar inputs), then:
+\begin{equation}
+    P(\text{both miss defect}) \geq P(\text{producer misses}) \cdot P(\text{judge misses})
+\end{equation}
+The independence assumption \emph{underestimates} the probability of undetected defects.
+\end{proposition}
+
+This result formalizes why LLM-as-Judge systems using the same model family as the code producer underperform expectations. The \emph{diversity gain} from cross-model judging (using judge $M_J^B$ from a different vendor than producer $M_P^A$) versus same-model judging ($M_J^A$) is:
+\begin{equation}
+\Delta_{\mathrm{div}} = P_{\mathrm{esc}}^{A \text{ judges } A} - P_{\mathrm{esc}}^{B \text{ judges } A}
+\end{equation}
+This gain has two components: the detection rate difference ($d_J^B$ versus $d_J^A$) and the correlation reduction ($\rho_{AB} < \rho_{AA}$). Even at equal detection rates, diversity gain is positive whenever $\rho_{AB} < \rho_{AA}$.
+
+Empirically, diverse techniques can achieve effectiveness \emph{greater} than the independence assumption predicts (positive diversity gain), while same-technique repetitions underperform it \citep{littlewood2000}.
+
+\subsection{Optimal Layer Ordering}
+
+\begin{theorem}[ROI Ordering]
+\label{thm:roi-ordering}
+Under independence, when layers form a cascade (resolved items skip subsequent layers), cost-optimal ordering sorts by decreasing $r_\ell / c_\ell$, where $r_\ell$ is the resolution rate.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Pairwise exchange argument (Smith's rule): swapping adjacent layers $\ell_a, \ell_b$ shows the ordering $\ell_a$ before $\ell_b$ is cheaper iff $r_a / c_a > r_b / c_b$.
+\end{proof}
+
+Under positive correlation, ROI ordering can be suboptimal. The marginal value of a layer depends more on its independence from existing layers than on its absolute detection rate.
+
+\subsection{The Turing Enforcement Principle}
+
+Rice's theorem establishes that for any non-trivial semantic property $P$ of programs (depending on input-output behavior, not syntactic form), the set $\{e : \phi_e \in P\}$ is undecidable. This motivates a fundamental enforcement gap:
+
+\begin{theorem}[Enforcement Gap]
+\label{thm:enforcement-gap}
+For any syntactic property $P_S$, there exists a deterministic enforcer with $P(\text{correct enforcement}) = 1$. For any semantic property $P_U$, every enforcer (including any LLM) satisfies $P(\text{correct enforcement}) < 1$. The gap cannot be closed by prompt engineering alone.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Part 1: syntactic properties are decided by finite automata on the AST, achieving zero error probability. Part 2: an LLM is a fixed-weight transformer with finite training data. Rice's theorem establishes that no algorithm decides $P_U$ for all programs; the practical consequence is that achieving $P = 1$ would require correctly classifying programs from an unbounded space, including those arbitrarily far from the training distribution.
+\end{proof}
+
+The AgentSpec result \citep{wang2026agentspec} provides empirical calibration: 87.26\% enforcement for code-based rules versus 77\% for prompt-based rules. The 10-point gap is the measured enforcement gap.
+
+\subsection{Detection Ceiling via Data Processing Inequality}
+
+\begin{theorem}[Detection Ceiling]
+\label{thm:detection-ceiling}
+For any defense layer $\ell$ with access to observable features $X$ (code text, AST, test results), the detection rate for defect type $j$ satisfies:
+\begin{equation}
+    d_{\ell,j} \leq \frac{I(X; D_j)}{H(D_j)}
+\end{equation}
+where $D_j$ is the binary indicator of defect presence and $I(X; D_j)$ is the mutual information between observable features and defect status. This follows from the Data Processing Inequality.
+\end{theorem}
+
+The Detection Ceiling makes precise the intuition that some defects cannot be reliably detected from code alone. When the mutual information $I(X; D_j)$ is low (because the defect is about intent, not syntax), no amount of analytical sophistication can raise detection above the ceiling. For example, silent scope expansion requires the task description as context; Layer 1 (structural gates) does not observe the task description, so $d_{1,13} \approx 0$.
+
+\subsection{Codebase Entropy and the Accretion Category}
+
+\begin{definition}[Codebase Entropy]
+\label{def:codebase-entropy}
+For a codebase $\mathcal{C}$ of $n$ files, let $\mu(f_i)$ be the minimum set of files a developer must understand to correctly modify $f_i$. The codebase entropy is:
+\begin{equation}
+H(\mathcal{C}) = \frac{1}{n} \sum_{i=1}^{n} \log_2 |\mu(f_i)|
+\end{equation}
+A perfectly modular codebase has $H(\mathcal{C}) = 0$; a fully coupled one has $H(\mathcal{C}) = \log_2 n$.
+\end{definition}
+
+\begin{definition}[Accretion Rate]
+The accretion rate $\alpha(t) = (H(\mathcal{C}_{t+1}) - H(\mathcal{C}_t)) / |\Delta_t|$ measures entropy increase per unit of code change.
+\end{definition}
+
+\begin{theorem}[Compound Degradation]
+\label{thm:compound-degradation}
+A sequence of $n$ individually CI-passing changes, each adding $\Delta H$ bits of entropy (unnecessary complexity, duplicated logic, expanded scope), produces total entropy growth:
+\begin{equation}
+    H_{\text{total}} \geq n \cdot \Delta H + \binom{n}{2} \cdot \Delta H_{\text{cross}}
+\end{equation}
+where $\Delta H_{\text{cross}} \geq 0$ accounts for cross-change interactions. The growth is superlinear when $\Delta H_{\text{cross}} > 0$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Each change adds code without refactoring, increasing both $n$ and coupling degree. The sum telescopes, and the $\log_2 |\mu(f_i)|$ term grows as $\beta \log_2 n$ under the assumption $|\mu(f_i)| \sim n^\beta$ with $0 < \beta < 1$. CI checks are \emph{pointwise} (verifying the current change) but entropy is \emph{global} (depending on cumulative coupling). Pointwise correctness does not imply bounded global entropy.
+\end{proof}
+
+This theorem explains how codebases degrade under AI-generated code even when every individual change passes CI. The degradation is not visible at the per-change level; it accumulates through interactions between changes, manifesting as increasing complexity, decreasing coherence, and rising bug rates.
+
+\subsection{The DRE Cascade Theorem}
+
+\begin{theorem}[DRE Cascade]
+\label{thm:dre-cascade}
+For $L$ independent layers, cumulative Defect Removal Efficiency for type $j$ is:
+\begin{equation}
+D_j = 1 - \prod_{\ell=1}^{L} (1 - d_{\ell,j})
+\end{equation}
+Under a Gaussian copula with correlation matrix $\mathbf{R}$:
+\begin{equation}
+D_j = 1 - C_{\mathbf{R}}(1 - d_{1,j}, \ldots, 1 - d_{L,j})
+\end{equation}
+At correlation $\rho = 1$, the second layer adds nothing ($D = d$). At $\rho = 0$, we recover independence.
+\end{theorem}
+
+Three layers at individually modest rates ($d_1 = 0.3$, $d_2 = 0.75$, $d_3 = 0.5$) yield $D = 1 - (0.7)(0.25)(0.5) = 0.9125$, exceeding 91\% cumulative DRE. Achieving DRE $> 95\%$ requires $\geq 3$ diverse techniques \citep{capersjones2012}. A weak independent detector ($d = 0.3, \rho = 0$) can outperform a strong correlated detector ($d = 0.7, \rho = 0.8$) in marginal DRE improvement.
+
+\subsection{The Accretion Category}
+
+\begin{definition}[Accretion Defect]
+\label{def:accretion}
+An \emph{accretion defect} is a code change that is: (i) functionally correct (all tests pass), (ii) superfluous (there exists a smaller change $\Delta' \subset \Delta$ satisfying the same requirement), (iii) individually defensible (it passes all automated checks and violates no stated standard), and (iv) collectively harmful (cumulative application increases codebase entropy by $\epsilon > 0$ per change).
+\end{definition}
+
+The Accretion Category is absent from all classical defect taxonomies (IEEE 1044, ODC, Beizer, CWE) because all four assume intentional authorship: code results from a human decision that was either correct or incorrect. Accretion arises from statistical pattern completion, which produces code because it is \emph{probable}, not because it is \emph{necessary}. It is the characteristic defect class of AI-generated code, and the primary driver of the GitClear observations (8$\times$ duplication, 60\% refactoring collapse).
+
+Individual accretion detection is undecidable (requires exhibiting a smaller sufficient change, reducing to program equivalence). Aggregate detection is feasible via statistical process control on entropy proxies: accretion rate, refactoring ratio, clone frequency, lines per function point.
+
+\begin{corollary}[Refactoring Ratio Threshold]
+\label{cor:refactoring}
+Let $r$ be the fraction of refactoring changes ($\alpha < 0$) and $(1-r)$ additions ($\alpha > 0$). Equilibrium requires $r \cdot |\mathbb{E}[\alpha | \text{refactoring}]| \geq (1-r) \cdot \mathbb{E}[\alpha | \text{addition}]$. GitClear data indicates the pre-AI equilibrium at $r \approx 0.24$; the post-AI state at $r \approx 0.095$ violates the bound by approximately 2.5$\times$.
+\end{corollary}
+
+\subsection{Cost-of-Quality Model}
+
+The Quality pillar develops a cost-of-quality model following the Juran tradition:
+
+\begin{equation}
+    \text{CoQ} = C_{\text{prevention}} + C_{\text{appraisal}} + C_{\text{internal failure}} + C_{\text{external failure}}
+\end{equation}
+
+The classical 1:10:100 ratio (prevention to internal failure to external failure) requires recalibration by decidability class:
+
+\begin{itemize}
+\item \textbf{Decidable types:} approximately 1:3:100. Detection is cheap (automated at the appraisal stage); production costs remain high.
+\item \textbf{Semi-decidable types:} approximately 1:15:100. Appraisal requires LLM or human review.
+\item \textbf{Undecidable types:} approximately 1:50:30. Appraisal is expensive (deep expert review); but production cost is \emph{lower} because these degrade maintainability, not availability.
+\end{itemize}
+
+For Undecidable types, appraisal cost can exceed discounted external failure cost. It is sometimes economically rational to \emph{accept} these defects.
+
+\begin{theorem}[Optimal Quality Level]
+\label{thm:optquality}
+With defect rate $\lambda(q) = \lambda_0 e^{-\beta q}$, the optimal quality investment is:
+\begin{equation}
+q^* = \frac{1}{\beta} \ln\!\left(\frac{c_F \cdot \lambda_0 \cdot \beta}{c_P + c_A}\right)
+\end{equation}
+where $c_F$ is failure cost and $c_P + c_A$ is marginal prevention/appraisal cost.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Total cost $\text{CoQ}(q) = (c_P + c_A) \cdot q + c_F \cdot \lambda_0 e^{-\beta q}$. Differentiating and setting to zero: $(c_P + c_A) = c_F \cdot \lambda_0 \cdot \beta \cdot e^{-\beta q^*}$. Solving for $q^*$ yields the stated expression. The second derivative is positive, confirming a minimum.
+\end{proof}
+
+This gives context-dependent quality targeting: $q^* \approx 1$ for security-critical production code ($c_F$ high), $q^* \approx 0.7$ for internal tools ($c_F$ moderate, Layers 1--2 suffice), $q^* \approx 0.3$ for prototypes ($c_F$ low, Layer 1 only). The appraisal compression problem further constrains the achievable quality: if code generation rate $g$ exceeds appraisal capacity $a$, a fraction $(g-a)/g$ bypasses appraisal entirely. Sonar data (48\% always verify) implies $g/a \approx 2$ on average; roughly half of AI code receives no appraisal \citep{sonar2026}. The quality stack's ordering is not merely cost optimization; it is a \emph{throughput constraint}: only automated layers (1--2) can match AI generation speed.
+
+
+% ====================================================================
+% 8. THE GOVERNANCE PILLAR (EXPANDED)
+% ====================================================================
+\section{The Governance Pillar}
+\label{sec:governance}
+
+The Governance pillar \citep{pillar-governance} addresses the system-level problem: how do you maintain architectural coherence when AI agents modify codebases faster than humans can evaluate the implications?
+
+\subsection{Theory Loss as Rate-Distortion}
+
+Following \citet{naur1985}, a \emph{program theory} $T$ is the totality of a developer's understanding: the mapping from problem domain to code, design rationale, rejected alternatives, and the causal model of change propagation. The Governance pillar formalizes theory externalization as a rate-distortion problem:
+
+\begin{theorem}[Theory Externalization Bound]
+\label{thm:theory-loss}
+The minimum description length of a program theory $T$ under distortion constraint $D$ satisfies:
+\begin{equation}
+    R(D) = \min_{p(\hat{T}|T): \mathbb{E}[d(T,\hat{T})] \leq D} I(T; \hat{T})
+\end{equation}
+where $\hat{T}$ is the externalized representation (documentation, ADRs, comments) and $d(T, \hat{T})$ is a distortion measure.
+\end{theorem}
+
+\begin{conjecture}[Tacit Divergence]
+\label{conj:tacit}
+Decompose the program theory as $T = (T_{\mathrm{explicit}}, T_{\mathrm{tacit}})$. For the tacit component:
+\begin{equation}
+    \lim_{D \to 0} R_{\mathrm{tacit}}(D) = \infty
+\end{equation}
+with $R_{\mathrm{tacit}}(D) = \Omega(\log(1/D))$ as $D \to 0$. In contrast, $R_{\mathrm{explicit}}(D)$ remains finite for all $D \geq 0$.
+\end{conjecture}
+
+If the Tacit Divergence Conjecture holds, then no governance scheme can fully externalize program theory. Some knowledge will always be lost when the original developers (human or AI) are no longer involved. This is a fundamental limitation, not an engineering challenge to be solved.
+
+\subsection{Collins's Tacit Knowledge Taxonomy}
+
+\citet{collins2010} advances beyond \citet{polanyi1966} by taxonomizing tacit knowledge into three types with distinct externalization properties:
+
+\begin{center}
+\begin{tabular}{lp{5cm}p{5cm}}
+\toprule
+Type & What Governance Can Capture & What Resists Capture \\
+\midrule
+RTK (Relational) & Decision context, rationale, rejected alternatives, advice received & Obvious-to-the-writer context \\
+STK (Somatic) & Checklists, review heuristics, examples (lossy) & Debugging intuition, code quality ``smell'' \\
+CTK (Collective) & (Nothing) & Team norms, ``good enough'' thresholds \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Relational tacit knowledge (RTK) is knowledge that \emph{could} be made explicit but has not been, due to social contingency; ADRs and governance tools operate effectively here. Somatic tacit knowledge (STK) resides in embodied practice, partially capturable through instrumentation but not transmissible through text. Collective tacit knowledge (CTK) is ``embodied in society,'' acquired only through enculturation, and resistant to externalization by any known means.
+
+The Dreyfus model adds a further constraint: expert knowledge is specifically \emph{less} amenable to externalization than novice knowledge. The more expert a practitioner, the more their knowledge resides in pattern recognition that resists decomposition into rules. AI agents operating at the ``competent'' level of the Dreyfus hierarchy lack the intuitive, holistic perception of proficient and expert practitioners.
+
+\subsection{The False Confidence Problem}
+
+If \citet{naur1985} is correct, then any governance artifact (THEORY.md, structured ADRs, extracted decision logs) is a lossy compression. The map-territory problem applies: documentation is a map, not the territory. The risk: a team possessing documentation may believe it understands the system's theory when it actually possesses only a compressed, lossy representation. This could be worse than having no documentation, because no documentation produces appropriate humility (``we don't know why this is here''), while lossy documentation produces false confidence (``THEORY.md says it's for X, so we'll change it accordingly'').
+
+However, this argument has practical limits. Lossy compression is still enormously useful (JPEG images demonstrate this). Documentation with explicit uncertainty markers (``confidence: medium,'' ``last validated: 2025-03'') addresses the false confidence risk.
+
+\subsection{The Double Bottleneck Theorem}
+
+AI coding agents produce verbose execution logs $L$ (often 100K+ tokens). A governance system must extract structured knowledge $(D, A, R)$ (decisions, assumptions, rejected alternatives). This forms a Markov chain: $T \to L \to (D, A, R) \to G$, where $G$ represents governance actions.
+
+\begin{theorem}[Double Bottleneck]
+\label{thm:double-bottleneck}
+By the data processing inequality, applied twice:
+\begin{equation}
+    I(T; G) \leq I(T; (D, A, R)) \leq I(T; L)
+\end{equation}
+Each stage of the governance pipeline loses information. Governance fidelity is bounded above by log richness.
+\end{theorem}
+
+\begin{corollary}[Log Richness Lower Bound]
+For governance to achieve fidelity $I(T; G) \geq F_{\min}$, the agent log must satisfy $I(T; L) \geq F_{\min}$. Terse logs impose an upper bound on governance fidelity regardless of extraction sophistication.
+\end{corollary}
+
+\subsection{The Governance Capacity Bound}
+
+\begin{proposition}[Governance Capacity Principle]
+\label{thm:governance-capacity}
+Let $R_{\text{drift}}$ be the rate at which architectural drift is injected (bits per time unit) and $C_{\text{gov}}$ the governance channel capacity (bits per time unit the governance system can process and correct). Then:
+\begin{enumerate}
+    \item If $R_{\text{drift}} < C_{\text{gov}}$, there exists a governance coding scheme (combination of reviews, tests, policies, automated checks) maintaining architectural coherence with arbitrarily small residual drift.
+    \item If $R_{\text{drift}} > C_{\text{gov}}$, \textbf{no governance scheme} can prevent architectural drift from growing without bound.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+By structural analogy to Shannon's noisy channel coding theorem. Part (1): when drift rate is below capacity, governance corrections can be encoded with sufficient redundancy. The ``coding scheme'' corresponds to layered governance (linting catches syntactic drift, CI tests catch behavioral drift, human review catches semantic drift, ADRs catch strategic drift). Part (2): by the converse of the channel coding theorem, when drift rate exceeds capacity, governance failure probability is bounded away from zero.
+\end{proof}
+
+\begin{remark}
+This result is framed as a \emph{structural analogy} to Shannon's noisy channel coding theorem, not a direct application. Shannon's theorem requires a precisely defined channel with stationary transition probabilities and a finite input alphabet; the ``governance channel'' lacks these properties in the strict sense. The principle's value is in design guidance: it formalizes the intuition that governance systems have finite corrective bandwidth, that this bandwidth is measurable in principle, and that exceeding it produces qualitatively different (unbounded) behavior.
+\end{remark}
+
+For a layered governance system with $L$ independent layers, the combined capacity satisfies $C_{\text{gov}} \leq \sum_{\ell=1}^{L} C_\ell$, with equality when layers operate on non-overlapping aspects. When AI agents increase the modification rate $\lambda$ while $C_{\text{gov}}$ remains constant (human review bandwidth is fixed), the condition $R_{\text{drift}} > C_{\text{gov}}$ is eventually satisfied. Automated governance layers (fitness functions, architectural tests, invariant checkers) are therefore \emph{necessary}, not merely convenient.
+
+\subsection{Multi-Granularity Governance as Cascade Control}
+
+The Governance pillar models the governance system as a cascade control system with three loops:
+
+\begin{enumerate}
+    \item \textbf{Inner loop} (synchronous, per-generation): validates each code generation against syntax rules, linting constraints, and file-ownership invariants. Sampling period $T_1$ (fastest). Bandwidth: high.
+    \item \textbf{Middle loop} (asynchronous, per-phase): runs compliance audits, reflexion model checks, and contract verification at phase boundaries. Sampling period $T_2 \gg T_1$. Bandwidth: moderate.
+    \item \textbf{Outer loop} (deliberative, per-milestone): performs ATAM tradeoff analysis, strategic alignment review, and ADR lifecycle management. Sampling period $T_3 \gg T_2$. Bandwidth: low.
+\end{enumerate}
+
+Let $D(z)$ denote drift introduced by agent-generated code. Each loop has controller $C_k(z)$ and plant $P_k(z)$. The inner loop's closed-loop transfer function is:
+\begin{equation}
+    G_{\mathrm{inner}}(z) = \frac{C_1(z) P_1(z)}{1 + C_1(z) P_1(z)}
+\end{equation}
+Each outer loop treats the inner loop's output as its plant.
+
+\begin{theorem}[Cascade Governance Stability]
+\label{thm:cascade-stability}
+The three-loop system is stable if and only if:
+\begin{enumerate}
+    \item Each loop is individually stable (all poles of $G_k(z)$ lie within the unit circle).
+    \item Bandwidth separation holds: $\omega_{\mathrm{bw},1} > \omega_{\mathrm{bw},2} > \omega_{\mathrm{bw},3}$.
+    \item Each outer loop treats the inner as approximately unity gain within its bandwidth.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Condition (1) follows from BIBO stability of discrete-time systems. Condition (2) ensures frequency-domain decoupling; without it, outer loop corrections feed into the inner loop's operating range, creating destructive interference. Condition (3) ensures the outer loop's model of the inner loop is accurate within its bandwidth. Under these conditions, the combined characteristic polynomial factors approximately into three independent polynomials.
+\end{proof}
+
+Classical cascade control requires a 3:1 to 5:1 bandwidth ratio between adjacent loops. If the inner loop checks every generation (seconds), the middle loop should operate on minutes-to-hours timescales, and the outer loop on days-to-weeks.
+
+\subsection{Nyquist Sampling Requirements}
+
+Let $\omega_d^{(k)}$ be the maximum frequency of architectural drift relevant to loop $k$. Each governance loop must sample at:
+\begin{equation}
+    f_k \geq 2\omega_d^{(k)}
+\end{equation}
+
+Concrete rate calculations illustrate the constraint. If an AI agent produces 50 code generations per hour, the inner loop must sample at least 100 events per hour to capture per-generation violations. If emergent drift (coupling growth, convention erosion) manifests on a per-PR timescale and a team merges 10 PRs per day, the middle loop requires at least 20 audit events per day. If strategic misalignment accumulates over weeks, the outer loop requires review at least every 3.5 days to satisfy the Nyquist condition.
+
+If the outer loop samples too slowly, it aliases gradual architectural erosion as apparent stability, missing drift until it becomes catastrophic. When AI agents increase the disturbance frequency (more changes per unit time), the sampling rate of each loop must increase accordingly, or the loop becomes unstable.
+
+\subsection{The Governance Bifurcation}
+
+Define architectural coherence $C(t) \in [0,1]$ as a scalar conformance measure. The dynamics are:
+\begin{equation}
+    \frac{dC}{dt} = \mu \cdot G(t) \cdot (1 - C)^\beta - \gamma \cdot R(t) \cdot (1 - C)
+\end{equation}
+where $G(t)$ is governance intervention rate, $R(t)$ is agent generation rate, $\mu$ is governance effectiveness, $\gamma$ is agent drift propensity (using $\gamma$ for drift propensity, not $\delta_a$, to avoid overloading the relaxation operator symbol), and $\beta > 1$ captures diminishing governance returns. The asymmetry ($\beta$ in the governance term but not the drift term) reflects the empirical observation that easy violations are caught first while subtle ones require disproportionate effort, whereas drift injection is approximately linear in agent activity.
+
+\begin{theorem}[Governance Bifurcation]
+\label{thm:bifurcation}
+The system undergoes a transcritical bifurcation at $\mu G / \gamma R = 1$:
+\begin{itemize}
+    \item \textbf{Supercritical} ($\mu G > \gamma R$): a stable interior fixed point at $C^* = 1 - (\gamma R / \mu G)^{1/(\beta-1)} > 0$. The system self-corrects.
+    \item \textbf{Subcritical} ($\mu G < \gamma R$): the only stable fixed point is $C^* = 0$ (total coherence collapse).
+\end{itemize}
+Near the bifurcation, recovery time diverges (critical slowing down), and small perturbations in $R(t)$ cause qualitative regime changes.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Setting $dC/dt = 0$ and factoring yields $(1 - C)[\mu G (1 - C)^{\beta - 1} - \gamma R] = 0$. The trivial fixed point $C = 1$ is always present but unstable for $\beta > 1$. The interior fixed point $C^* = 1 - (\gamma R / \mu G)^{1/(\beta - 1)}$ exists only when $\mu G > \gamma R$. When $\mu G < \gamma R$, the drift term dominates everywhere in $(0, 1)$, driving coherence to zero. Linearization around the interior fixed point shows it exchanges stability with the $C = 0$ fixed point exactly at $\mu G / \gamma R = 1$, the hallmark of a transcritical bifurcation.
+\end{proof}
+
+The phase portrait has two regimes separated by a sharp transition. In the supercritical regime, perturbations away from $C^*$ are corrected by governance feedback. In the subcritical regime, coherence degrades monotonically. With $\beta > 1$, the equilibrium coherence is always strictly less than 1: perfect conformance is asymptotically unattainable, though the gap shrinks as $G/R$ increases.
+
+\subsection{The Ratchet Lattice}
+
+Let $\mathcal{L} = (2^{\mathcal{R}}, \subseteq)$ be the power-set lattice over a universe of governance rules $\mathcal{R}$. A governance state at time $t$ is an element $S_t \in \mathcal{L}$.
+
+\begin{definition}[Governance Ratchet]
+\label{def:ratchet}
+A ratchet is a closure operator $\rho: \mathcal{L} \to \mathcal{L}$ on the constraint lattice $\mathcal{L}$, satisfying: (i) extensiveness: $S \subseteq \rho(S)$ (rules are only added); (ii) monotonicity: $S \subseteq S' \implies \rho(S) \subseteq \rho(S')$; (iii) idempotence: $\rho(\rho(S)) = \rho(S)$.
+\end{definition}
+
+The ADR acceptance workflow is literally a closure operation: accepting a decision adds constraints, those constraints may force additional constraints (transitive closure), and the result is stable under re-application.
+
+\begin{theorem}[Ratchet Convergence]
+\label{thm:ratchet-convergence}
+Let $\rho$ be a governance ratchet on a finite rule universe $\mathcal{R}$. The sequence $S_0, S_1 = \rho(S_0), S_2 = \rho(S_1), \ldots$ converges to a fixed point $S^* = \rho(S^*)$ in at most $|\mathcal{R}|$ steps.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By extensiveness, $S_t \subseteq S_{t+1}$, so the sequence is monotonically non-decreasing. Since $\mathcal{R}$ is finite, $\mathcal{L}$ has finite height $|\mathcal{R}|$. A monotone chain of finite height stabilizes. Alternatively, by the Knaster-Tarski theorem, every monotone operator on a complete lattice has a least fixed point.
+\end{proof}
+
+\begin{theorem}[Ossification Risk]
+\label{thm:ossification}
+If $\mathcal{R}$ contains contradictory rules ($\exists\, r_1, r_2 \in \mathcal{R}$ with no code satisfying both) and the ratchet is purely additive, then any trajectory including both $r_1$ and $r_2$ produces an ossified state (where $\mathrm{Allowed}(S) = \emptyset$).
+\end{theorem}
+
+\begin{proof}
+By extensiveness, once $r_1 \in S_t$ and $r_2 \in S_{t'}$, both persist in all subsequent states. If $r_1 \wedge r_2$ is unsatisfiable, $\mathrm{Allowed}(S) = \emptyset$.
+\end{proof}
+
+\subsection{Controlled Relaxation with Evidence Expiry}
+
+The ossification theorem provides formal justification for relaxation mechanisms. Define a relaxation operator $\delta: \mathcal{L} \to \mathcal{L}$ with $\delta(S) \subseteq S$. The combined governance operator is:
+\begin{equation}
+    \Gamma(S) = \rho(S \setminus \delta(S))
+\end{equation}
+First remove expired or superseded rules via $\delta$, then apply the ratchet closure $\rho$. Relaxation may be triggered by evidence expiry (a rule's justifying evidence has a validity window), decision supersession (a newer ADR replaces an older one), or explicit deprecation.
+
+\begin{theorem}[Controlled Descent]
+If $\delta$ removes only rules whose justifying evidence has expired, and $\rho$ re-derives still-justified consequences, then $\Gamma$ produces states that are both internally consistent and evidence-backed.
+\end{theorem}
+
+The evidence expiry window for each rule should be proportional to its domain-specific median lifetime, connecting the ratchet to the survival analysis below.
+
+\subsection{Decision Survival Analysis with Competing Risks}
+
+Architectural decisions have finite lifetimes. The survival function is $S(t) = P(\text{decision valid at time } t) = \exp\left(-\int_0^t h(u) \, du\right)$ where $h(u)$ is the hazard function. Decisions fail for multiple independent reasons. Let $K$ index competing risks:
+
+\begin{center}
+\begin{tabular}{clp{7cm}}
+\toprule
+$k$ & Risk Type & Description \\
+\midrule
+1 & Technology obsolescence & Chosen technology superseded \\
+2 & Requirement change & Business requirements shift \\
+3 & Evidence expiry & Justifying data becomes stale \\
+4 & Organizational change & Team structure or strategy shifts \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The cause-specific hazard for risk $k$ is:
+\begin{equation}
+    h_k(t) = \lim_{\Delta t \to 0} \frac{P(t \leq T_d < t + \Delta t, \; K_d = k \mid T_d \geq t)}{\Delta t}
+\end{equation}
+with overall hazard $h(t) = \sum_k h_k(t)$. The cumulative incidence function is:
+\begin{equation}
+    F_k(t) = \int_0^t h_k(u) \exp\!\left(-\int_0^u h(\tau)\, d\tau\right) du
+\end{equation}
+
+Empirically calibrated decay rates (using Weibull hazard $h(t) = (k/\lambda)(t/\lambda)^{k-1}$ with shape $k$ and scale $\lambda$):
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+Decision Domain & Dominant Risk & Weibull $\alpha$ & Scale $\lambda$ (mo.) & Median Life \\
+\midrule
+Frontend framework & $k=1$ & 1.5--2.5 & 2--5 & 1--4 mo. \\
+API contract & $k=2$ & 1.2--1.8 & 5--12 & 3--9 mo. \\
+Database schema & $k=3$ & 1.0--1.4 & 18--36 & 12--36 mo. \\
+Security policy & $k=4$ & 0.8--1.2 & 12--24 & 8--18 mo. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These parameter ranges are \emph{illustrative estimates} derived from practitioner experience and ecosystem churn rates. No controlled longitudinal study of decision decay rates exists. The qualitative ordering (frontend decisions decay fastest; database decisions are most durable) is better supported than the specific numerical values.
+
+\subsection{The Theory Preservation Problem}
+
+The Governance pillar identifies the \emph{theory preservation problem} as fundamentally open: how do you preserve program theory across agent generations, context window boundaries, and team transitions? This is not merely a documentation problem. Documentation captures the explicit component of theory; the tacit component (Naur's ``direct, intuitive knowledge,'' Polanyi's personal knowledge, Collins's mimeomorphic actions) resists formalization.
+
+When AI generates a substantial fraction of code, a new failure mode appears: \emph{theoretically orphaned implementations}, code for which the theory was never in anyone's head. Current approaches (Architecture Decision Records, ARCHITECTURE.md, embedded comments, convention-by-example) are partial solutions. Each captures some explicit knowledge; none captures tacit knowledge. The theory preservation problem is the long-term challenge that will determine whether AI-assisted software development produces maintainable systems or disposable ones.

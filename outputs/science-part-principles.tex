@@ -1,0 +1,57 @@
+\section{Design Principles}
+\label{sec:principles}
+
+The following 10 principles synthesize the design implications of all seven pillars. Each principle is grounded in specific formal results and empirical evidence.
+
+\begin{enumerate}[label=\textbf{P\arabic*.}, leftmargin=3em]
+
+\item \textbf{Budget Context, Do Not Maximize It.}
+\emph{Source: Information pillar, Theorem~\ref{thm:context-budget}.}
+The optimal context size is strictly less than window capacity. Overfilling the context window degrades performance through the degradation function $\delta(|C|)$. Design context selection as an optimization problem, not a packing problem.
+
+\item \textbf{Enforce Structurally What Must Hold Invariantly.}
+\emph{Source: Information, Reliability, Quality, Coordination pillars.}
+Structural enforcement achieves compliance probability 1; instructional enforcement achieves $(1-\epsilon)^T$, which decays exponentially with pipeline length. Every critical invariant (file ownership, type safety, format constraints, security policies) should be enforced through mechanisms the agent cannot circumvent.
+
+\item \textbf{Invest in Per-Step Quality, Not Pipeline Sophistication.}
+\emph{Source: Reliability pillar, Theorem~\ref{thm:compound-sensitivity}.}
+Compound error sensitivity has elasticity $n$: a 1\% improvement in per-step quality yields an $n$\% improvement end-to-end. This makes per-step quality the highest-leverage investment in any multi-step pipeline.
+
+\item \textbf{Verify with Independent Methods, Not Self-Assessment.}
+\emph{Source: Reliability (circular validation bias), Quality (FKG inequality).}
+Same-model verification provides zero bias reduction on shared blind spots. Verification effectiveness requires independence: different model families, different analysis methods, or structural (non-LLM) verification.
+
+\item \textbf{Scale Agents to $n^* \approx 1/\sqrt{\delta_a}$, Not Beyond.}
+\emph{Source: Coordination pillar, Theorem~\ref{thm:extended-amdahl}.}
+Beyond the optimal agent count, adding agents decreases effective throughput due to the reliability factor $(1-\delta_a)^n$. Use Quality-Adjusted Speedup, not raw speedup, to evaluate parallelism decisions.
+
+\item \textbf{Decompose Tasks Along Low-Coupling Boundaries.}
+\emph{Source: Coordination pillar, Proposition~\ref{prop:cut-conflict}.}
+Task decomposition is not arbitrary; it should follow the coupling structure of the codebase. Balanced min-cut on the coupling graph minimizes merge conflicts and coordination overhead. File-ownership contracts reduce conflict growth from $O(k^2)$ to $O(k)$.
+
+\item \textbf{Match Verification Intensity to Risk.}
+\emph{Source: Reliability pillar (adaptive verification), Quality pillar (decidability classes).}
+Not all code changes require the same verification investment. High-risk changes (security-critical, cross-module, novel logic) warrant full four-layer verification. Low-risk changes (formatting, documentation, well-tested patterns) warrant Layer 1 only. The switching threshold depends on expected failure cost and information gap.
+
+\item \textbf{Design Governance for the Velocity of Change.}
+\emph{Source: Governance pillar, Theorem~\ref{thm:governance-capacity}.}
+When AI agents increase change velocity, governance capacity must increase proportionally. The governance capacity bound is absolute: if drift rate exceeds governance capacity, divergence is unbounded regardless of governance sophistication. Governance investment must scale with agent throughput.
+
+\item \textbf{Optimize for VIH, Not Raw Speed.}
+\emph{Source: Temporal pillar, Proposition~\ref{prop:vih-optimal}.}
+Verified Iterations per Hour, not raw iterations per hour, is the metric that predicts effective throughput. Skipping verification to go faster is VIH-negative when the resulting quality penalty compounds across iterations.
+
+\item \textbf{Treat the Abstraction Gap as a Budget.}
+\emph{Source: Abstraction pillar (Spec-Code Convergence), Information pillar (gap decomposition).}
+The information needed to bridge the abstraction gap must come from somewhere: specification, context, or model prior. Design the harness to make this budget explicit. When the gap exceeds the sum of these three sources, the task should be decomposed or the specification enriched, not attempted with insufficient information.
+
+\item \textbf{Detect Accretion, Not Just Defects.}
+\emph{Source: Quality pillar (Accretion Category, Compound Degradation Theorem).}
+Classical defect detection focuses on code that is wrong. AI-generated code introduces a novel failure mode: code that is correct, unnecessary, individually defensible, and collectively harmful. Accretion passes all automated checks and code review, yet degrades codebase health through superlinear entropy growth. Harnesses should track structural metrics (duplication rates, abstraction depth, dependency fan-out) over time, not just per-change correctness.
+
+\end{enumerate}
+
+
+% ====================================================================
+% 12. LIMITATIONS AND OPEN PROBLEMS
+% ====================================================================

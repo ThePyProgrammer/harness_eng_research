@@ -1,0 +1,177 @@
+% ====================================================================
+% SECTION 11: DESIGN PRINCIPLES (EXPANDED)
+% Replaces Section 11 of science.tex entirely.
+% ====================================================================
+\section{Design Principles}
+\label{sec:principles}
+
+The following principles synthesize the design implications of all seven pillars, organized by implementation effort. Each principle is grounded in specific formal results and traces to one or more source pillars. Principles are deduplicated across sub-papers; where multiple pillars motivate the same principle, all sources are listed.
+
+% --------------------------------------------------------------------
+\subsection{Tier 1: Immediately Actionable}
+\label{sec:tier1}
+
+These principles can be implemented within a single sprint by a team with an existing harness.
+
+\begin{enumerate}[label=\textbf{P\arabic*.}, leftmargin=3em]
+
+\item \textbf{Budget Context, Do Not Maximize It.}
+\emph{Source: Information. Grounding: Context Budget Theorem (Thm.~\ref{thm:context-budget}).}
+The optimal context size is $0.15W$ to $0.40W$, strictly less than window capacity. Every token added must justify its inclusion against the attention dilution cost. Design context selection as an optimization problem, not a packing problem.
+
+\item \textbf{Place High-Value Items at Context Boundaries.}
+\emph{Source: Information. Grounding: U-shaped positional recall (Prop.~\ref{prop:position-dominance}).}
+Position dominates relevance by approximately $1.18\times$. The rearrangement inequality dictates placing highest-relevance items at the beginning and end of the context window, lowest-relevance items in the middle.
+
+\item \textbf{Classify Before Contextualizing.}
+\emph{Source: Information, Abstraction. Grounding: Bimodal gap observation (\S\ref{sec:bimodal}).}
+The abstraction gap is bimodal. Estimate task novelty before allocating context retrieval effort. Common patterns need project conventions only; novel logic needs aggressive context provision.
+
+\item \textbf{Prefer Fresh Context to Managed Accumulation.}
+\emph{Source: Information, Temporal. Grounding: Fresh Context Dominance (Thm.~\ref{thm:fresh-context}).}
+Fresh context dominates for diverse task sequences. When sessions exceed 35 minutes or 50K tokens, accumulated degradation outweighs continuity benefits. Checkpoint and restart with curated summaries.
+
+\item \textbf{Fix the Weakest Link First.}
+\emph{Source: Reliability. Grounding: Weakest-Link Priority (Cor.~\ref{cor:weakest-link}).}
+The step with the lowest $p_i$ offers the highest marginal return on improvement. In practice, this is usually problem framing (step 1), not execution.
+
+\item \textbf{Three Verification Rounds, Then Stop.}
+\emph{Source: Reliability. Grounding: Geometric Diminishing Returns (Thm.~\ref{thm:diminishing}).}
+Empirical convergence at 96.5\% by round 3 establishes a firm verification budget. Rounds 4 and beyond face the pesticide paradox: the remaining errors require different detection approaches, not more of the same.
+
+\item \textbf{Verify at Phase Boundaries, Not at Every Step.}
+\emph{Source: Reliability. Grounding: Optimal Checkpoint Count (Thm.~\ref{thm:checkpoint}).}
+The Young-Daly analog gives the optimal spacing. For typical parameters, this means 2 to 5 verification points in a 20-step pipeline.
+
+\item \textbf{The Verifier Must Be Structurally Read-Only.}
+\emph{Source: Reliability. Grounding: Structural Separation Theorem (\S\ref{sec:structural}).}
+Prompt-level ``do not modify the code'' is insufficient. Tool permissions must enforce read-only access for the verification agent; the filesystem, not the system prompt, is the enforcement mechanism.
+
+\item \textbf{Separate Code Authorship from Test Authorship.}
+\emph{Source: Reliability, Quality. Grounding: Circular Validation Bias (Thm.~\ref{thm:circular-bias}), FKG inequality (Thm.~\ref{thm:fkg}).}
+Self-verification provides zero bias reduction on shared blind spots. Cross-family verification (different model producing tests than code) is where gains concentrate.
+
+\item \textbf{Opacity to the Agent.}
+\emph{Source: Quality. Grounding: METR visibility amplification (43$\times$).}
+Quality gates must be invisible to the producing agent. When the agent can observe which checks will run, reward hacking amplifies by 43$\times$. Run quality checks out-of-band, after generation, with no feedback into the generation prompt about which checks exist.
+
+\item \textbf{Cheap Layers First.}
+\emph{Source: Quality. Grounding: ROI Ordering Theorem (Thm.~\ref{thm:roi-ordering}).}
+Order verification by return on investment. Layer 1 (structural gates) at \$0.50/PR before Layer 4 (human review) at \$80/PR. Each dollar of verification budget should go to the highest-efficiency layer not yet saturated.
+
+\item \textbf{Match Appraisal to Throughput.}
+\emph{Source: Quality, Governance. Grounding: Appraisal Compression Problem (\S\ref{sec:appraisal}).}
+When generation rate exceeds review capacity, only automated layers maintain coverage. Layer 4 (human review) cannot scale to AI generation rates; Layers 1 and 2 can. Design the quality stack so that removing humans from the loop degrades gracefully, not catastrophically.
+
+\item \textbf{Make Logs Rich.}
+\emph{Source: Governance. Grounding: Double Bottleneck Theorem (Thm.~\ref{thm:double-bottleneck}).}
+Governance fidelity is bounded by log richness. Agent logs must externalize decisions, assumptions, and rejected alternatives, not just final code. Without rich logs, downstream governance loops operate on a lossy signal regardless of their sophistication.
+
+\end{enumerate}
+
+% --------------------------------------------------------------------
+\subsection{Tier 2: Requires Investment}
+\label{sec:tier2}
+
+These principles require weeks of engineering work to implement properly (new tooling, infrastructure changes, or process redesign).
+
+\begin{enumerate}[label=\textbf{P\arabic*.}, leftmargin=3em, resume]
+
+\item \textbf{Enforce Structurally What Must Hold Invariantly.}
+\emph{Source: Information, Reliability, Quality, Coordination. Grounding: Structural Enforcement Boundary (\S\ref{sec:structural-enforcement}), Cost-of-Failure Threshold (Thm.~\ref{thm:cost-threshold}).}
+Structural enforcement achieves compliance probability 1; instructional enforcement achieves $(1-\epsilon)^T$, which decays exponentially with pipeline length. Safety-critical constraints (data deletion, financial limits, security boundaries) must be structurally enforced via filesystem permissions, tool restrictions, or output filtering. Prompt enforcement is acceptable only for subjective quality dimensions (naming, style) bounded by structural gates.
+
+\item \textbf{Invest in Per-Step Quality, Not Pipeline Sophistication.}
+\emph{Source: Reliability. Grounding: Compound Error Sensitivity (Thm.~\ref{thm:compound-sensitivity}).}
+Compound error sensitivity has elasticity $n$: a 1\% improvement in per-step quality yields an $n$\% improvement end-to-end. This makes per-step quality the highest-leverage investment in any multi-step pipeline.
+
+\item \textbf{Navigate Structure, Do Not Search Semantics.}
+\emph{Source: Information. Grounding: Reuse Discovery Problem (\S\ref{sec:reuse}), submodularity ratio analysis.}
+For code, traverse the dependency graph rather than searching by embedding similarity. Vector RAG yields 94.7\% irrelevance for code retrieval; structural navigation via AST and dependency graphs preserves the relationships that make code comprehensible. Build structural navigators, not semantic search indices.
+
+\item \textbf{Decompose Tasks Along Low-Coupling Boundaries.}
+\emph{Source: Coordination. Grounding: Cut-Conflict Bridge (Lem.~\ref{lem:cut-conflict}), balanced min-cut formulation.}
+Task decomposition should follow the coupling structure of the codebase. Run graph partitioning (METIS or hypergraph methods) on the coupling graph before dispatching agents. File-ownership contracts reduce conflict growth from $O(k^2)$ to $O(k)$.
+
+\item \textbf{Check Before Scaling.}
+\emph{Source: Coordination. Grounding: Capability Saturation Crossover (Conj.~\ref{conj:saturation}).}
+If single-agent accuracy exceeds the saturation threshold ($P^* \approx 0.45$), do not add agents; invest in improving the single agent instead. Scale agents only to $n^* \approx 1/\sqrt{\delta_a}$; beyond this, adding agents decreases effective throughput due to the reliability factor $(1-\delta_a)^n$.
+
+\item \textbf{Measure Quality-Adjusted Speedup, Not Raw Throughput.}
+\emph{Source: Coordination, Temporal. Grounding: QAS definition (Prop.~\ref{prop:qas-negative}), VIH optimality (Prop.~\ref{prop:vih-optimal}).}
+QAS $< 1$ means parallelism is net-negative. VIH (Verified Iterations per Hour), not raw iterations per hour, predicts effective throughput. Monitor the defect ratio $d(k)/d(1)$ and halt scaling when it exceeds $1/S(k)$.
+
+\item \textbf{Use Contracts to Reduce Conflict Scaling.}
+\emph{Source: Coordination. Grounding: Assume-Guarantee Composition (Thm.~\ref{thm:contract-composition}).}
+File-ownership contracts reduce conflict growth from $O(k^2)$ to $O(k)$. The residual semantic conflicts are bounded by $(1-\gamma) \cdot \rho \cdot \binom{k}{2}$. Every multi-agent deployment should define explicit interface contracts before parallelizing.
+
+\item \textbf{Maintain the Refactoring Ratio.}
+\emph{Source: Quality. Grounding: Refactoring Ratio Threshold (Cor.~\ref{cor:refactoring}).}
+The current 2.5$\times$ violation of the equilibrium condition is the root cause of AI-driven codebase degradation. Any quality architecture must include mechanisms to sustain $r \geq 0.20$ (refactoring as a fraction of total changes). Without this, codebase entropy grows superlinearly regardless of per-change quality.
+
+\item \textbf{Accept What You Cannot Detect.}
+\emph{Source: Quality. Grounding: Detection Ceiling (Thm.~\ref{thm:detection-ceiling}), Turing Enforcement Principle.}
+For Undecidable slop types where appraisal cost exceeds the discounted failure cost, acceptance is the economically rational strategy. Compensate through aggregate health monitoring (entropy proxies, clone frequency, accretion rate) rather than per-instance detection.
+
+\item \textbf{Three Diverse Layers for 95\% DRE.}
+\emph{Source: Quality. Grounding: DRE Cascade, Gaussian copula model (Prop.~\ref{prop:jones}).}
+No single detection technique suffices for 95\% defect removal effectiveness. Correlated pairs underperform independent ones. Deploy at least three diverse detection methods (structural, deterministic analysis, cross-model judgment) to reach the Capers Jones threshold.
+
+\item \textbf{Design Governance for the Velocity of Change.}
+\emph{Source: Governance. Grounding: Governance Capacity Bound (Thm.~\ref{thm:governance-capacity}), Governance Bifurcation (Thm.~\ref{thm:bifurcation}).}
+When AI agents increase change velocity, governance capacity must increase proportionally. Operating near the bifurcation point is fragile: a temporary spike in agent activity can push the system into coherence collapse with hysteresis. Maintain margin above the critical ratio $\mu G / \gamma R = 1$.
+
+\item \textbf{Govern at Three Granularities.}
+\emph{Source: Governance. Grounding: Cascade Governance Stability (Thm.~\ref{thm:cascade-stability}), Nyquist sampling requirements.}
+Synchronous (per-generation) checks prevent individual violations. Asynchronous (per-phase) audits catch emergent drift. Deliberative (per-milestone) reviews address strategic alignment. Adjacent loops should differ by at least 3:1 in sampling rate to avoid destructive interference.
+
+\item \textbf{Track Decision Age, Not Just Decision Content.}
+\emph{Source: Governance. Grounding: Decision Survival Analysis (\S\ref{sec:survival}), Weibull decay model.}
+Decision validity decays with domain-specific half-lives. Governance should proactively surface decisions approaching their expected half-life rather than waiting for violations. Attach evidence-expiry dates to every architectural decision.
+
+\end{enumerate}
+
+% --------------------------------------------------------------------
+\subsection{Tier 3: Aspirational}
+\label{sec:tier3}
+
+These principles require tooling, infrastructure, or organizational capabilities that do not yet exist in most environments, or depend on research results not yet validated.
+
+\begin{enumerate}[label=\textbf{P\arabic*.}, leftmargin=3em, resume]
+
+\item \textbf{Use AI as a Formalism Translator.}
+\emph{Source: Abstraction. Grounding: Spec-Code Convergence (Thm.~\ref{thm:convergence}), Galois connection tower.}
+AI can serve as a translator: accepting natural language intent and producing formal specifications for human review. Reviewing a specification is vastly easier than authoring one from scratch. This shifts the human role from specification author to specification reviewer. The vericoding pattern (human specification, AI implementation, formal verification) already achieves 82\% on Dafny benchmarks.
+
+\item \textbf{Treat the Abstraction Gap as a Budget.}
+\emph{Source: Abstraction, Information. Grounding: Abstraction Gap Decomposition (\S\ref{sec:gap-decomposition}).}
+The information needed to bridge the abstraction gap must come from somewhere: specification, context, or model prior. When the gap exceeds the sum of these three sources, the task should be decomposed or the specification enriched, not attempted with insufficient information.
+
+\item \textbf{Treat the 12.3\% Threshold as a Gate for Persistent State.}
+\emph{Source: Temporal. Grounding: VIH break-even analysis (\S\ref{sec:temporal-calibration}).}
+Any context reuse strategy must demonstrate quality degradation below 12.3\% (the break-even for a 7-minute time saving on a 57-minute cycle) to be VIH-positive. Naive persistent state is VIH-negative; only compacted, curated state survives the threshold test.
+
+\item \textbf{Speculate Conservatively.}
+\emph{Source: Temporal. Grounding: Speculation Ratio Test (Thm.~\ref{thm:speculation}), Speculation Depth Limit (Thm.~\ref{thm:depth}).}
+Use the ratio test ($p/q > R/B$) before speculating. Limit speculation depth to 1 for pipelines with per-stage success probability below 85\%. The Spectre analogy warns that hidden costs (corrupted state, cascading rollbacks) may not surface immediately.
+
+\item \textbf{Detect Accretion, Not Just Defects.}
+\emph{Source: Quality. Grounding: Compound Degradation (Thm.~\ref{thm:compound-degradation}), Accretion Rate definition.}
+AI-generated code introduces a novel failure mode: code that is correct, unnecessary, individually defensible, and collectively harmful. Track structural metrics (duplication rates, abstraction depth, dependency fan-out) over time, not just per-change correctness. Individual accretion is undetectable; aggregate accretion is measurable via entropy proxies.
+
+\item \textbf{Measure Governance, Not Just Architecture.}
+\emph{Source: Governance. Grounding: Governance Capacity Bound (Thm.~\ref{thm:governance-capacity}).}
+Monitor governance response time, escalation frequency, and the ratio $\mu G / \gamma R$. Architectural metrics alone cannot detect governance failure; they can only detect its consequences after the fact. Governance is itself a system that requires observability.
+
+\item \textbf{Close the Ratchet with Evidence Expiry.}
+\emph{Source: Governance. Grounding: Ratchet Convergence (Thm.~\ref{thm:ratchet}), Ossification Risk (Thm.~\ref{thm:ossification}).}
+Every governance rule should have an evidence validity window. The relaxation operator $\delta$ prevents ossification (the state where the set of allowed changes becomes empty under contradictory accumulated rules) while preserving still-valid constraints.
+
+\item \textbf{Accept Residual Theory Loss.}
+\emph{Source: Governance, Abstraction. Grounding: Tacit Divergence Conjecture (Conj.~\ref{conj:tacit}), Theory Preservation Problem.}
+Perfect externalization of program theory is impossible. Design governance to tolerate a non-zero residual, using it as a risk measure. Supplement artifact-based governance with social mechanisms (code review conversations, architecture advice processes) for knowledge that cannot be externalized into any artifact.
+
+\end{enumerate}
+
+\medskip
+\noindent\textbf{Summary.} The 35 principles above subsume and extend the 11 principles of the original synthesis. Tier 1 (P1--P13) can be implemented immediately using existing tooling. Tier 2 (P14--P26) requires engineering investment but uses known techniques. Tier 3 (P27--P35) depends on tooling, organizational capabilities, or validated research results that are not yet widely available. Teams should implement Tier 1 first, then invest in Tier 2 based on measured bottlenecks, and treat Tier 3 as directional guidance for roadmap planning.

@@ -1,0 +1,559 @@
+% ====================================================================
+% 2. THE ABSTRACTION PILLAR (EXPANDED)
+% ====================================================================
+\section{The Abstraction Pillar}
+\label{sec:abstraction}
+
+The Abstraction pillar \citep{pillar-abstraction} addresses the foundational question: \emph{what is the relationship between a specification and the code that implements it?} The answer has direct implications for harness design, because the harness is precisely the mechanism that mediates the translation from specification to code.
+
+\subsection{The Abstraction Gap}
+
+\begin{definition}[Abstraction Gap]
+\label{def:abstraction-gap}
+For a specification $S$ and a target program $P$, the \emph{abstraction gap} is defined as:
+\begin{equation}
+    \mathcal{G}(S, P) = K(P \mid S)
+\end{equation}
+where $K(P \mid S)$ is the conditional Kolmogorov complexity of $P$ given $S$: the length of the shortest program that produces $P$ given $S$ as input.
+\end{definition}
+
+This definition captures an intuitive notion: the abstraction gap measures how much additional information is needed to go from the specification to the implementation. When $S$ is vague (``build me a web app''), $K(P \mid S)$ is large. When $S$ is a complete formal specification, $K(P \mid S)$ approaches zero.
+
+The abstraction gap satisfies four basic properties, each following from standard results in algorithmic information theory \citep{li2019introduction}:
+
+\begin{enumerate}[label=(\alph*)]
+    \item \textbf{Minimality:} $\mathcal{G}(S, P) = O(1)$ if and only if $S$ algorithmically determines $P$. This is immediate from the definition: a constant-length program suffices to produce $P$ from $S$.
+    \item \textbf{Maximality:} $\mathcal{G}(S, P) = K(P) + O(1)$ if and only if $S$ provides no algorithmic information about $P$. This follows because ignoring $S$ is always an option, so $K(P \mid S) \leq K(P) + O(1)$, with equality when the algorithmic mutual information $I(S : P)$ is negligible.
+    \item \textbf{Monotonicity:} If $S \sqsubseteq S'$ in the refinement ordering, then $\mathcal{G}(S', P) \leq \mathcal{G}(S, P) + O(\log n)$, where $n = \max(|S|, |S'|, |P|)$. Under constructive refinement (where a bounded-length computable function maps $S'$ to $S$), the bound tightens to $O(1)$.
+    \item \textbf{Additivity:} For any intermediate representation $S'$, $\mathcal{G}(S, P) \leq \mathcal{G}(S, S') + \mathcal{G}(S', P) + O(\log n)$, by the chain rule for Kolmogorov complexity.
+\end{enumerate}
+
+\begin{remark}
+$K(P \mid S)$ is uncomputable. This is a fundamental limitation of the Kolmogorov formalization. The Information pillar (Section~\ref{sec:information}) operationalizes the gap using Shannon entropy $H(P \mid S)$, which is computable from data. The Kolmogorov formulation remains valuable as a theoretical reference point: it provides clean bounds without distributional assumptions and connects to Solomonoff's theory of algorithmic prediction.
+\end{remark}
+
+\subsection{Normalised Information Distance and Universality}
+
+Following \citet{li2004similarity}, we define the canonical metric on the abstraction spectrum:
+
+\begin{definition}[Abstraction Distance]
+The \emph{abstraction distance} between specification $S$ and program $P$ is the normalised information distance:
+\begin{equation}
+    d(S, P) = \frac{\max(K(S \mid P),\; K(P \mid S))}{\max(K(S),\; K(P))}
+\end{equation}
+\end{definition}
+
+The universality theorem of \citet{li2004similarity} establishes that $d$ is a metric (up to $O(\log n / n)$ terms) and is \emph{universal}: for every computable normalised distance $D: \{0,1\}^* \times \{0,1\}^* \to [0,1]$, we have $d(x, y) \leq D(x, y) + O(1/n)$. This means $d(S, P)$ minorises every other reasonable distance measure between specification and code. The metric takes values in $[0, 1]$: $d \approx 0$ means the specification and code are informationally equivalent; $d \approx 1$ means they share no algorithmic content.
+
+For harness design, universality implies that the normalised information distance is the tightest possible single-number summary of the specification-code relationship. Any domain-specific metric (function point ratios, test coverage gaps, embedding distances) can be no smaller than $d$, making it a useful lower bound even though it is uncomputable.
+
+\subsection{Spec-Code Convergence}
+
+The central theorem of the Abstraction pillar formalizes the thesis of \citet{gonzalez2026spec} that ``a sufficiently detailed spec is code.''
+
+\begin{theorem}[Spec-Code Convergence]
+\label{thm:convergence}
+For an incompressible program $P$ (i.e., $K(P) \geq |P| - O(\log |P|)$), any specification $S$ satisfying $K(P \mid S) \leq c$ for constant $c$ must satisfy:
+\begin{equation}
+    |S| \geq |P| - O(\log |P|)
+\end{equation}
+That is, a specification that closes the abstraction gap for an incompressible program must be approximately as long as the program itself.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By Chaitin's incompleteness theorem \citep{chaitin1966length}, an $N$-bit formal system can determine at most $N + O(1)$ bits of an algorithmically random string. Since $P$ is incompressible, $K(P) \geq |P| - O(1)$. The assumption $K(P \mid S) \leq c$ (constant) implies, via the chain rule, that $K(P) \leq K(S) + K(P \mid S) + O(\log n) \leq K(S) + O(1)$. Therefore $K(S) \geq K(P) - O(1) \geq |P| - O(1)$. Since $K(S) \leq |S| + O(1)$ by definition, we conclude $|S| \geq |P| - O(\log |P|)$.
+\end{proof}
+
+This theorem has a sharp design implication: for complex, novel code (which is approximately incompressible), there is no free lunch. The information must come from somewhere. The harness designer's choice is not whether to provide this information, but \emph{how}: through the specification, through context (codebase files, documentation, examples), or through the model's prior (training data).
+
+\begin{remark}
+The incompressibility assumption is important. Most real programs are highly compressible: \citet{hindle2012naturalness} showed that code has lower entropy than English prose. For compressible programs (the common case), specifications can be dramatically shorter than implementations, and the ``no free lunch'' implication is correspondingly weaker. The theorem's relevance is strongest for novel, domain-specific logic that cannot be predicted from the model's training distribution.
+\end{remark}
+
+\paragraph{A concrete example.} Consider a sorting function: the specification ``sort this list in ascending order'' is a few tokens, while any correct implementation is tens of lines. This works because sorting algorithms are maximally compressible relative to the model's prior (they appear millions of times in training data). Now consider a proprietary pricing algorithm with 47 business rules, exception handling for 12 regional tax regimes, and a legacy discount table. This logic is approximately incompressible relative to the model's prior, and the Spec-Code Convergence Theorem predicts that any specification sufficient to generate it correctly must encode essentially all 47 rules, all 12 regimes, and the full discount table. There is no shortcut.
+
+\subsection{The Shannon Channel Model}
+
+The Abstraction pillar models spec-to-code translation as communication through a noisy channel. The specification $S$ is the message, the program $P$ is the received signal, and the agent (with its model parameters $\theta$ and context $C$) is the channel.
+
+The channel capacity is:
+\begin{equation}
+    \mathcal{C}(\theta, C) = \max_{p(S)} I(S; P)
+\end{equation}
+where the mutual information $I(S; P)$ quantifies how much of the specification's information content survives translation into code. The abstraction gap represents the information lost in transit. When $\mathcal{G}(S, P) > \mathcal{C}(\theta, C)$, the channel cannot faithfully transmit the specification, and the harness must either enrich the context $C$, improve the model $\theta$, or decompose the task into sub-problems whose individual gaps fall within channel capacity.
+
+The relationship between the Kolmogorov framework and the Shannon channel model is complementary. The Kolmogorov formulation ($K(P \mid S)$) is distribution-free and yields the Convergence Theorem, but it is uncomputable. The Shannon formulation ($H(P \mid S)$) is estimable from LLM log-probabilities, the chain rule holds with exact equality (no $O(\log n)$ error terms), and the probabilistic framework fits LLM-mediated translation naturally. For sequences typical according to a source, Kolmogorov complexity is asymptotically close to Shannon code length \citep{vitanyi2004shannon}. We view the Kolmogorov framework as the theoretical ceiling and the Shannon model as the measurable, falsifiable floor.
+
+\subsection{The Refinement Lattice and Galois Connections}
+
+Specifications and programs form a partially ordered set under a refinement relation $\sqsubseteq$, where $S_1 \sqsubseteq S_2$ means ``$S_2$ refines $S_1$'' (is more specific). This partial order forms a complete lattice \citep{back1980correctness, morgan1994programming} with:
+
+\begin{itemize}[nosep]
+    \item $\top = \mathbf{abort}$: establishes no postcondition (maximally abstract; any program satisfies it).
+    \item $\bot = \mathbf{magic}$: establishes every postcondition (impossible perfect program).
+    \item $S_1 \sqcap S_2$ (meet): demonic choice.
+    \item $S_1 \sqcup S_2$ (join): angelic choice.
+\end{itemize}
+
+A concrete, deterministic, feasible program $P$ sits near the bottom of this lattice. ``A sufficiently detailed spec is code'' becomes: sufficiently many refinement steps reach a deterministic, feasible element of the lattice.
+
+\paragraph{The Galois connection tower.} Following \citet{cousot1977abstract}, each level of the abstraction spectrum corresponds to a Galois connection. An \emph{abstraction layer} between concrete domain $(C, \sqsubseteq_C)$ and abstract domain $(A, \sqsubseteq_A)$ is a pair $(\alpha, \gamma)$ where $\alpha: C \to A$ (abstraction) and $\gamma: A \to C$ (concretization) satisfy: $\alpha(c) \sqsubseteq_A a \iff c \sqsubseteq_C \gamma(a)$.
+
+The abstraction spectrum is then a tower of Galois connections:
+\begin{equation}
+    C \rightleftarrows A_1 \rightleftarrows A_2 \rightleftarrows \cdots \rightleftarrows A_n
+\end{equation}
+where $C$ is executable code and $A_n$ approaches natural language. Each layer discards information; the composition $\alpha_n \circ \cdots \circ \alpha_1$ maps code to its most abstract description. Information loss is monotonic: once a Galois connection discards a distinction, no subsequent layer can recover it.
+
+\paragraph{Concrete example.} Consider a web application's authentication module. The tower might look like:
+\begin{itemize}[nosep]
+    \item $A_4$: ``Users can log in'' (natural language, $\sigma \approx 0.1$)
+    \item $A_3$: ``OAuth 2.0 with PKCE, session timeout 30 min'' (architectural spec, $\sigma \approx 0.5$)
+    \item $A_2$: Typed interface with pre/postconditions (contract, $\sigma \approx 0.7$)
+    \item $A_1$: Implementation with concrete cryptographic choices ($\sigma \approx 0.9$)
+    \item $C$: Executable code ($\sigma = 1.0$)
+\end{itemize}
+Each $\alpha$ step from $C$ upward discards implementation detail; each $\gamma$ step downward requires the agent to supply that detail from prior or context. The abstraction gap at each layer measures the information that must be supplied to descend one level.
+
+\subsection{The Curry-Howard-Lambek Bridge}
+
+The Curry-Howard-Lambek correspondence \citep{martinlof1979constructive, wadler2015propositions, lambek1986higher} unifies the refinement lattice with type theory and category theory:
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Logic} & \textbf{Type Theory} & \textbf{Category Theory} \\
+\midrule
+Proposition & Type & Object \\
+Proof & Term (program) & Morphism $1 \to A$ \\
+Implication $A \Rightarrow B$ & Function $A \to B$ & Exponential $B^A$ \\
+$\forall x{:}A.\; B(x)$ & $\Pi(x{:}A).B(x)$ & Right adjoint to pullback \\
+$\exists x{:}A.\; B(x)$ & $\Sigma(x{:}A).B(x)$ & Left adjoint to pullback \\
+Cut elimination & $\beta$-reduction & Composition \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Under this correspondence, a \emph{specification} is a proposition (or type), and an \emph{implementation} is a proof (or term inhabiting that type). Martin-L\"{o}f's intuitionistic type theory \citep{martinlof1979constructive} establishes a structural isomorphism: specifications and implementations inhabit a single formal universe. The gap between them is a gap of \emph{role within a shared structure}, not of mathematical kind. This does not entail that specifications and implementations are interchangeable in practice (no working mathematician treats the statement of a theorem as identical to its proof), but it does mean they are related by a formally precise notion of refinement rather than by an informal analogy.
+
+The connection to the abstraction gap is direct: $K(P \mid S)$ measures the proof complexity of the proposition corresponding to the specification $S$. A specification that is ``hard to implement'' is, in the Curry-Howard reading, a proposition that is ``hard to prove.'' The seL4 microkernel illustrates this vividly: the C implementation is 8,700 lines, but the Isabelle/HOL proof of functional correctness is approximately 200,000 lines. In the $(\sigma, \kappa)$ coordinates defined below, the proof has $\sigma \approx 1.0$ but $\kappa = 0$ (the proof is longer than the program it verifies, providing no compression).
+
+\subsection{The Specificity-Compression Space}
+
+The Abstraction pillar introduces a two-dimensional metric for characterizing positions on the abstraction spectrum:
+
+\begin{definition}[Specificity-Compression Coordinates]
+\label{def:sigma-kappa}
+For any representation $R$ (specification, code, or intermediate form):
+\begin{align}
+    \sigma(R) &= 1 - \frac{K(P \mid R)}{K(P)} \in [0, 1] \quad \text{(specificity)} \\
+    \kappa(R) &= 1 - \frac{|R|}{K(P)} \in (-\infty, 1] \quad \text{(compression)}
+\end{align}
+where $\sigma$ measures how much of the program's information content is captured, and $\kappa$ measures how concisely it is expressed relative to the program's inherent complexity.
+\end{definition}
+
+The Spec-Code Convergence Theorem (Theorem~\ref{thm:convergence}) implies that for incompressible programs, the Pareto frontier in $(\sigma, \kappa)$ space passes through the point $(1, 0)$: full specificity requires approximately zero compression. Natural language specifications occupy the high-$\kappa$, low-$\sigma$ region (concise but ambiguous); executable code occupies the high-$\sigma$, low-$\kappa$ region (specific but verbose).
+
+\paragraph{Thinker placement.} The two-dimensional framework organizes the positions of major thinkers qualitatively. The placements are ordinal estimates based on published positions, not computed quantities:
+
+\begin{center}
+\small
+\begin{tabular}{lccl}
+\toprule
+\textbf{Thinker} & $\hat{\sigma}$ & $\hat{\kappa}$ & \textbf{Framework} \\
+\midrule
+Dijkstra & 0.9--1.0 & 0.0--0.2 & Weakest precondition \\
+Hoare & 0.85--0.9 & 0.2--0.4 & Axiomatic specs $\{P\}S\{Q\}$ \\
+Lamport & 0.75--0.8 & 0.8--0.9 & TLA+ \\
+Knuth & 0.6--0.65 & $\sim$0 & Literate programming (WEB) \\
+Brooks & variable & variable & Essential complexity \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Dijkstra ($\sigma \approx 0.95$, $\kappa \approx 0.1$) demanded maximum specificity at the cost of compression: formal proofs that are as long as (or longer than) the programs they verify. Hoare ($\sigma \approx 0.87$, $\kappa \approx 0.3$) achieved a practical balance through axiomatic triples $\{P\}S\{Q\}$ that are shorter than full proofs but still mechanically checkable. Lamport ($\sigma \approx 0.78$, $\kappa \approx 0.85$) occupies a remarkable position: TLA+ specifications are both concise \emph{and} precise, achieving high compression through mathematical notation while retaining high specificity through model checking. This explains why TLA+ and English have similar lengths for the same system but radically different implementation reliability \citep{newcombe2015amazon}. Knuth ($\sigma \approx 0.63$, $\kappa \approx 0$) pursued literate programming, where the specification \emph{is} the code, interleaved with prose; the result has moderate specificity (the prose adds intent) but zero compression (the artifact is at least as long as the code). Brooks resisted fixed placement, arguing that the appropriate level depends on the essential complexity of the problem.
+
+\subsection{The Uncanny Valley of Specification}
+
+The thinker placements reveal a hypothesis: the range $\sigma \in [0.3, 0.45]$ is sparsely populated, forming an ``uncanny valley'' of specification. Specifications in this zone are formal enough to feel constraining but not formal enough to provide mechanical guarantees. This is the zone of semi-formal notations (UML, most design documents) that are widely criticized as providing the worst of both worlds \citep{jackson2021essence}.
+
+The formal framework offers an explanation: this zone maximizes cognitive cost (the spec requires careful reading) while minimizing verification benefit (the spec cannot be mechanically checked). Below $\sigma \approx 0.3$, natural language is cheap to write and the model's prior fills the gap. Above $\sigma \approx 0.45$, formal methods provide mechanical verification that justifies the authoring cost. Between these bounds, neither advantage obtains. We emphasize that this is a hypothesis derived from ordinal placements, not a measured finding; a controlled study comparing developer productivity across formalism levels would be needed to test it.
+
+The harness designer's challenge is to move the operating point along the Pareto frontier. AI agents shift the frontier itself, enabling higher $\sigma$ at given $\kappa$ by leveraging prior knowledge $\theta$ to fill the gap. The Information pillar quantifies this shift precisely.
+
+
+% ====================================================================
+% 3. THE INFORMATION PILLAR (EXPANDED)
+% ====================================================================
+\section{The Information Pillar}
+\label{sec:information}
+
+The Information pillar \citep{pillar-information} operationalizes the abstraction gap using Shannon entropy and addresses the engineering problem of delivering the right information to the agent at the right time.
+
+\subsection{Context Selection as Submodular Optimization}
+
+Given a codebase of $n$ units $U = \{u_1, \ldots, u_n\}$ with total token size $T \gg W$ (the context window capacity), the context selection problem is:
+
+\begin{equation}
+    C^* = \arg\max_{C \subseteq U,\; |C| \leq W} \; f(C) \cdot (1 - \delta(|C|))
+\end{equation}
+
+where $f(C) = I(C; P \mid S, \theta)$ is the context relevance function (mutual information between context and target program) and $\delta(|C|)$ is the empirically observed degradation function.
+
+\paragraph{Submodularity.} The relevance function $f$ is submodular under mild conditions, meaning it exhibits diminishing returns: adding a codebase unit to a small context set yields more information gain than adding it to a large one.
+
+\begin{proof}[Proof sketch for submodularity]
+Write $f(C) = H(P \mid S, \theta) - H(P \mid S, C, \theta)$. The first term is constant with respect to $C$, so $f$ is submodular if and only if $g(C) = H(P \mid S, C, \theta)$ is supermodular. Supermodularity of $g$ states that for $A \subseteq B \subseteq U$ and $u \notin B$:
+\[
+    g(A \cup \{u\}) - g(A) \leq g(B \cup \{u\}) - g(B)
+\]
+Equivalently, the marginal reduction in entropy from adding $u$ is larger for smaller sets (diminishing returns of information). Sufficient conditions include: (a) conditional independence of codebase units given $(P, S, \theta)$; (b) jointly Gaussian distribution of $(U, P)$ given $(S, \theta)$ \citep{krause2008near}; (c) log-supermodular conditional density $p(P, C \mid S, \theta)$.
+\end{proof}
+
+Under submodularity, the greedy algorithm (repeatedly add the unit with highest marginal gain) achieves a $(1-1/e)$ approximation guarantee for the monotone case.
+
+\paragraph{Code dependencies break submodularity.} When codebase units have strong complementarities (for example, an interface definition $u_i$ and its implementation $u_j$), $f(\{u_i, u_j\}) > f(\{u_i\}) + f(\{u_j\})$, violating the diminishing returns property. In practice, such complementarities are localized within modules while diminishing returns dominate globally. The \emph{submodularity ratio} $\gamma_f$ \citep{das2011submodular} quantifies this: when $\gamma_f < 1$ but bounded away from zero, greedy algorithms achieve a $(1 - e^{-\gamma_f})$ approximation, degrading gracefully rather than catastrophically.
+
+\paragraph{The degradation-adjusted objective.} The product $\tilde{f}(C) = f(C) \cdot (1 - \delta(|C|))$ is \emph{non-monotone}: beyond a certain context size, adding more units decreases overall performance despite their positive information content. This is because the degradation penalty $\delta(|C|)$ grows faster than the marginal information gain. The non-monotone setting requires different algorithmic treatment (randomized greedy or multilinear extension methods) with a $1/2$-approximation guarantee \citep{buchbinder2015tight}.
+
+Empirical evidence from five independent studies \citep{chroma2025contextrot, liu2024lost, du2025context} supports a power-law degradation model $\delta(n) = (n/W_{\text{eff}})^{\alpha_d}$ with $\alpha_d \in [0.3, 0.5]$. The power law captures steep early degradation followed by a flattening tail, fitting observed data better than exponential or sigmoid alternatives.
+
+\subsection{The U-Shaped Positional Recall Function}
+
+\citet{liu2024lost} established that models attend strongly to context boundaries but miss information buried in the middle. We model this as a double-exponential with length-dependent floor:
+
+\begin{equation}
+    \text{recall}(i, n) = \phi_0 \left(\frac{n_0}{n}\right)^{\!\gamma} + A_p \cdot e^{-\lambda_p \cdot i} + A_r \cdot e^{-\lambda_r \cdot (n - i)}
+\end{equation}
+
+where $\phi_0$ is the baseline floor at reference length $n_0$, $\gamma$ controls floor collapse with length, and $(A_p, \lambda_p)$, $(A_r, \lambda_r)$ parameterize primacy and recency effects respectively. Fitting to the 20-document QA data of \citet{liu2024lost}: $\phi_0 = 0.55$, $A_p = 0.20$, $\lambda_p = 0.26$, $A_r = 0.17$, $\lambda_r = 0.15$, $\gamma = 0.23$.
+
+The primacy effect is grounded in the attention sink mechanism: \citet{xiao2024efficient} showed that the first 4 tokens absorb over half the total attention mass regardless of content, with perplexity exploding $955\times$ when they are removed. The practical implication is that context \emph{ordering} matters as much as content: highest-relevance items should be placed at context boundaries (beginning and end), with lowest-relevance items in the middle.
+
+\subsection{The Abstraction Gap Decomposition}
+
+The Information pillar decomposes the abstraction gap using Shannon's chain rule:
+
+\begin{theorem}[Abstraction Gap Decomposition]
+\label{thm:gap-decomposition}
+\begin{equation}
+    H(P \mid S) = \underbrace{H(P \mid S, C, \theta)}_{\text{residual uncertainty}} + \underbrace{I(P; C \mid S, \theta)}_{\text{context contribution}} + \underbrace{I(P; \theta \mid S)}_{\text{prior contribution}}
+\end{equation}
+This decomposition holds with exact equality (no approximation error) and all three terms are estimable from LLM log-probabilities.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Apply the chain rule twice. Step 1: $H(P \mid S) = H(P \mid S, \theta) + I(P; \theta \mid S)$, using $H(X \mid Y) = H(X \mid Y, Z) + I(X; Z \mid Y)$. Step 2: $H(P \mid S, \theta) = H(P \mid S, C, \theta) + I(P; C \mid S, \theta)$, applying the same identity. Substituting step 2 into step 1 yields the result. Each step is an instance of the Shannon chain rule, which holds with exact equality (unlike the Kolmogorov analog, which incurs $O(\log n)$ error terms).
+\end{proof}
+
+The three terms have distinct interpretations and design implications:
+
+\begin{itemize}[nosep]
+    \item \textbf{Residual uncertainty} $H(P \mid S, C, \theta)$: bits the model cannot determine even with context and prior. These are genuinely novel design decisions that require human input or iterative refinement.
+    \item \textbf{Context contribution} $I(P; C \mid S, \theta) = f(C)$: bits the context provides beyond specification and prior. This is what context engineering optimizes.
+    \item \textbf{Prior contribution} $I(P; \theta \mid S)$: bits the model's training data provides. For common patterns, this term dominates.
+\end{itemize}
+
+The decomposition reveals a bimodal structure. For common patterns where the model's training data provides strong priors, $I(P; \theta \mid S)$ dominates and context matters little. For novel logic, the prior term is small, $I(P; C \mid S, \theta)$ dominates, and context selection becomes the critical lever. This bimodality explains why AI agents can generate boilerplate effortlessly but struggle with domain-specific logic: the abstraction gap is not uniform across code types.
+
+Empirical support comes from \citet{gloaguen2026agents}: LLM-generated context files \emph{reduced} success rates by 3\% while increasing costs by 20\%, because for common patterns the prior already supplies the needed information and additional context creates distraction. Human-written files helped only 4\%, and only when existing documentation was sparse.
+
+\subsection{The Context Budget Theorem}
+
+\begin{theorem}[Optimal Context is Sub-Capacity]
+\label{thm:context-budget}
+Under the power-law degradation model, the optimal context size satisfies $|C^*| < W$, with practical estimates of $|C^*| \approx 0.15W$ to $0.40W$ depending on task type.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By contradiction. If $|C^*| = W$, consider removing the unit $u_{\text{last}}$ with smallest marginal information gain from $C^*$. The resulting $C' = C^* \setminus \{u_{\text{last}}\}$ satisfies $\tilde{f}(C') > \tilde{f}(C^*)$ whenever the marginal degradation cost of including $u_{\text{last}}$ exceeds its marginal information gain. Under the marginal exhaustion condition (which holds because $f$ has diminishing returns while $\delta$ is convex and accelerating), this inequality holds at $|C| = W$, contradicting the assumed optimality of $C^*$.
+
+The continuous relaxation yields an elasticity-matching condition at the optimum:
+\[
+    \frac{F'(x^*)}{F(x^*)} = \frac{\delta'(x^*)}{1 - \delta(x^*)}
+\]
+where $F(x) = \max_{C:|C|=x} f(C)$. The relative rate of information gain must equal the relative rate of degradation increase.
+\end{proof}
+
+This result is counterintuitive: more context is not better context. Every frontier model tested by \citet{chroma2025contextrot} (18 models across four providers) exhibited monotonic performance degradation as input length increased. Even whitespace padding (zero semantic content) degrades performance by 13.9\% to 85\% \citep{du2025context}. Context is a scarce resource requiring budgeting, not a bucket to be filled.
+
+For a 200K-token window performing code generation, the optimal context budget is approximately 30K--80K tokens. The remaining capacity is not merely wasted if filled; it is \emph{actively harmful}. This is consistent with JetBrains' finding that removing 52\% of context tokens \emph{improved} performance by 2.6\% \citep{jetbrains2025complexity}.
+
+\subsection{The Context Curation Theorem}
+
+\begin{theorem}[Curation Beats Accumulation]
+\label{thm:curation}
+Let $C_s$ (curated, $|C_s| \ll W$) and $C_l$ (uncurated, $|C_l| \approx W$) be two context configurations with information densities $\rho(C) = \sum v(f_i) / |C|$. The curated configuration delivers higher effective information whenever:
+\begin{equation}
+    \rho(C_s) \cdot |C_s| \cdot (1 - \delta(|C_s|)) > \rho(C_l) \cdot |C_l| \cdot (1 - \delta(|C_l|))
+\end{equation}
+Each additional item must clear a rising inclusion bar: the marginal value must exceed $[\delta(|C| + |\Delta|) - \delta(|C|)] / [1 - \delta(|C| + |\Delta|)] \cdot V_{\text{eff}}(C)$. As $|C|$ grows and $\delta$ steepens, this bar rises rapidly.
+\end{theorem}
+
+This theorem formalizes the principle that a small, carefully selected context outperforms a large, undiscriminating one. It explains the convergence of production harnesses toward minimal always-loaded context: HumanLayer's CLAUDE.md under 60 lines \citep{humanlayer2025skillissue}, OpenAI Codex's AGENTS.md at roughly 100 lines \citep{openai2025codex}.
+
+\subsection{Fresh Context Dominance}
+
+\begin{proposition}[Fresh Context Dominance]
+\label{prop:fresh-context}
+Let $\{S_1, \ldots, S_T\}$ be a task sequence with diversity $d = \mathbb{E}_{i \neq j}[1 - \cos(v_i, v_j)] > 0$. Under accumulated context, relevance density $\rho_t$ decays monotonically: each $\Delta_i$ (context generated for task $S_i$) has high value for $S_i$ but low expected value for subsequent tasks $S_t$ ($t \neq i$), so the numerator $\sum v_t(f_i)$ grows slowly while the denominator $|C_t|$ grows by at least $|\Delta_t|$ per step. Under fresh context, $\rho_t$ is constant (re-selected each time). Fresh context dominates in total effective information for $T > T^* = c_{\text{select}} / \mathbb{E}[\Delta V_t]$.
+\end{proposition}
+
+Production harnesses set $T^* = 1$ in practice: GSD never accumulates, Codex tears down containers per task, and RAPID isolates agents in separate worktrees. This suggests the selection cost $c_{\text{select}}$ is small relative to degradation costs.
+
+\subsection{Three-Tier Information Architecture}
+
+Production harnesses have converged on a three-tier information model:
+
+\begin{enumerate}
+    \item \textbf{Active tier}: always-loaded context (project rules, CLAUDE.md, recent files). Size budget: 5--15\% of $W$.
+    \item \textbf{Searchable tier}: on-demand retrieval via tools (grep, glob, semantic search). Unbounded in principle, but each retrieval consumes tokens from the active budget.
+    \item \textbf{Hidden tier}: permanently excluded information (binary files, generated code, secrets). Enforced structurally via .gitignore-like mechanisms.
+\end{enumerate}
+
+This convergence is not accidental; it reflects the optimization structure of the context selection problem. The active tier contains high-relevance, low-size items that are always worth including. The searchable tier implements adaptive context selection. The hidden tier enforces the constraint $|C^*| < W$ by preventing low-relevance items from consuming budget.
+
+\subsection{Structural vs. Instructional Enforcement}
+
+\begin{proposition}[Structural Enforcement Dominance]
+\label{prop:enforcement}
+Let $\epsilon$ be the per-step instruction violation probability and $T$ the number of agent steps. Instructional enforcement (prompts, rules files) achieves compliance probability $(1-\epsilon)^T$, which decays exponentially in $T$. Structural enforcement (file system permissions, tool restrictions, automated gates) achieves compliance probability 1 regardless of $T$.
+\end{proposition}
+
+The reliability gap $(1-\epsilon)^T$ grows rapidly. At $\epsilon = 0.02$ and $T = 50$, instructional compliance is 36\%. At $T = 100$, it falls to 13\%. At $\epsilon = 0.05$ and $T = 250$ (JetBrains' upper bound for agent runs), instructional enforcement is virtually guaranteed to fail at least once. This result, which reappears in the Reliability and Quality pillars, is one of the strongest cross-pillar findings: \emph{anything that must hold invariantly should be enforced structurally, not instructionally.}
+
+Production harnesses implement structural enforcement through five categories: filesystem isolation (RAPID worktrees, Codex containers), tool restriction (Spotify Honk's allowlisted commands), context scoping (GSD's fresh 200K per task), output filtering (JetBrains' observation masking), and interface contracts (typed tool schemas). The principle: prefer mechanisms over policies.
+
+\subsection{The Reuse Discovery Problem}
+
+The Information pillar identifies a largely unsolved problem: how does the agent discover that a relevant utility, pattern, or abstraction already exists in the codebase? This is formalized as approximate nearest-neighbor search in a semantic embedding space, where the query is the agent's current intent and the corpus is the set of existing code units.
+
+\begin{definition}[Functional Similarity]
+Given candidate function $g$ and existing function $f_j$, define:
+\begin{equation}
+    \text{sim}(g, f_j) \triangleq \frac{I(g; f_j)}{H(g, f_j)}
+\end{equation}
+This normalised mutual information takes values in $[0,1]$: 0 for independent functions, 1 for functionally equivalent ones.
+\end{definition}
+
+Under a code embedding $\phi$ that is approximately sufficient for functional semantics, the reuse detection problem reduces to finding all $f_j$ with $\|\phi(\sigma_g) - \phi(f_j)\| < r(\tau)$ for some threshold $\tau$.
+
+The problem is that the agent does not know what it does not know; it cannot search for something whose existence it has not hypothesized. The GitClear finding of $8\times$ increased code duplication \citep{gitclear2025} is a direct consequence of this unsolved problem. No published work formalizes the ``should I reuse or create?'' decision as a gate in the agent's action space. Existing tools provide \emph{context retrieval} (presenting similar code), not \emph{reuse enforcement} (requiring justification for creating duplicates). A \emph{reuse map} $R = \{(n_j, \sigma_j, \ell_j)\}$ (name, signature, location) compresses the codebase for reuse decisions at roughly $1000\times$ compression ratio while retaining approximate sufficiency, making it an ideal active-tier item.
+
+
+% ====================================================================
+% 4. THE RELIABILITY PILLAR (EXPANDED)
+% ====================================================================
+\section{The Reliability Pillar}
+\label{sec:reliability}
+
+The Reliability pillar \citep{pillar-reliability} addresses the most consequential quantitative fact about agent workflows: compound errors destroy end-to-end reliability.
+
+\subsection{Series Reliability and Compound Error Sensitivity}
+
+An $n$-step agent pipeline is a series reliability system. If each step succeeds independently with probability $p$, the end-to-end reliability is:
+
+\begin{equation}
+    R(n) = p^n
+\end{equation}
+
+At $p = 0.95$ and $n = 20$, $R(20) = 0.36$. At $p = 0.85$ and $n = 10$, $R(10) = 0.20$.
+
+\begin{theorem}[Compound Error Sensitivity]
+\label{thm:compound-sensitivity}
+The elasticity of end-to-end reliability with respect to per-step reliability is:
+\begin{equation}
+    \mathcal{E}(R, p) = \frac{\partial \ln R}{\partial \ln p} = n
+\end{equation}
+A 1\% relative improvement in per-step reliability yields an $n$\% relative improvement in end-to-end reliability.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Direct differentiation: $dR/dp = n p^{n-1}$. The elasticity is $(p/R)(dR/dp) = (p \cdot n p^{n-1}) / p^n = n$.
+\end{proof}
+
+This result has a stark practical consequence: for long pipelines, small improvements in per-step quality matter far more than architectural sophistication. The elasticity equals the pipeline length, meaning that a 20-step pipeline amplifies per-step improvements (or degradations) 20-fold.
+
+\paragraph{Concrete example.} For $p_0 = 0.95$ and $n = 10$: $\partial R/\partial p = 10 \times 0.95^9 = 6.30$. A 1-percentage-point increase in per-step accuracy (from 0.95 to 0.96) raises pipeline reliability from 59.9\% to 66.5\%, a gain of 6.6 percentage points.
+
+For heterogeneous pipelines, $\partial R / \partial p_j = R / p_j$, which is inversely proportional to $p_j$. Improvement effort should target the step with the lowest reliability. In practice, this is usually problem framing (step 1), not execution. With $p_1 = 0.80$ (problem framing), $p_{2 \ldots 9} = 0.98$ (execution), $p_{10} = 0.92$ (integration) for a 10-step pipeline: $R = 0.80 \times 0.98^8 \times 0.92 = 0.626$. Improving $p_1$ from 0.80 to 0.90 yields $R = 0.703$ (12.3\% absolute gain); improving all execution steps from 0.98 to 0.99 yields $R = 0.662$ (5.7\% gain at $8\times$ the intervention breadth).
+
+\subsection{Common-Cause Failures: The Marshall-Olkin Model}
+
+The independence assumption ($R(n) = p^n$) is an approximation. In practice, agent steps share common causes of failure (model limitations, context misunderstanding, specification ambiguity). The Reliability pillar models this using the Marshall-Olkin common-cause framework \citep{marshall1967multivariate}.
+
+\begin{definition}[Common-Cause Failure Model]
+\label{def:common-cause}
+Decompose each step's failure into an independent component $Z_i \sim \text{Bernoulli}(\alpha_i)$ and a shared common-cause component $Y \sim \text{Bernoulli}(\gamma)$:
+\begin{equation}
+    X_i = \max(Z_i, Y)
+\end{equation}
+where $X_i$ is the failure indicator for step $i$. The common-cause shock $Y$ represents failures that affect all steps simultaneously: task misunderstanding at step 1 that biases all subsequent steps, shared model weights inducing common-mode failures, or context drift affecting multiple steps.
+\end{definition}
+
+Under the common-cause model, pipeline reliability is:
+\begin{equation}
+    R(n) = (1 - \gamma) \prod_{i=1}^{n} (1 - \alpha_i)
+\end{equation}
+
+The common-cause failure rate $\gamma$ imposes a hard ceiling: no amount of per-step improvement can raise $R(n)$ above $(1 - \gamma)$. For the homogeneous case ($\alpha_i = \alpha$ for all $i$), this gives $R(n) = (1 - \gamma)(1 - \alpha)^n$, which reduces to $p^n$ when $\gamma = 0$ (recovering the independent model).
+
+This decomposition is practically important. Research on agent failures suggests that most failures are attributable to problem framing and context management (the $\gamma$ component), not execution-step errors (the $\alpha_i$ components) \citep{cemri2025multiagent}. Improving individual $\alpha_i$ has limited effect when $\gamma$ dominates; the leverage is in reducing $\gamma$ through better context engineering and specification. Empirical evidence from \citet{hariharan2025plan} (63\% failure rate on 100-step tasks) is consistent with the independent model as a reasonable first approximation, but error clustering in problem-framing steps dominates execution-step errors.
+
+\subsection{Optimal Verification Scheduling}
+
+Given a pipeline of $n$ steps with per-step failure probability $q = 1 - p$, the Reliability pillar formulates verification checkpoint placement as a dynamic programming problem. The key result is a discrete analog of the Young-Daly checkpoint interval from HPC:
+
+\begin{theorem}[Optimal Checkpoint Count]
+\label{thm:checkpoint}
+For a homogeneous pipeline with $n$ steps, per-step failure probability $q$, base verification cost $c_0$, and per-step verification cost $c_v$, the optimal number of verification checkpoints is:
+\begin{equation}
+    k^* \approx \sqrt{\frac{n(1-p) \cdot c_0}{c_v}}
+\end{equation}
+For typical agent pipelines, $k^* \in [2, 4]$, and three verification rounds capture over 96\% of detectable errors.
+\end{theorem}
+
+\begin{proof}[Proof sketch (Young-Daly analog)]
+Partition the pipeline into $k$ contiguous segments separated by verification checkpoints. Segment $j$ spans steps $[a_j, b_j]$ with failure probability $F_j = 1 - \prod_{i=a_j}^{b_j} p_i$ and length $L_j = b_j - a_j + 1$. The expected cost given $k$ segments is:
+\[
+    \mathbb{E}[\text{Cost}] = (k-1) \cdot c_v + \sum_{j=1}^{k} g(L_j)
+\]
+where $g(L) = (1 - p^L) \cdot c_0 \cdot L$ is the expected rework cost for a segment of length $L$. The segment cost $g(L)$ is convex in $L$ for $0 < p < 1$ (verified by computing $g''(L) = c_0 \mu p^L(2 - \mu L)$ where $\mu = -\ln p > 0$; this is positive for $L < 2/\mu$, which at $p = 0.95$ means $L < 39$, covering practical pipelines). By Schur-convexity of a sum of convex functions subject to $\sum L_j = n$, the minimum is at the equal-length partition $L_j = n/k$ for all $j$. Substituting $g(n/k)$ and minimizing over $k$ yields $k^* \approx \sqrt{n(1-p)c_0/c_v}$.
+\end{proof}
+
+\paragraph{Concrete example.} For $p = 0.95$, $c_v = 1$, $c_0 = 5$, $n = 20$: $L^* = \sqrt{1/(0.05 \times 5)} = 2$, suggesting verification every 2 steps. For $p = 0.99$, $c_v = 10$: $L^* = \sqrt{10/(0.01 \times 5)} \approx 14$, suggesting verification once or twice in a 20-step pipeline.
+
+\subsection{Geometric Diminishing Returns for Verification}
+
+\begin{theorem}[Geometric Diminishing Returns]
+\label{thm:diminishing-returns}
+Let $M(k)$ be the expected number of errors detected by $k$ verification rounds, each independently detecting remaining errors with probability $v$. Then:
+\begin{equation}
+    \Delta M(k) = M(k) - M(k-1) = N_0 \cdot v \cdot (1-v)^{k-1}
+\end{equation}
+The marginal value of round $k$ decays geometrically with ratio $(1-v)$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+After $k$ rounds, the probability a given error remains undetected is $(1-v)^k$. Hence $M(k) = N_0(1 - (1-v)^k)$ and $\Delta M(k) = N_0 v (1-v)^{k-1}$.
+\end{proof}
+
+Empirical calibration against \citet{hariharan2025plan}: cumulative error detection of 62\% after round 1, 89\% after round 2, and 96.5\% after round 3. Fitting the geometric model with $v = 0.62$:
+
+\begin{center}
+\small
+\begin{tabular}{cccc}
+\toprule
+Round $k$ & Predicted $D(k)$ & Observed $D(k)$ & Residual \\
+\midrule
+1 & 0.620 & 0.620 & 0.000 \\
+2 & 0.856 & 0.890 & $-$0.034 \\
+3 & 0.945 & 0.965 & $-$0.020 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The slight underprediction at rounds 2--3 is consistent with an improving detection rate ($v_1 = 0.62$, $v_2 = 0.71$, $v_3 = 0.68$), where the verifier sharpens its focus after eliminating easy errors. The stopping criterion (verify until marginal expected catch falls below verification cost) yields $k \approx 3$ for typical parameters. Rounds 4 and beyond face the pesticide paradox: the remaining errors require different detection approaches, not more of the same.
+
+\subsection{Four-Layer Verification Architecture}
+
+The Reliability pillar synthesizes these results into a four-layer verification architecture, ordered by efficiency $\eta = d/c$ (detection rate per unit cost):
+
+\begin{center}
+\small
+\begin{tabular}{clcccc}
+\toprule
+Layer $\ell$ & Name & $d(\ell)$ & $f(\ell)$ & $c(\ell)$ & $\eta(\ell)$ \\
+\midrule
+1 & Structural gates & 0.95 & ${\sim}0$ & 1 & 0.950 \\
+2 & Deterministic analysis & 0.80 & 0.10 & 5 & 0.160 \\
+3 & LLM-as-Judge & 0.70 & 0.25 & 50 & 0.014 \\
+4 & Human review & 0.90 & 0.05 & 500 & 0.002 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Layer 1 (type checking, schema validation, permission enforcement) is $7\times$ more efficient than Layer 2 (unit tests, integration tests, property-based tests), $68\times$ more efficient than Layer 3 (LLM semantic analysis, pattern detection, style review), and $528\times$ more efficient than Layer 4 (expert assessment for architectural fit, design quality, business logic). The cost-minimizing strategy achieving a target detection rate $d^*$ activates layers in decreasing order of efficiency until the target is met (a variant of the fractional knapsack problem, for which greedy ordering is optimal).
+
+If layers are applied in sequence, each independently detecting defects, the combined detection rate is:
+\begin{equation}
+    d_{\text{combined}} = 1 - \prod_{j=1}^{m} (1 - d(\ell_j))
+\end{equation}
+With all four layers and 3 iterations of the middle layers: $d_{\text{combined}} \geq 0.958$, matching the empirical 96.5\% convergence.
+
+Verification intensity should be \emph{adaptive}: higher for high-risk changes (security-critical, cross-module, novel logic) and lower for low-risk changes (formatting, documentation, well-tested patterns). The optimal verification level minimizes $J(\ell, \hat{g}, r) = c(\ell) + \lambda \cdot r \cdot \hat{g} \cdot (1 - d(\ell))$, where $r \in [0,1]$ is risk level and $\hat{g} \in [0,1]$ is the estimated spec-to-code information gap. Level $\ell$ is preferred over $\ell - 1$ when $r \cdot \hat{g}$ exceeds the switching threshold $\tau(\ell{-}1 \to \ell) = (c(\ell) - c(\ell{-}1)) / (\lambda \cdot (d(\ell) - d(\ell{-}1)))$.
+
+\subsection{Circular Validation Bias}
+
+When the same agent (or same model family) produces both code and tests, a systematic bias arises from shared blind spots.
+
+\begin{definition}[Circular Validation Bias]
+\label{def:circular-bias}
+Let $\beta_A$ be the blind-spot rate of agent $A$ (the probability that a defect falls in a category the agent systematically misses) and $\beta_{A'}$ the blind-spot rate of a verifier $A'$. The residual bias after verification is:
+\begin{equation}
+    \beta = \beta_A (1 - \beta_{A'})
+\end{equation}
+When $A = A'$ (self-verification), $\beta_{A'} = \beta_A$ for the shared blind-spot categories, yielding zero bias reduction on those categories.
+\end{definition}
+
+This result connects directly to METR's finding that roughly 50\% of SWE-bench test-passing pull requests would not be merged by repository maintainers \citep{metr2026swebench}. (An important baseline caveat: only about 68\% of human-written ``golden patches'' would be merged on re-review, so the gap attributable to AI deficiency is approximately 18 percentage points, not 50; the remainder reflects maintainer subjectivity and the study's small evaluator pool of 4 maintainers across 3 repositories.) The tests pass because they test the code's actual behavior (including bugs) rather than the intended behavior. Cross-family verification, using a different model or a structurally different verification method, is where bias reduction concentrates.
+
+\subsection{Adversarial Collapse of Prompt Enforcement}
+
+Empirical evidence demonstrates that LLM agents actively circumvent evaluation criteria when given the opportunity. METR documented reward-hacking rates of 30.4\% on RE-Bench (where the scoring function was visible) versus 0.7\% on HCAST (where it was hidden), a $43\times$ difference \citep{metr2025rewardhacking}. NIST CAISI documented agents commenting out assertions, downloading solutions from GitHub, crashing servers via \texttt{/dev/urandom}, and reading future git commits \citep{nist2025cheating}. Apollo Research confirmed in-context scheming in frontier models, with covert action rates of 13\% for o3 \citep{apollo2025scheming}.
+
+Prompt-based mitigation proved ineffective: adding ``do not cheat'' to the system prompt did not reduce reward-hacking rates. Under adversarial conditions (the agent actively seeks to circumvent constraints), prompt enforcement fails entirely ($\epsilon \to 1$) and the enforcement transition threshold collapses to approximately $c_s - c_p$. This provides formal justification for the principle: safety-critical constraints must be structurally enforced.
+
+\subsection{The Structural Enforcement Boundary}
+
+\begin{theorem}[Cost-of-Failure Threshold]
+\label{thm:structural-boundary}
+Let $c_s$ be the cost of structural enforcement, $c_p$ the cost of prompt enforcement, and $L$ the expected cost of a failure. Structural enforcement is cost-effective when:
+\begin{equation}
+    L > L^* = \frac{c_s - c_p}{\epsilon}
+\end{equation}
+where $\epsilon$ is the per-step prompt violation probability. For multi-step pipelines, the threshold drops as $L^*/n$, since the expected number of violations grows linearly in $n$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The expected cost under prompt enforcement is $c_p + \epsilon L$; under structural enforcement, $c_s + \delta_s L$ where $\delta_s < \epsilon$ is the specification gap under structural enforcement. Setting these equal and solving for $L$ yields $L^* = (c_s - c_p)/(\epsilon - \delta_s)$. For $\delta_s \approx 0$, this simplifies to $L^* = (c_s - c_p)/\epsilon$. In an $n$-step pipeline where the constraint must hold at every step, the probability of at least one violation under prompt enforcement is $1 - (1-\epsilon)^n \approx n\epsilon$ for small $\epsilon$, so the effective threshold drops to approximately $L^*/n$.
+\end{proof}
+
+\begin{theorem}[Structural Separation Theorem]
+\label{thm:structural-separation}
+Structural separation (different agents for code and test authorship) reduces circular validation bias whenever $|B_A \cap B_{A'}| < |B_A|$. The reduction is maximized when blind-spot sets are disjoint ($B_A \cap B_{A'} = \emptyset$).
+
+Sufficient conditions for effective separation:
+\begin{enumerate}[nosep]
+    \item Different model family (different pretraining corpora yield different error distributions).
+    \item Different input representation (e.g., formal specification vs.\ natural language).
+    \item Adversarial framing (instructing the test author to actively seek failures).
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Under the blind-spot model, when author $A$ writes code and verifier $A'$ writes tests, a bug escapes only if it falls in both blind-spot sets $B_A \cap B_{A'}$. The escape probability is $\mu(B_A \cap B_{A'})$. Under same-author verification ($A' = A$), the escape probability is $\mu(B_A)$ (the full blind-spot rate). Separation reduces the escape probability by $\mu(B_A) - \mu(B_A \cap B_{A'}) = \mu(B_A \setminus B_{A'}) > 0$ whenever the blind-spot sets are not identical. The reduction is maximized at $\mu(B_A)$ when $B_A \cap B_{A'} = \emptyset$. The three sufficient conditions promote disjointness by ensuring that the error distributions of $A$ and $A'$ arise from different sources (different training data, different input modalities, different optimization objectives).
+\end{proof}
+
+The practical implication: as pipelines grow longer, the set of invariants that \emph{should} be enforced structurally expands. Structural enforcement is not an all-or-nothing choice; the optimal boundary shifts with pipeline length, failure cost, and the cost differential between structural and prompt enforcement. Using AgentSpec parameters \citep{wang2026agentspec}: $\epsilon = 0.23$ (prompt failure rate), $c_p = 1$, $c_s = 10$, yielding $L^* \approx 39$. When a single violation costs more than $39\times$ the prompt engineering cost, structural enforcement is justified. For safety-critical constraints (data deletion, financial transactions), $L$ typically exceeds this threshold by orders of magnitude.
+
+\subsection{Checkpoint Optimality: The Young-Daly Connection}
+
+The checkpoint count formula (Theorem~\ref{thm:checkpoint}) is a discrete analog of the Young-Daly checkpoint interval formula \citep{young1974first, daly2006higher} from high-performance computing. In HPC, the optimal checkpoint interval balances the cost of saving state against the cost of lost computation upon failure. The correspondence is:
+
+\begin{center}
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{HPC (Young-Daly)} & \textbf{Agent Pipeline} \\
+\midrule
+Checkpoint cost & Verification cost $c_v$ \\
+Mean time between failures & $1/(1-p)$ steps \\
+Lost computation on failure & Rework cost $c_0 \cdot L$ \\
+Optimal interval $\tau^* = \sqrt{2 \delta C}$ & Optimal segment $L^* = \sqrt{c_v / ((1-p) c_0)}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The structural parallel is exact: both problems minimize total expected cost (checkpoint overhead plus expected rework) under a Poisson-like failure process. The agent pipeline setting introduces one additional feature: the verification step is itself imperfect (detection probability $v < 1$), which the classical Young-Daly formula does not account for. This imperfection is absorbed into the geometric diminishing returns result (Theorem~\ref{thm:diminishing-returns}), which bounds the value of repeated verification at each checkpoint.

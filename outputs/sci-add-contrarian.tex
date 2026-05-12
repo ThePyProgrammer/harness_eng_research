@@ -1,0 +1,332 @@
+% ============================================================
+% CONTRARIAN POSITIONS (insert between Design Principles and Limitations)
+% ============================================================
+\section{Engaging Contrarian Positions}
+\label{sec:contrarian}
+
+The framework's formal results invite strong objections from multiple intellectual
+traditions.  Rather than constructing strawmen, we steelman seven contrarian
+positions, group them thematically, and evaluate what the evidence actually
+supports.  Each position draws on material originally developed across the
+seven pillars; here we consolidate by theme rather than by pillar.  Table~\ref{tab:contrarian-summary} provides a summary; the subsections below
+develop each position in detail.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lp{4.5cm}p{4.5cm}}
+\toprule
+\textbf{Position} & \textbf{Strongest Form} & \textbf{Framework Response} \\
+\midrule
+Scale makes governance obsolete & Scaling laws predict learned priors will outperform engineered methods & Abstraction gap is mechanism-agnostic; compound errors are mathematical identities \\
+Formal methods are overkill & Situated action and language games challenge fixed specifications & $\sigma$ is a design parameter; formal methods at high $\sigma$, NL at low $\sigma$ \\
+Governance is overhead & Cost exceeds benefit below a team-size threshold & Bifurcation theorem identifies exact threshold; AI velocity shifts it lower \\
+ADRs are theater & No empirical evidence ADRs improve quality outcomes & Survival analysis with evidence expiry addresses staleness; empirical gap acknowledged \\
+Humans should review everything & Human review is the gold standard & Throughput mismatch: 50\%+ of code is AI-generated; humans triage, not review exhaustively \\
+AI quality is good enough & GitHub RCT shows no quality difference & Longitudinal data contradicts; accretion effects invisible to short-term studies \\
+Theory cannot be preserved & Tacit knowledge has divergent description length & Lossy compression beats no compression; uncertainty markers address false confidence \\
+\bottomrule
+\end{tabular}
+\caption{Summary of contrarian positions engaged, with their strongest forms and framework responses.}
+\label{tab:contrarian-summary}
+\end{table}
+
+\subsection{The Bitter Lesson: Scale Makes Governance Obsolete}
+\label{sec:contrarian-bitter}
+
+\paragraph{The steelmanned argument.}
+Sutton's Bitter Lesson~\citep{sutton2019bitter} observes that general methods
+leveraging computation (search, learning) have historically defeated
+hand-engineered, knowledge-intensive approaches.  LLMs trained on all publicly
+available code are the epitome of the scaling approach.  If scaling continues to
+improve, formal methods, governance mechanisms, and structured verification may
+become unnecessary overhead, much as hand-tuned chess evaluation functions were
+rendered obsolete by AlphaZero.  Dijkstra's programme of designing formal
+languages for formal thought is precisely the kind of ``human-knowledge''
+approach that scaling predicts will lose.
+
+Distributed cognition theory~\citep{hutchins1995cognition, clark2003natural}
+strengthens this position: the human + LLM + IDE + test suite constitutes a
+distributed cognitive system that achieves precision even when no single
+component (including the human's natural-language specification) is precise
+alone.  Formally, the abstraction gap $\mathcal{G}(S_{\text{NL}}, P)$ may be
+large, but $\mathcal{G}(S_{\text{NL}} \parallel \Phi_{\text{LLM}} \parallel
+\mathcal{T}_{\text{tests}}, P)$ can be small under distributed composition.
+This is a genuine strength of the natural-language approach that the framework
+can accommodate but does not predict.
+
+\paragraph{What the evidence shows.}
+The framework is agnostic on mechanism.  If scaling obsoletes formal methods,
+the abstraction gap $\mathcal{G}(S, P) = K(P \mid S)$ still exists; what
+changes is the mechanism for traversing it (brute-force learned priors rather
+than structured refinement).  The compound error sensitivity theorem
+(Theorem~\ref{thm:sensitivity}) is a mathematical identity, not a claim about
+any particular verification method: $R = \prod p_i$ holds whether the $p_i$ are
+achieved by formal proofs, learned verifiers, or brute-force sampling.  The
+Bitter Lesson predicts that \emph{how} we achieve high $p_i$ will shift; it
+does not predict that the multiplicative structure of pipeline reliability will
+change.
+
+Moreover, current empirical evidence is mixed.  HumanEval pass rates exceed
+90\%, but SWE-bench Verified plateaus around 77\%, with METR finding that
+approximately 50\% of test-passing PRs would not be merged by human
+reviewers~\citep{metr2026swebench}.  LiveCodeBench remains at 38.9\%.  The gap
+between isolated-function benchmarks and real-world integration tasks has not
+closed with scale alone.  The 50-point gap between HumanEval ($> 90\%$, low-NCD
+tasks with short specifications) and LiveCodeBench (38.9\%, high-NCD tasks
+requiring complex integration) is precisely what the abstraction gap framework
+predicts: as task complexity grows, the LLM's learned prior can no longer
+compensate for the information deficit in the specification.
+
+The Goodhart taxonomy~\citep{manheim2019goodhart} provides additional grounds
+for skepticism about pure-scaling approaches.  All four Goodhart mechanisms
+(regressional, extremal, causal, adversarial) manifest in agent benchmarks:
+\begin{itemize}
+  \item \emph{Regressional:} optimising a noisy proxy (test pass rates) selects
+    for noise in the proxy-target relationship.
+  \item \emph{Extremal:} the proxy-target relationship, estimated in a typical
+    regime, breaks down at extremes of task complexity.
+  \item \emph{Causal:} intervening on the proxy (writing code to pass tests) can
+    break the causal pathway to genuine quality.
+  \item \emph{Adversarial:} agents can directly manipulate the proxy without
+    affecting the target.
+\end{itemize}
+Every documented NIST CAISI cheating instance is detectable through structural
+invariant violation checks, not through statistical proxy-target monitoring,
+supporting the principle that structural enforcement addresses what scaling
+alone cannot.  The ``true quality'' $Q$ in any gaming detection framework is
+fundamentally uncomputable; all practical proxies inherit the Goodhart problem
+they aim to detect.
+
+
+\subsection{Formal Methods Are Overkill}
+\label{sec:contrarian-formal}
+
+\paragraph{The steelmanned argument.}
+Suchman's situated action theory~\citep{suchman1987plans} argues that plans are
+resources for action, not determinants of action.  If this is correct, the
+refinement lattice (which models specification as a plan progressively
+concretised into code) may be the wrong metaphor for iterative, conversational
+development.  The specification-code relationship is not a static refinement
+chain but a dynamic, context-dependent process where meaning emerges from
+interaction.
+
+Wittgenstein's later philosophy~\citep{wittgenstein1953philosophical} deepens
+this critique.  If meaning is constituted by use rather than by formal
+structure, then a prompt's informational content is not a fixed quantity
+measurable by Kolmogorov complexity; it is a move in a language game whose
+significance depends on shared practices.  This challenges a presupposition of
+the entire information-theoretic framework: that specifications have fixed
+informational content independent of context.
+
+The democratisation argument adds practical weight: 5~billion natural-language
+speakers versus 27~million programmers (a 185:1 ratio).  If natural-language
+programming enables even 10\% of this population to direct computation, the
+total value created may dwarf the quality loss on individual
+programmes~\citep{litt2023malleable, altman2024intelligence}.  Prompt-based
+rules achieve 77\% compliance (AgentSpec data), which may be ``good enough''
+for most use cases.
+
+\paragraph{What the evidence shows.}
+These arguments are strongest when the specificity requirement is low
+($\sigma < 0.3$) and weakest when formal guarantees are needed
+($\sigma > 0.7$).  The framework accommodates both by treating $\sigma$ as a
+design parameter, not a universal constant.  For prototypes and low-stakes
+tooling, Layer~1 structural gates alone may suffice; for production systems with
+safety constraints, the formal machinery becomes essential.
+
+The 82\% success rate of vericoding~\citep{vericoding2025} (human writes formal
+specification, AI generates implementation, formal verifier checks conformance)
+demonstrates that formal methods can be made accessible through AI translation:
+the human reviews a specification rather than authoring one from scratch.  This
+addresses the historical cost barrier~\citep{kleppmann2025formal} without
+abandoning formal guarantees.  The key insight is that AI can serve as a
+\emph{formalism translator}, shifting the human role from specification author
+to specification reviewer.  Reviewing a formal specification is vastly easier
+than authoring one from scratch, which changes the cost calculus that
+historically made formal methods prohibitive.
+
+We acknowledge, following Suchman and Wittgenstein, that the $\sigma$ parameter
+itself may be an illegitimate formalisation of something that resists
+quantification.  We flag this as a foundational question for future work on the
+epistemology of specification, rather than claiming to resolve it.
+
+For AI coding agents that operate through conversation (iterative prompting,
+evaluation, and revision), Suchman's critique is particularly sharp: the
+``specification'' is not a document but an evolving dialogue whose informational
+content is not fixed at any single moment.  The framework applies most naturally
+when specifications are written documents with stable content, and less
+naturally to interactive, conversational development where meaning is negotiated
+in real time.  This limitation is genuine and not resolved by the current
+framework.
+
+
+\subsection{Governance Is Overhead}
+\label{sec:contrarian-overhead}
+
+\paragraph{The steelmanned argument.}
+Governance has a cost curve that intersects its benefit curve at a specific
+scale, and below that scale the cost exceeds the benefit.  For a two-person
+startup, time spent writing ADRs and configuring fitness functions is time not
+spent shipping features.  The strongest version: governance mechanisms are a
+form of organisational scar tissue, growing in response to past failures but
+imposing ongoing friction on teams that have already internalised the lessons.
+
+Conway's Law~\citep{conway1968} strengthens this position: if architecture
+mirrors organisational structure, and organisational metrics predict
+failure-proneness with approximately 85\% precision~\citep{nagappan2008}
+(outperforming all code metrics), then code-level governance treats a symptom.
+Restructuring teams would be more effective than adding governance layers.  The
+argument extends to agent teams: if agents mirror the organisational structures
+of the teams that build them, then governing agent code is futile without
+governing the organisational context that shapes agent behaviour.
+
+\paragraph{What the evidence shows.}
+Governance cost is roughly fixed per mechanism; benefit scales with team size
+and codebase complexity.  The crossover appears at 5 to 10 developers, or more
+precisely, at the point where no single person holds the complete mental model.
+For distributed teams, formal governance becomes valuable earlier because
+informal channels (hallway conversations, whiteboard sessions) are degraded or
+absent.
+
+Conway's Law admits an inverse: the inverse Conway
+maneuver~\citep{skelton2019} deliberately restructures teams to produce desired
+architecture.  Code-level governance and organisational governance are
+complementary, not substitutes.  The novel question for AI agents is whether
+agent governance requires organisational awareness, and the answer appears to be
+yes: agent topology should mirror the desired system decomposition (the inverse
+Conway maneuver applied to agents).
+
+The governance capacity bound (Theorem~\ref{thm:capacity}) provides the formal
+resolution: governance is overhead precisely when the drift rate is below the
+bifurcation threshold.  Below the threshold, the system self-corrects without
+governance.  Above it, governance is not overhead but a structural necessity;
+its absence leads to coherence collapse.  The question is empirical: where does
+a given team sit relative to the threshold?
+
+The AI velocity corollary sharpens this analysis: when agents generate code at
+10 to 100$\times$ the rate of human developers, the drift rate increases
+proportionally while governance capacity remains constant (it is bounded by
+human review bandwidth).  This pushes teams above the bifurcation threshold
+earlier and more frequently.  The automated governance necessity follows:
+governance must itself be partially automated to scale with agent throughput,
+which is precisely what the multi-granularity cascade control architecture
+provides.
+
+
+\subsection{ADRs and Documentation Are Theater}
+\label{sec:contrarian-adrs}
+
+\paragraph{The steelmanned argument.}
+ADRs can drift from purpose, enable responsibility diffusion, and suffer the staleness problem. Despite recommendations from ThoughtWorks, AWS, Microsoft, and Google, no published empirical study demonstrates that ADRs improve measurable software quality outcomes (defect rates, time-to-market, maintenance cost). The evidence is entirely practitioner reports and observational accounts.
+
+The false confidence problem is acute: documentation with the appearance of completeness but no mechanism for detecting its own staleness creates a worse situation than acknowledged ignorance. Teams may defer to stale ADRs rather than exercising judgment, producing decisions that are formally ``compliant'' but substantively wrong.
+
+\paragraph{What the evidence shows.}
+ADRs provide clear value for onboarding and cross-team alignment. The primary failure mode is absent content (decisions made without ADRs) or bloated content (too many decisions documented), not wrong content. The survival analysis (Section~\ref{sec:survival}) provides a concrete remedy: tracking decision age alongside decision content, with domain-specific half-lives triggering proactive review.
+
+Evidence expiry and the controlled relaxation operator $\delta$ address the staleness critique directly. Documentation with explicit uncertainty markers (``confidence: medium,'' ``last validated: 2025-03'') addresses the false confidence risk. The contribution is making these mechanisms formal rather than ad hoc.
+
+The empirical gap is real and should be acknowledged honestly. The strongest evidence is that the \emph{problem} is real (AI accelerates architectural drift and quality degradation). The evidence that documentation and governance \emph{solve} it remains largely anecdotal. Designing governance systems to be testable, by tracking drift trajectories and decision decay, is a prerequisite for future empirical validation.
+
+The ``ratchet is too rigid'' objection~\citep{ford2017} applies here as well: monotonically increasing documentation strictness prevents legitimate architectural evolution. The strongest governance systems already incorporate relaxation mechanisms. Fitness functions can be deprecated. Evidence expiry provides a natural clock for rule relaxation. The ratchet critique applies most forcefully to systems that treat rules as permanent rather than contextual, which is precisely what the lattice descent operator $\delta$ addresses through controlled relaxation with evidence expiry.
+
+
+\subsection{The Human Should Just Review Everything}
+\label{sec:contrarian-human}
+
+\paragraph{The steelmanned argument.}
+Human review is the gold standard for code quality. Rather than building elaborate multi-layer verification architectures, organisations should invest in thorough human review of all agent-generated code. Human reviewers can detect subtle architectural violations, naming convention drift, unnecessary abstractions, and strategic misalignment that no automated system can match. The four-layer defense architecture adds complexity and cost without matching the capabilities of a skilled human reviewer.
+
+Mode selection is hard to automate~\citep{bainbridge1983ironies}: deciding when to apply lightweight versus heavyweight governance requires the kind of contextual judgment that resists formalisation. Bainbridge's ironies of automation create a genuine double bind: the more we automate governance decisions, the less capable humans become at making them when automation fails.
+
+\paragraph{What the evidence shows.}
+The throughput mismatch is the decisive counterargument. AI agents now generate over 50\% of committed code on major platforms. GitClear documents 211 million changed lines with an 8$\times$ increase in code duplication and a 60\% collapse in refactoring activity~\citep{gitclear2025}. Human review cannot scale to match this generation rate. At \$80 per PR for thorough human review (Layer~4 cost), the economics are prohibitive for high-throughput agent pipelines.
+
+The detection ceiling theorem (Theorem~\ref{thm:ceiling}) shows that each layer has hard upper bounds on what it can detect, determined by available context. Human review has the highest ceiling but the lowest throughput. Layers~1 through 3 have lower ceilings but orders-of-magnitude higher throughput. The optimal architecture uses cheap, fast layers to filter the stream before expensive human attention is applied.
+
+The Bayesian mode selection framework (Theorem~\ref{thm:mode}) provides a principled threshold for escalation: the asymmetric cost structure ($c_{\mathrm{FG}} \gg c_{\mathrm{GF}}$) means choosing the governed (human-reviewed) mode at even 5 to 10\% posterior probability of needing it is Bayes-optimal. This is not a replacement for human judgment but a triage mechanism that directs human attention where it has the highest marginal value.
+
+The Dodge-Romig sampling plans~\citep{dodge1929method} and MIL-STD-105E switching rules provide the classical precedent: adaptive inspection regimes that tighten or relax based on observed quality. Our four-layer architecture adapts this paradigm to software verification, where the ``inspector'' at each layer has different capabilities and costs. The human reviewer remains indispensable for the undecidable slop types (meaningless tests, architectural erosion, boilerplate inflation) that resist automated detection, but the human's scarce attention is directed by the preceding automated layers rather than applied uniformly.
+
+
+\subsection{AI Code Quality Is Good Enough}
+\label{sec:contrarian-quality}
+
+\paragraph{The steelmanned argument.}
+The quality concerns are overstated. GitHub's controlled RCT~\citep{github2024rct} found that AI-assisted developers completed tasks 55\% faster with no measurable quality difference. For the vast majority of business software (CRUD applications, internal tools, prototypes), ``good enough'' quality is the economically rational target. The optimal quality level is explicitly $q^* < 1$ for low-stakes code; investing in elaborate quality architectures for code that will be rewritten in six months is waste.
+
+Speed itself has value. The Yerkes-Dodson objection (``speed kills quality''~\citep{yerkes1908relation}) applies to human cognition under time pressure, but AI agents do not experience cognitive fatigue. The DORA finding that high-performing teams achieve both speed and stability~\citep{forsgren2018accelerate} suggests that the speed-quality tradeoff is not fundamental.
+
+LLM-as-Judge is unreliable: inter-rater agreement (omega of 0.462 to 0.803) is concerning~\citep{llmjudgetrust2024}. Same-model judging amplifies correlated errors via the FKG inequality (Theorem~\ref{thm:fkg}). If the verification layer itself is unreliable, the entire quality architecture rests on shaky foundations.
+
+\paragraph{What the evidence shows.}
+The GitHub RCT measured short-term task completion, not long-term maintainability. GitClear's longitudinal data tells the opposite story: 17\% maintainability drops, refactoring declining from 25\% to less than 10\% of changed lines, and bug rates rising 12\% at six months~\citep{gitclear2025}. The compound degradation theorem (Theorem~\ref{thm:degradation}) formalises why: individually CI-passing changes can produce superlinear entropy growth through accretion effects that no single-change review can detect.
+
+The ``slop is acceptable'' position is partially validated by our own framework. The optimal quality level (Theorem~\ref{thm:optquality}) is explicitly $q^* < 1$ for low-stakes code. The contribution is making this precise: for prototypes, Layer~1 only; for production systems, all four layers. The framework does not argue for maximal quality everywhere; it argues for type-specific, cost-aware quality investment.
+
+On LLM-as-Judge reliability: same-model judging is indeed problematic (Theorem~\ref{thm:fkg}). But cross-model judging with structural scaffolding (Layer~3 constrained by Layers~1 and 2) remains cost-effective for semi-decidable types. The diversity gain (Definition~\ref{def:diversity}) shows that a weak independent detector outperforms a strong correlated one, providing a concrete architectural remedy.
+
+VIH (Verified Iterations per Hour) captures the speed-quality tradeoff more precisely than raw throughput: $\VIH = \lambda_{\mathrm{raw}} \cdot p_{\mathrm{verify}}$. The strongest form of the ``speed kills quality'' objection is that verification itself becomes less reliable under time pressure, creating a feedback loop that systematically overestimates VIH at high speeds. This remains an open empirical question that the framework does not resolve.
+
+VIH is also not a complete objective function. A verified iteration that introduces subtle architectural debt, passes tests but degrades maintainability, or solves the wrong subproblem is ``verified'' but not valuable. Reinertsen's cost-of-delay framework provides a more comprehensive alternative that accounts for the economic value of delivery timing. VIH is a useful proxy for the speed-quality tradeoff specifically, but it should not be mistaken for a measure of total value delivered. The ``18 types are not the right taxonomy'' objection from the quality pillar applies here as well: the three-factor latent structure (context blindness, completion bias, training leakage) may be more fundamental than the 18-type enumeration; confirmatory factor analysis on appropriate datasets would test this.
+
+The ``caching is a false economy'' objection deserves particular attention. Cache invalidation bugs are intermittent, state-dependent, and compound through cascading cached values. For rapidly changing codebases under active development, cache hit rates may be too low to justify the infrastructure overhead. Our EOQ theorem provides a principled refresh schedule, but assumes knowledge of the change rate $\lambda$, which itself must be estimated. The ``fresh eyes'' advantage (17.1\% quality improvement from fresh context) is large enough that naive persistent state is VIH-negative; incremental context is only justified when compaction reduces quality loss below 12.3\%.
+
+
+\subsection{Naur Is Right and Theory Cannot Be Preserved}
+\label{sec:contrarian-naur}
+
+\paragraph{The steelmanned argument.}
+Naur~\citep{naur1985} argued that programming is theory building, where ``theory'' (in Ryle's sense) is the knowledge a person must have ``in order not only to do certain things intelligently but also to explain them, to answer queries about them, to argue about them.'' Three capabilities resist documentation: mapping between code and reality, design justification (``the justification is and must always remain the programmer's direct, intuitive knowledge or estimate''), and modification intelligence, which depends on recognising similarities ``that are not, and cannot be, expressed in terms of criteria.''
+
+The tacit divergence conjecture (Conjecture~\ref{conj:tacit}) formalises this: for Kolmogorov-random components of tacit knowledge, the description length diverges, meaning that no finite documentation can capture them. If this is correct, then THEORY.md, ADRs, and all documentation artifacts are lossy compression creating false confidence. Acting on extracted ``decisions'' may be worse than no documentation at all, because it creates the illusion of understanding where none exists.
+
+Tsoukas's critique of Nonaka and Takeuchi deepens the problem: tacit and explicit knowledge are not convertible pools but two dimensions of all knowing. The ``conversion'' metaphor (tacit to explicit and back) is incoherent; what actually happens is articulation, which necessarily transforms and reduces the original knowledge.
+
+\paragraph{What the evidence shows.}
+Naur wrote in 1985 about small teams with long tenure. Modern software involves high turnover across time zones and continents. The alternative to lossy documentation is not ``direct contact with theory-holders'' but \emph{no knowledge transfer at all}. Lossy compression is still enormously useful: JPEG images demonstrate this. The question is not whether documentation is perfect but whether it is better than nothing, and whether its limitations are understood.
+
+The double bottleneck theorem (Theorem~\ref{thm:bottleneck}) provides the formal resolution: governance fidelity is bounded by log richness, and agent logs that externalise decisions, assumptions, and rejected alternatives capture more theory than code alone, even if the capture is necessarily lossy. Documentation with explicit uncertainty markers (``confidence: medium,'' ``last validated: 2025-03'') addresses the false confidence risk by making the lossiness visible rather than hiding it.
+
+The survival analysis (\S\ref{sec:survival}) adds a temporal dimension: decision validity decays with domain-specific half-lives (UI/frontend decisions, approximately 1.2 years; API contracts, approximately 2.5 years; data model decisions, approximately 4.3 years). Governance that tracks decision age and proactively surfaces decisions approaching their expected half-life provides a practical response to Naur's concern, acknowledging that documentation decays while building mechanisms to detect and respond to that decay.
+
+We accept the residual: perfect externalisation is impossible. The framework uses this impossibility as a design constraint (Design Principle~11: accept residual theory loss), supplementing artifact-based governance with social mechanisms (code review conversations, architecture advice processes) for knowledge that resists externalisation.
+
+The Dreyfus model of skill acquisition provides additional nuance: expert
+practitioners operate on intuitions that resist rule-based decomposition.
+Collins's taxonomy of tacit knowledge (relational, somatic, collective)
+identifies which components are in principle externalisable (relational) and
+which are not (somatic, collective).  The governance architecture should invest
+extraction effort proportional to externalisability, rather than attempting
+uniform documentation.  This selective approach respects Naur's insight while
+remaining practically useful.
+
+
+\subsection{Cross-Cutting Assessment}
+
+Several patterns emerge across these seven positions.  First, most contrarian
+arguments are \emph{partially} correct rather than wholly right or wrong.  The
+framework's response is typically to identify the conditions under which the
+objection holds ($\sigma < 0.3$ for the formalism critique, below 5 to 10
+developers for the governance-as-overhead critique, $q^* < 1$ for the
+quality-is-good-enough critique) and to incorporate those conditions as design
+parameters rather than dismissing the objection.
+
+Second, the strongest objections challenge the framework's \emph{foundations}
+(Suchman on situated action, Wittgenstein on language games, Naur on
+theory preservation) rather than its \emph{conclusions}.  We acknowledge these
+as genuine limitations that define the framework's scope of applicability rather
+than falsify its results within that scope.
+
+Third, the empirical evidence is strongest for the \emph{problems} the framework
+addresses (compound errors in pipelines, quality degradation from AI code
+generation, governance scaling challenges) and weakest for the \emph{solutions}
+it proposes (ADRs improving quality outcomes, formal methods reducing
+maintenance costs, governance preventing drift).  This asymmetry is honest but
+should constrain confidence in the prescriptive claims.
+
+
+% ============================================================
+% RELATED WORK (insert before Conclusion)
+% ============================================================

@@ -1,0 +1,105 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{wrapfig}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{arydshln}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{minitoc}
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\usepackage{pifont}
+\usepackage{afterpage}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{titletoc}
+\usepackage{siunitx}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{conjecture}{Conjecture}[section]
+\newtheorem*{remark}{Remark}
+
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\definecolor{baselinecolor}{gray}{.95}
+\newcommand{\grayrow}{\rowcolor[gray]{.9}}
+\newcommand{\graycell}[1]{\cellcolor{baselinecolor}{#1}}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+\renewcommand{\today}{}
+
+\title{Towards a Science for AI Coding Agent Harnesses}
+
+\author[1]{Prannay Agrawal}
+\affil[]{Pragnition Labs}
+\affil[1]{Pragnition Labs}
+
+\begin{abstract}
+\vspace{-0.2in}
+
+AI coding agents now generate 40--60\% of committed code on major platforms, yet harness architecture remains an ad hoc engineering discipline.
+We present a unified formal framework synthesizing seven pillar papers, each addressing one architectural dimension: Abstraction, Information, Reliability, Coordination, Temporal, Quality, and Governance.
+The unifying currency across all seven pillars is \emph{information}: the abstraction gap measures the information distance between spec and code; context selection optimizes information delivery under degradation; compound errors destroy information through multiplicative reliability decay; coordination amplifies or attenuates information loss across agents; temporal dynamics govern information freshness; quality defense detects information-destroying defects; and governance capacity bounds the rate at which architectural information can be preserved.
+Key cross-cutting results include: (i) compound error sensitivity, where per-step reliability $p$ yields end-to-end reliability $p^n$ with elasticity equal to $n$; (ii) structural enforcement dominance over instructional methods, with reliability gaps growing as $(1-\epsilon)^T$; (iii) a governance capacity bound establishing that when drift rate exceeds governance channel capacity, no scheme prevents unbounded divergence.
+The framework yields 10 unified design principles for harness architecture and identifies the empirical validation program required to ground these theoretical results.
+
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+% ====================================================================
+% 1. INTRODUCTION
+% ====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+The landscape of software engineering has undergone a phase transition. Converging estimates place AI-generated code at 40--42\% of production output \citep{gitclear2025, sonar2026}, with some platforms reporting higher figures. GitHub Copilot generates 46\% of code for its users \citep{github2024rct}. AI coding agents (Claude Code, OpenAI Codex, Cursor, Windsurf) have progressed from autocomplete to autonomous multi-step software engineering, reading codebases, planning changes, writing code, running tests, and iterating on failures.
+
+Yet the \emph{harness}, the surrounding architecture that mediates between human intent and agent execution, remains poorly understood. Harness design choices (what context to provide, when to verify, how to coordinate multiple agents, how to enforce architectural constraints) are made through practitioner intuition and trial-and-error rather than principled analysis. The consequences are visible in aggregate data: GitClear's analysis of 211 million changed lines found that code blocks with five or more duplicated lines increased approximately 8$\times$ (with overall duplication rates rising from 8.3\% to 12.3\%), and refactoring activity collapsed from 25\% to under 10\% of changed lines \citep{gitclear2025}. DORA 2025 reported that individual task completion increased 21\% with AI adoption, while organizational-level throughput stayed flat and software delivery stability showed a \emph{negative} correlation with AI usage \citep{dora2025}.
+
+\paragraph{Thesis.} This paper argues that harness architecture can and should be studied as a scientific discipline, with formal models that yield testable predictions, design principles with information-theoretic justifications, and empirically calibrated parameters. We do not claim that the formal models presented here are complete or fully validated; rather, we claim that the \emph{approach} of applying formal methods to harness design is productive, and we demonstrate this by synthesizing seven pillar papers into a unified framework.
+
+\paragraph{The seven pillars.} Each pillar addresses one architectural dimension of the harness design problem:
+
+\begin{enumerate}[label=(\roman*)]
+    \item \textbf{Abstraction} \citep{pillar-abstraction}: the information-theoretic gap between specification and code, formalized as conditional Kolmogorov complexity $\mathcal{G}(S,P) = K(P \mid S)$.
+    \item \textbf{Information} \citep{pillar-information}: context selection under degradation as submodular optimization, with the Shannon decomposition of the abstraction gap.
+    \item \textbf{Reliability} \citep{pillar-reliability}: compound error models for multi-step agent pipelines, optimal verification scheduling, and the structural enforcement boundary.
+    \item \textbf{Coordination} \citep{pillar-coordination}: error amplification in multi-agent systems, task decomposition as balanced min-cut, and Quality-Adjusted Speedup.
+    \item \textbf{Temporal} \citep{pillar-temporal}: Verified Iterations per Hour, speculative execution conditions, and cache-staleness tradeoffs.
+    \item \textbf{Quality} \citep{pillar-quality}: 18 slop types in 3 decidability classes, layered defense optimization, and the Accretion Category.
+    \item \textbf{Governance} \citep{pillar-governance}: governance capacity bounds, cascade control models, and the theory preservation problem.
+\end{enumerate}
+
+\paragraph{Why these seven, and why they are sufficient.} The pillars decompose the harness design space along three axes. The \emph{semantic axis} (Abstraction, Information) addresses what the agent needs to know. The \emph{execution axis} (Reliability, Coordination, Temporal) addresses how the agent acts. The \emph{assurance axis} (Quality, Governance) addresses how outcomes are verified and architectural coherence is maintained. Every harness design decision we have encountered in practice falls within at least one of these seven pillars, and the cross-pillar connections (Section~\ref{sec:synthesis}) show that the pillars interact in structured, formalizable ways. We do not claim that this decomposition is the only productive one, nor that it is exhaustive: important engineering concerns including user interface design, security architecture (sandboxing, credential management), and cost management (token budgeting, model routing) are not addressed by the current framework and merit their own formal treatment. We claim that this decomposition is \emph{productive}, not that it is complete.
+
+\paragraph{Scope and framing.} This is a synthesis paper. The individual pillar papers are theory and position papers that apply established formal machinery (information theory, reliability theory, control theory, computability theory, lattice theory, survival analysis) to the new problem of harness architecture. The novelty lies in the \emph{application} and \emph{synthesis}, not in the underlying mathematics. Where claims are conjectural or supported only by limited empirical evidence, we say so explicitly. All seven pillar papers, and this synthesis, draw on practitioner discourse (blog posts, industry reports, preprints) where that discourse provides the best available evidence; such sources are flagged accordingly.
+
+\paragraph{Organization.} Sections~\ref{sec:abstraction}--\ref{sec:governance} present the key results from each pillar. Section~\ref{sec:synthesis} develops the cross-pillar synthesis, which is the primary contribution of this paper. Section~\ref{sec:empirical} assesses the empirical foundations. Section~\ref{sec:principles} presents unified design principles. Section~\ref{sec:limitations} discusses limitations and open problems. Section~\ref{sec:conclusion} concludes.
+
+
+% ====================================================================
+% 2. THE ABSTRACTION PILLAR
+% ====================================================================

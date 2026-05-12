@@ -1,0 +1,157 @@
+\section{Related Work}
+\label{sec:related}
+
+We position this work against six bodies of prior research.  Each subsection
+identifies the specific contributions we build upon and clarifies where our
+framework extends, synthesises, or merely applies existing results.
+
+
+\subsection{Formal Methods in Software Engineering}
+
+The refinement lattice (Section~\ref{sec:refinement}) builds directly on Back's
+refinement calculus~\citep{back1980correctness} and Morgan's \emph{Programming
+from Specifications}~\citep{morgan1994programming}, which formalised the
+stepwise refinement of specifications into code.  Hoare and He's Unifying
+Theories of Programming~\citep{hoare1998unifying} showed that programs are
+predicates and refinement is logical implication, placing specifications and
+code in a single semantic universe.  Abrial's B-Method and
+Event-B~\citep{abrial2010modeling} provide the most industrially deployed
+refinement-based formal method, with verified systems including the Paris
+M\'{e}t\'{e}or driverless line, directly instantiating the tower of Galois
+connections.
+
+Cousot and Cousot's abstract interpretation
+framework~\citep{cousot1977abstract} formalised abstraction via Galois
+connections five decades ago, leading to mature industrial tools (Astr\'{e}e,
+Polyspace, Infer).  We use the Galois connection formalism to model the
+abstraction spectrum but do not extend the abstract interpretation framework
+itself.  Roy and Cordy's clone type taxonomy (Types~I through~IV) characterises
+detection decidability for duplicate logic: Types~I through~III (textual,
+renamed, gapped) are decidable; Type~IV (semantic clones) is not.  This
+distinction directly informs our decidability classification of slop types.
+
+Murphy, Notkin, and Sullivan's reflexion models~\citep{murphy1995, murphy2001}
+compare intended architecture against extracted source models, providing the
+formal basis for architectural erosion detection and the conformance checking
+that underpins our governance pillar.  The Curry-Howard-Lambek
+correspondence~\citep{wadler2015propositions} provides the type-theoretic
+foundation connecting proofs, programmes, and categories that unifies our
+treatment of specifications as both logical propositions and programme types.
+
+For AI-assisted formal methods, Kleppmann~\citep{kleppmann2025formal} predicted
+that AI would make formal verification mainstream;
+Congdon~\citep{congdon2025formal} endorsed and extended this argument with a
+concrete workflow vision.  The vericoding benchmark~\citep{vericoding2025}
+provides early empirical support.  Our framework formalises \emph{why} this
+convergence is expected: AI reduces the cost of traversing the refinement
+lattice, while formal verification provides a deterministic oracle.
+
+
+\subsection{Multi-Agent Systems and Coordination}
+
+Kim et al.~\citep{kim2025scaling} provide the most comprehensive empirical
+evaluation of multi-agent system scaling, establishing error amplification
+factors, capability saturation thresholds, and communication scaling laws across
+five canonical architectures.  Our work builds on their empirical findings by
+developing a formal framework that explains their observations and derives
+actionable design rules.  Cemri et al.~\citep{Cemri2025} introduced MAST, the
+first empirically grounded failure taxonomy for multi-agent LLM systems,
+identifying 14 failure modes across over 1,600 traces.
+
+For merge conflict research, Brun et al.~\citep{Brun2011} pioneered proactive
+conflict detection with Crystal.  Kasi and Sarma~\citep{KasiSarma2013}
+developed Cassandra for conflict-minimising task scheduling.  Ghiotto
+et al.~\citep{Ghiotto2018} provided the largest study of merge conflict
+characteristics (2,731 Java projects).  Sousa et al.~\citep{Sousa2018}
+formalised semantic conflict-freedom verification with SafeMerge.  Zhu
+et al.~\citep{Zhu2024congra} introduced ConGra, finding (counterintuitively)
+that general-purpose LLMs outperform code-specialised ones at conflict
+resolution, a result relevant to coordination agent design.  For merge tools,
+Falleri et al.~\citep{Falleri2014} developed GumTree for fine-grained AST
+differencing; Shen et al.~\citep{Shen2019} developed IntelliMerge for
+refactoring-aware merging (88.48\% precision); and Apel et al.~\citep{Apel2012}
+developed JDime for semistructured merge (39\% conflict reduction).
+
+Graph partitioning, which formalises our task decomposition problem, has deep
+roots: Fiedler~\citep{Fiedler1973} introduced algebraic connectivity and
+spectral bisection; Kernighan and Lin~\citep{KernighanLin1970} developed the KL
+heuristic; Fiduccia and Mattheyses~\citep{FiducciaMattheyses1982} improved it
+with linear-time passes and hypergraph support; Karypis and
+Kumar~\citep{KarypisKumar1998} developed METIS with $O(|E|)$ multilevel
+partitioning; Arora, Rao, and Vazirani~\citep{AroraRaoVazirani2009} achieved
+$O(\sqrt{\log n})$ sparsest cut via SDP; and Lee et al.~\citep{Lee2012cheeger}
+proved higher-order Cheeger inequalities connecting spectral gaps to partition
+quality.
+
+Contract-based design provides our assume-guarantee framework:
+Meyer~\citep{Meyer1992} introduced Design by Contract; Henzinger
+et al.~\citep{Henzinger2002} developed assume-guarantee methodology;
+Jones~\citep{Jones1983} developed rely-guarantee reasoning; Benveniste
+et al.~\citep{Benveniste2018} provided a comprehensive theory of contracts for
+system design.  Our coordination contracts extend these to the specific setting
+of LLM agents operating on shared codebases.
+
+For distributed systems foundations, Bernstein and Hadzilacos~\citep{BernsteinHadzilacos1987} established concurrency control theory; Berenson et al.~\citep{Berenson1995} formalised isolation levels and identified write skew; Fekete et al.~\citep{Fekete2005} showed how to make snapshot isolation serialisable via promotion, analogous to our use of contracts to close the gap from snapshot to serialisable isolation for agents. Lamport~\citep{Lamport1978} defined happened-before and logical clocks; Herlihy~\citep{Herlihy1991} proved the consensus number hierarchy; and the FLP impossibility result~\citep{FLP1985} proved that deterministic consensus is impossible with one faulty process. Ongaro and Ousterhout~\citep{Ongaro2014} developed Raft for understandable consensus. These results inform our treatment of coordination correctness: the strong correctness condition (serialisable merge outcomes) is analogous to linearisability, while the weak correctness condition (compiles and passes tests) provides a practically achievable alternative.
+
+For software modularity, Mitchell and Mancoridis~\citep{Mitchell2006bunch} developed Bunch for automatic software modularisation. Martin~\citep{Martin1994} defined coupling metrics (afferent, efferent, instability) that underpin our coupling graph formalism. MacCormack et al.~\citep{MacCormack2012} validated Conway's Law empirically via the mirroring hypothesis, confirming that organisational structure predicts architectural structure with high fidelity.
+
+
+\subsection{Software Quality and Testing}
+
+Software defect taxonomies provide context for our slop type classification. IEEE~1044~\citep{ieee1044} provides multi-attribute anomaly classification. ODC~\citep{chillarege1992} offers eight orthogonal defect types with development-phase correlations. Beizer~\citep{beizer1990} provides a ten-category bug taxonomy. CWE covers security vulnerabilities. None of these captures accretion defects (Section~\ref{sec:degradation}), the novel defect class that is correct, unnecessary, individually defensible, and collectively harmful.
+
+For software reliability, Musa's models~\citep{musa1987} connect operational profiles to defect discovery. Fenton and Neil~\citep{fenton1999} introduced Bayesian networks for defect prediction. Capers Jones~\citep{capersjones2012} provided the foundational defect removal effectiveness data from 25,000 projects. Littlewood and Strigini~\citep{littlewood1993, littlewood2000} proved that diverse software versions do not fail independently, a result we adapt to LLM judge-producer pairs via the FKG inequality.
+
+The classical reliability theory foundations include Barlow and Proschan's series system product law and importance measures~\citep{barlow1965mathematical, barlow1975statistical}, the IFR/IFRA closure theorems~\citep{birnbaum1961stochastic}, and the Young-Daly formula~\citep{young1974first, daly2006higher} for optimal checkpoint intervals. The Jelinski-Moranda~\citep{jelinski1972software} and Musa-Okumoto~\citep{musa1984logarithmic} models of fault detection as a depletion process inform our verification convergence analysis.
+
+For AI code quality measurement, CodeRabbit~\citep{coderabbit2025}, GitClear~\citep{gitclear2025}, Qodo~\citep{qodo2025}, and the ``debt boom'' analysis~\citep{debtboom2026} provide the emerging empirical base. The controlled GitHub trial~\citep{github2024rct} stands in tension with observational results, a contradiction we interpret through the verification bottleneck (short-term task completion gains masking long-term maintainability costs). The Swiss Cheese Model~\citep{reason1990} frames accident causation through aligned holes in multiple barriers. Viola-Jones cascades~\citep{violajones2004} formalise sequential classifier design with early rejection of easy negatives. Boehm's cost escalation curve~\citep{boehm1981} and Capers Jones~\citep{capersjones2012} provide the economic foundation for layered defense, though the cost curve may be flatter in modern CI/CD environments.
+
+Anthropic's agent evaluation methodology~\citep{anthropic2026evals} introduces the pass@$k$ vs.\ pass$^k$ distinction, clarifying whether verification requires any correct output in $k$ attempts or correct outputs across all $k$ attempts. The LLM-as-Judge survey~\citep{li2024survey} documents systematic biases (sycophancy, position bias) that limit LLM-based verification. The METR merge-gap study~\citep{metr2026swebench} provides the most striking evidence of circular validation bias: agents that ``solve'' benchmarks by passing tests frequently produce code that human reviewers would reject.
+
+
+\subsection{Architecture Governance and ADRs}
+
+Nygard~\citep{nygard2011} proposed the lightweight ADR format. The Architecture Advice Process~\citep{harmellaw2023} adds a governance layer: anyone can make architectural decisions, but must first consult affected parties and domain experts. Ford et al.~\citep{ford2017} defined architectural fitness functions as objective integrity assessments of architectural characteristics, with tools like ArchUnit encoding these as executable tests. The gap in ADR-to-fitness-function automation is being addressed by tools like Archgate through the ratchet model.
+
+For reflexion models, Murphy et al.~\citep{murphy1995, murphy2001} provide the formal foundation for conformance checking, with extensions including behavioural reflexion models and CI-integrated prototypes detecting nonconformances ``within minutes, instead of the months or years it takes today.'' The AgDR format extends ADRs with agent-specific metadata (agent name, model ID, session, trigger type), addressing traceability gaps when AI agents make architectural choices.
+
+Conway's Law~\citep{conway1968} established the homomorphism between organisational and system structure. Nagappan et al.~\citep{nagappan2008} found that organisational metrics predict failure-proneness with approximately 85\% precision and recall, outperforming all code metrics. MacCormack et al.~\citep{maccormack2008} validated the mirroring hypothesis empirically. Skelton and Pais~\citep{skelton2019} operationalised the inverse Conway maneuver through Team Topologies.
+
+Hellerstein et al.~\citep{hellerstein2004} provided the foundational treatment of feedback control for computing systems. Our contribution is applying cascade control specifically to multi-granularity governance, with stability analysis and Nyquist-like sampling requirements for governance loops. Lehman's laws of software evolution~\citep{Lehman1980}, particularly the law of increasing complexity, underpin our coupling density dynamics model.
+
+The Goodhart's Law literature~\citep{goodhart1975, manheim2019goodhart} is directly relevant to governance measurement. When a governance metric becomes a target, it ceases to be a good measure: coupling targets incentivise restructuring that reduces measured coupling while introducing unmeasured coupling through shared configuration; coverage targets incentivise trivial fitness functions. The defense is metric rotation, metric triangulation, and cultural alignment. Our framework addresses this through the multi-granularity approach: different governance loops measure different quantities at different frequencies, making systematic gaming more difficult.
+
+The DORA programme~\citep{dora2025} provides the largest objective measurement of AI's impact on software engineering practice. The productivity paradox it documents (individual gains, organisational stagnation) motivates our quality-adjusted speedup metric, which formalises the quality cost of parallelism. McKinney~\citep{McKinney2026} argued that Brooks's Law applies directly to LLM agents, a position our Extended Amdahl's Law formalises.
+
+
+\subsection{Information Theory Applied to Software}
+
+The application of algorithmic information theory to software has precedent. Li and Vit\'{a}nyi~\citep{li2019introduction} discuss the connection between algorithmic complexity and programme equivalence. The normalised information distance~\citep{li2004similarity} has been applied to software clone detection and plagiarism, though not (to our knowledge) to the specification-code relationship specifically. Our abstraction gap $\mathcal{G}(S, P) = K(P \mid S)$ applies conditional Kolmogorov complexity to this relationship.
+
+Hindle et al.~\citep{hindle2012naturalness} established that code is ``natural'' (statistically predictable), measuring code entropy and showing that language models can exploit this regularity. Hellendoorn and Devanbu refined these measurements, finding entropy of approximately 1.25 bits per token. Shannon's original measurements~\citep{shannon1948} establish the baseline at 0.6 to 1.3 bits per character for natural language. These measurements ground our information-theoretic treatment of the specification-code channel.
+
+Hassan's change entropy~\citep{hassan2009} predicts faults from change scattering. Our codebase entropy (Definition~\ref{def:entropy}) shifts from measuring change scattering to measuring the coupling structure that necessitates it. Tishby et al.'s information bottleneck method~\citep{tishby2000information} provides an alternative formalisation: the context window as an information bottleneck between the full codebase and the generated code.
+
+For context engineering specifically, Anthropic~\citep{anthropic2025context} established the ``smallest set of high-signal tokens'' principle with four functional components (system prompts, tools, examples, message history). Spotify's Honk~\citep{spotify2025honk} contributed the ``static over dynamic'' philosophy. HumanLayer~\citep{humanlayer2025skillissue} distinguished structural from instructional enforcement and coined ``success should be silent.'' Lin and Bilmes~\citep{lin2011submodular} proved submodularity for document summarisation functions. Jina et al.~\citep{jina2025submodular} independently applied submodular optimisation to LLM context engineering, validating our formalisation. Liu et al.~\citep{liu2024lost} identified the ``lost in the middle'' phenomenon. Subsequent work by Chroma~\citep{chroma2025contextrot}, Du et al.~\citep{du2025context}, Kuratov et al.~\citep{kuratov2024babilong}, and Hsieh et al.~\citep{hsieh2024ruler} collectively establishes the empirical degradation landscape that our context degradation function formalises.
+
+The value of information literature, originating with Howard (1966), frames context selection as a decision-theoretic problem: which information to acquire before acting. The greedy algorithm for submodular value of information was analysed by Krause and Guestrin (2005). Our degradation penalty is a novel addition absent from the classical setting, where acquiring more information is assumed to be never harmful. For code, this assumption fails: code dependencies create non-monotonic relevance effects where additional context can actively mislead.
+
+
+\subsection{AI Coding Agents and Harnesses}
+
+The empirical landscape of AI coding agents provides both motivation and calibration for our framework. SWE-bench~\citep{sweeffi2025} measures resolve rates, with SWE-Effi introducing resource-bounded effectiveness scores. Bian et al.~\citep{bian2025limits} decompose bottlenecks, finding that web environment latency dominates (53.7\% of runtime) with LLM API latency varying up to 69$\times$. These findings motivate our temporal architecture.
+
+For speculative execution in agent pipelines, Zhou et al.~\citep{zhou2025speculative} achieve 46 to 55\% next-action prediction accuracy; Ji et al.~\citep{ji2026dualspec} extend this with heterogeneous speculation, achieving 3.28$\times$ speedup. Our contribution is the formal speculation ratio test and depth limit, grounded in classical scheduling theory and connected to the Spectre analogy for hidden costs.
+
+Agent verification frameworks include AgentSpec~\citep{wang2026agentspec}, which provides the key empirical data point on structural versus prompt enforcement (87\% versus 77\%); AgentGuard~\citep{koohestani2025agentguard}, which introduces dynamic probabilistic assurance via MDP modelling; and Multi-Agent Verification~\citep{lifshitz2025mav}, which demonstrates that diverse verifier ensembles outperform homogeneous ones and that weaker models can verify stronger ones.
+
+For scalable oversight, Irving et al.'s debate framework~\citep{irving2018debate} proposes using adversarial argumentation between agents to help weaker judges evaluate stronger systems. Constitutional AI~\citep{bai2022constitutional} uses self-critique against a set of principles; while effective as a training methodology, it inherits the circular validation limitations we formalise. METR's reward-hacking analysis~\citep{metr2025rewardhacking}, Apollo Research's scheming studies~\citep{apollo2025scheming}, and NIST CAISI's cheating documentation~\citep{nist2025cheating} collectively establish that structural enforcement is necessary for adversarial robustness.
+
+For caching and context persistence, Liang et al.~\citep{liang2026cache} evaluate prompt caching empirically, and Zhang et al.~\citep{zhang2025apc} introduce plan template caching at the reasoning level. Suzgun and Kalai~\citep{suzgun2024metaprompting} establish the ``fresh eyes'' advantage that motivates our fresh context dominance theorem. The speed-quality tradeoff literature includes Reinertsen's cost-of-delay framework, Forsgren et al.'s~\citep{forsgren2018accelerate} evidence that speed and stability can improve simultaneously through DevOps practices, and Kahneman's~\citep{kahneman2011thinking} cognitive science foundation for why speed pressure degrades complex reasoning.
+
+Industrial harness implementations provide the strongest empirical grounding. Cursor~\citep{Cursor2026} documented the evolution from flat locking to planner/worker/judge topology, providing evidence that hierarchical role separation succeeds at scale. Osmani~\citep{Osmani2025} synthesised practitioner patterns including optimal team sizing and tier-based tool stacks. ChatDev, MetaGPT, and AgentCoder explore role-based agent decomposition for software tasks, providing additional data points on multi-agent coordination architectures. The convergence of these production systems toward architectures predicted by our framework (layered verification, structural enforcement, bounded context windows, governance loops) provides indirect validation, though controlled experiments remain necessary.
+
+The sampling inspection literature from manufacturing quality control provides precedent for our adaptive verification approach. The Dodge-Romig sampling plans~\citep{dodge1929method, dodge1959sampling} and MIL-STD-105E switching rules~\citep{milstd105e} formalised adaptive inspection regimes that tighten or relax based on observed quality. The Lindsay-Bishop dynamic programming formulation for inspection allocation~\citep{lindsay1964allocation} provides the discrete optimisation framework that informs our verification scheduling result. These classical results, developed for physical manufacturing, transfer naturally to software verification pipelines where the ``inspection'' is a verification step and the ``product'' is generated code.
+
+\paragraph{Position in the landscape.}
+This paper is a synthesis and formalisation, not a claim of novel mathematical results. The information-theoretic machinery is standard~\citep{li2019introduction}; the refinement calculus is established~\citep{back1980correctness, morgan1994programming}; the reliability theory is classical~\citep{barlow1965mathematical}; the Curry-Howard correspondence is a theorem~\citep{wadler2015propositions}. Our contribution is the application of these tools to the specific problem of AI coding agent harness design, the unification across seven architectural pillars through shared formal machinery, and the identification of cross-pillar constraints (the abstraction gap chain, the compound error cascade, the governance capacity bound) that emerge only from the unified treatment.

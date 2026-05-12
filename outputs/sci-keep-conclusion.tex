@@ -1,0 +1,26 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper has synthesized seven pillar papers into a unified formal framework for AI coding agent harness architecture. The key contributions of the synthesis are:
+
+\begin{enumerate}
+    \item \textbf{Information as the unifying currency}: all seven pillars reason about information flow, and their cross-pillar connections are mediated by information-theoretic identities.
+    \item \textbf{The Governance Information Budget} (Equation~\ref{eq:gib}): the integrating concept showing that every pillar constrains a different aspect of the same problem, namely closing the abstraction gap reliably, efficiently, and coherently.
+    \item \textbf{Three cross-cutting cascades}: the abstraction gap chain (Abstraction, Information, Quality), the compound error cascade (Reliability, Coordination, Temporal), and the structural enforcement principle (Information, Reliability, Quality, Coordination).
+    \item \textbf{Ten unified design principles} grounded in specific formal results from the constituent pillars.
+\end{enumerate}
+
+The thesis of this paper is that harness architecture is not merely an engineering problem to be solved through trial-and-error, but a scientific discipline amenable to formal analysis. The seven pillars provide a decomposition of the design space, each grounded in established mathematical machinery. The cross-pillar connections show that these are not independent concerns but facets of a unified information-theoretic problem.
+
+The framework is incomplete. The empirical validation gaps identified in Section~\ref{sec:empirical} are substantial, and several key quantities (Kolmogorov complexity, tacit knowledge content, governance capacity in practice) are either uncomputable or unmeasured. The theory preservation problem (Section~\ref{sec:governance}) remains fundamentally open.
+
+Nevertheless, the framework provides something the field currently lacks: a systematic way to reason about harness design decisions, predict their consequences, and identify the leverage points where investment yields the highest returns. The compound error sensitivity theorem tells us to invest in per-step quality. The structural enforcement principle tells us to make critical invariants agent-proof. The governance capacity bound tells us to scale governance with velocity. The abstraction gap decomposition tells us where information should come from.
+
+The next step is empirical validation. The five experiments proposed in Section~\ref{sec:limitations} would ground the theoretical predictions in measured parameters, transforming the framework from a formal exercise into a predictive tool. We invite the community to contribute to this validation program.
+
+
+% ====================================================================
+% APPENDIX
+% ====================================================================
+\begin{appendices}
+

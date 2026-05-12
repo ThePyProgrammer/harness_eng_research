@@ -1,0 +1,348 @@
+% ====================================================================
+% EXPANDED SECTIONS 9, 10, 12, AND APPENDIX A
+% For: Towards a Science for AI Coding Agent Harnesses
+% ====================================================================
+% This file contains expanded, self-contained versions of:
+%   Section 9:  Cross-Pillar Synthesis
+%   Section 10: Empirical Foundations
+%   Section 12: Limitations and Open Problems
+%   Appendix A: Cross-Pillar Theorem Index
+% ====================================================================
+
+
+% ====================================================================
+% 9. CROSS-PILLAR SYNTHESIS
+% ====================================================================
+\section{Cross-Pillar Synthesis}
+\label{sec:synthesis}
+
+The preceding sections presented each pillar independently. This section, the primary contribution of this synthesis paper, identifies the structural connections that bind them into a unified framework.
+
+\subsection{Information as the Unifying Currency}
+
+The deepest structural connection across all seven pillars is that each reasons about \emph{information flow} through the harness:
+
+\begin{itemize}[nosep]
+    \item \textbf{Abstraction}: the information gap $K(P \mid S)$ between specification and code.
+    \item \textbf{Information}: the Shannon decomposition $H(P \mid S) = H(P \mid S,C,\theta) + I(P;C \mid S,\theta) + I(P;\theta \mid S)$.
+    \item \textbf{Reliability}: compound error as information destruction, $R(n) = p^n$.
+    \item \textbf{Coordination}: error amplification as correlated information loss across agents.
+    \item \textbf{Temporal}: context fidelity $\Phi(t) = e^{-\Lambda t}$ as information decay over time.
+    \item \textbf{Quality}: the Detection Ceiling $d_{\ell,j} \leq I(X; D_j)/H(D_j)$ as an information bound on verification.
+    \item \textbf{Governance}: governance capacity $C_{\text{gov}}$ as information throughput of the correction channel.
+\end{itemize}
+
+The unification is strongest along the \emph{semantic axis} (Abstraction, Information) and the \emph{assurance axis} (Quality, Governance), where information theory is the native formalism. For the \emph{execution axis} (Reliability, Coordination, Temporal), the information-theoretic framing is a valid interpretation but not the generative formalism: $R(n) = p^n$ is a probability product from reliability theory, the Extended Amdahl's Law draws on parallel computing and concurrency control, and VIH draws on scheduling and queueing theory. Calling compound errors ``information destruction'' is accurate (errors do corrupt the information content of pipeline output) but retrospective; the results would stand unchanged without the information-theoretic gloss. We adopt the information lens because it provides a common vocabulary for cross-pillar reasoning, while acknowledging that its explanatory power varies across pillars.
+
+\subsection{The Abstraction Gap Chain}
+
+The first structural connection links three pillars in a chain:
+
+\begin{enumerate}
+    \item \textbf{Abstraction} defines the gap: $\mathcal{G}(S,P) = K(P \mid S)$.
+    \item \textbf{Information} operationalizes it: $H(P \mid S) = H(P \mid S,C,\theta) + I(P;C \mid S,\theta) + I(P;\theta \mid S)$, decomposing the gap into three actionable levers.
+    \item \textbf{Quality} addresses what happens when the gap is traversed poorly: the 18 slop types are failure modes of the translation from spec to code, and the Compound Degradation Theorem (Theorem~\ref{thm:compound-degradation}) quantifies the consequences.
+\end{enumerate}
+
+The chain makes precise how a specification becomes code and what goes wrong along the way. The Abstraction pillar establishes the theoretical limits. The Information pillar identifies the levers. The Quality pillar classifies the failure modes and designs defenses.
+
+\subsection{The Compound Error Cascade}
+
+The second structural connection links three pillars through the theme of multiplicative degradation:
+
+\begin{enumerate}
+    \item \textbf{Reliability} proves $R(n) = p^n$: compound errors in sequential pipelines.
+    \item \textbf{Coordination} extends to multi-agent settings: the Extended Amdahl's Law (Theorem~\ref{thm:extended-amdahl}) adds the reliability factor $(1-\delta_a)^n$, and empirical amplification ($17.2\times$) exceeds the independence prediction.
+    \item \textbf{Temporal} frames the rate at which compound errors occur: VIH $= \lambda_{\text{raw}} \cdot p_{\text{verify}}$ captures the tradeoff between iteration speed and error rate.
+\end{enumerate}
+
+The cascade reveals a fundamental tension: the same exponential that makes compound errors devastating also makes per-step improvements highly leveraged (elasticity $= n$). This is the core design insight: invest in per-step quality, not pipeline sophistication.
+
+\subsection{The Structural Enforcement Principle}
+
+The principle that structural enforcement dominates instructional enforcement appears independently in four pillars:
+
+\begin{table}[h]
+\centering
+\caption{The structural enforcement principle across pillars.}
+\label{tab:structural}
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Pillar} & \textbf{Manifestation} \\
+\midrule
+Information & Tier boundaries enforced structurally (file system, .gitignore) vs. instructionally (prompt rules). Compliance gap: $(1-\epsilon)^T$. \\
+Reliability & Cost-of-failure threshold $L^*$ determines when structural enforcement is cost-effective. Threshold drops as $1/n$ for multi-step pipelines. \\
+Quality & Decidable slop types should be caught by structural gates (Layer 1), not by probabilistic methods. \\
+Coordination & File-ownership contracts enforce $F_i \cap F_j = \emptyset$ structurally, eliminating textual/syntactic conflicts by construction. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The convergence is not coincidental. Structural enforcement converts probabilistic guarantees into deterministic ones. In any system where errors compound (as they do in all agent pipelines), converting even a small fraction of probabilistic steps to deterministic ones has outsized impact on end-to-end reliability.
+
+\subsection{The Four-Layer Defense Architecture}
+
+The four-layer verification architecture appears in both the Reliability and Quality pillars:
+
+\begin{table}[h]
+\centering
+\caption{The shared four-layer verification architecture.}
+\label{tab:four-layer}
+\begin{tabular}{clccc}
+\toprule
+\textbf{Layer} & \textbf{Mechanism} & \textbf{Cost} & \textbf{Determinism} & \textbf{Decidability Class} \\
+\midrule
+1 & Structural gates & Very low & Deterministic & Decidable \\
+2 & Automated testing & Low & Probabilistic & Semi-decidable \\
+3 & AI review & Moderate & Probabilistic & Semi-decidable \\
+4 & Human review & High & Judgment & Undecidable \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ordering by cost and determinism is not arbitrary; it follows from the decidability classification. Decidable defects should be caught at Layer 1 (structural gates), where detection is certain and marginal cost is near zero. Semi-decidable defects require Layers 2--3, where detection is probabilistic but cost-effective. Undecidable defects require Layer 4, where human judgment provides the irreplaceable element.
+
+\subsection{Governance Capacity as the Macro Constraint}
+
+The Governance pillar's capacity bound (Theorem~\ref{thm:governance-capacity}) is the system-level analog of the Reliability pillar's compound error sensitivity (Theorem~\ref{thm:compound-sensitivity}):
+
+\begin{itemize}[nosep]
+    \item \textbf{Reliability}: at the step level, if $p < 1$, errors compound as $p^n$.
+    \item \textbf{Governance}: at the system level, if $R_{\text{drift}} > C_{\text{gov}}$, divergence accumulates without bound.
+\end{itemize}
+
+Both are threshold phenomena: below the threshold, the system is self-correcting; above it, degradation is unbounded. Both have the same structural form: a rate of degradation versus a capacity for correction. And both yield the same design prescription: invest in increasing the correction capacity (per-step quality, governance bandwidth) rather than adding post-hoc repair mechanisms.
+
+\subsection{Shared Formal Machinery}
+\label{sec:shared-machinery}
+
+Table~\ref{tab:machinery} maps the 16 distinct formal techniques used across the seven pillars. The density of the mapping (most techniques appear in 2+ pillars) reflects the deep structural unity of the framework; the pillars are not independent theories glued together but facets of a common problem viewed through different mathematical lenses.
+
+\begin{table}[h]
+\centering
+\caption{Formal machinery shared across pillars. A bullet (\textbullet) indicates that the pillar makes substantive use of the technique; a circle ($\circ$) indicates secondary or analogical use.}
+\label{tab:machinery}
+\small
+\begin{tabular}{l@{\hskip 4pt}c@{\hskip 4pt}c@{\hskip 4pt}c@{\hskip 4pt}c@{\hskip 4pt}c@{\hskip 4pt}c@{\hskip 4pt}c}
+\toprule
+\textbf{Technique} & \textbf{Abs} & \textbf{Inf} & \textbf{Rel} & \textbf{Crd} & \textbf{Tmp} & \textbf{Qlt} & \textbf{Gov} \\
+\midrule
+Shannon information theory ($H$, $I$, DPI) & \textbullet & \textbullet & $\circ$ & $\circ$ & $\circ$ & \textbullet & \textbullet \\
+Kolmogorov complexity ($K$) & \textbullet & $\circ$ & & & & & \textbullet \\
+Series reliability / compound errors ($p^n$) & & & \textbullet & \textbullet & $\circ$ & & \\
+Structural vs. instructional enforcement & & \textbullet & \textbullet & \textbullet & & \textbullet & $\circ$ \\
+Submodular optimization / greedy approx. & & \textbullet & & & & \textbullet & \\
+Control theory (cascade, Nyquist, stability) & & & & & $\circ$ & & \textbullet \\
+Lattice theory (Galois, closure, refinement) & \textbullet & & & & & & \textbullet \\
+Concurrency control / isolation levels & & & & \textbullet & & & \\
+Survival analysis (competing risks, Weibull) & & & & & & & \textbullet \\
+Scheduling theory (Amdahl, stochastic DAG) & & & & \textbullet & \textbullet & & \\
+FKG / correlation inequalities & & & \textbullet & & & \textbullet & \\
+Graph partitioning (min-cut, Cheeger) & & & & \textbullet & & & \\
+Rate-distortion theory & & & & & & & \textbullet \\
+Queueing theory (Little's law, Kingman) & & & & & \textbullet & & \\
+Speculative execution theory & & & & & \textbullet & & \\
+Cache competitive analysis (Sleator-Tarjan) & & & & & \textbullet & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three patterns emerge. First, Shannon information theory provides the broadest cross-pillar vocabulary, appearing substantively in four pillars and secondarily in three more. Second, structural enforcement is the most widely shared \emph{design principle} (four pillars derive it independently). Third, several techniques (concurrency control, survival analysis, cache competitive analysis) are used in only one pillar, suggesting that further cross-pollination may be productive; for instance, survival analysis could model the lifetime of context relevance (connecting Governance to Temporal), and concurrency control formalisms could sharpen the governance ratchet's interaction with parallel agent modifications.
+
+\subsection{Shared Empirical Sources}
+\label{sec:shared-empirical}
+
+Table~\ref{tab:empirical-sources} maps the 14 primary empirical sources to the pillars that rely on them. The density of cross-pillar citations highlights both a strength (convergent evidence from multiple analytical perspectives) and a vulnerability (the same data points bear disproportionate evidentiary weight).
+
+\begin{table}[h]
+\centering
+\caption{Key empirical sources and the pillars that draw on them. Columns indicate pillar usage: Abs(traction), Inf(ormation), Rel(iability), Crd (Coordination), Tmp (Temporal), Qlt (Quality), Gov(ernance).}
+\label{tab:empirical-sources}
+\small
+\begin{tabular}{l@{\hskip 3pt}c@{\hskip 3pt}c@{\hskip 3pt}c@{\hskip 3pt}c@{\hskip 3pt}c@{\hskip 3pt}c@{\hskip 3pt}c@{\hskip 6pt}p{4.5cm}}
+\toprule
+\textbf{Source} & \textbf{Abs} & \textbf{Inf} & \textbf{Rel} & \textbf{Crd} & \textbf{Tmp} & \textbf{Qlt} & \textbf{Gov} & \textbf{Key Finding} \\
+\midrule
+GitClear 2025 & & \textbullet & & & \textbullet & \textbullet & \textbullet & 211M lines; 8$\times$ duplication; 60\% refactoring collapse \\
+DORA 2025 & & & & \textbullet & \textbullet & \textbullet & \textbullet & Throughput up 21\%; stability negative \\
+Kim et al.\ 2025 & \textbullet & & & \textbullet & & & & $17.2\times$ error amplification; 180 configs \\
+METR 2026 & \textbullet & & \textbullet & & & \textbullet & & 50\% test-passing PRs unmerged \\
+Liu et al.\ 2024 & & \textbullet & & & & & & Lost in the Middle; U-shaped recall \\
+Chroma 2025 & & \textbullet & & & \textbullet & & & 18 models; monotonic degradation \\
+JetBrains 2025 & & \textbullet & & & & & & Complexity increase in AI code \\
+CodeRabbit 2025 & & & & & & \textbullet & & 1.68$\times$ issues; 2.74$\times$ XSS vulns \\
+Veracode 2025 & & & & & & \textbullet & & AI code security defect rates \\
+Apollo Research 2025 & & & \textbullet & & & \textbullet & & Scheming behaviors in agents \\
+NIST CAISI 2025 & & & \textbullet & & & \textbullet & & Benchmark cheating evidence \\
+Hariharan et al.\ 2025 & & & \textbullet & & & & & 63\% failure on 100-step tasks \\
+Spotify Honk 2025 & & \textbullet & & & & \textbullet & & Production harness telemetry \\
+Gloaguen et al.\ 2026 & & \textbullet & & & & & & AGENTS.md convention data \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The table reveals a concentration risk: GitClear, DORA, and METR each support claims in 3--4 pillars, meaning that a successful challenge to any one of these sources would ripple across the framework. Section~\ref{sec:empirical} provides a quality assessment of each source to make this risk explicit.
+
+\subsection{Additional Cross-Pillar Connections}
+\label{sec:missed-connections}
+
+Beyond the three primary cascades (abstraction gap chain, compound error cascade, structural enforcement principle), five cross-pillar interactions merit formal development.
+
+\paragraph{1. Accretion meets the ratchet.}
+The Quality pillar's Accretion Category (individually CI-passing changes that collectively degrade codebase health) is precisely the failure mode that the Governance pillar's ratchet mechanism (Definition~\ref{def:ratchet}) aims to prevent. The interaction, however, is non-trivial. Accretion defects are correct by construction; they satisfy all existing ratchet constraints. To prevent accretion, the ratchet must enforce \emph{structural health metrics} (duplication rate, dependency fan-out, abstraction depth) rather than per-change correctness. But structural health constraints are inherently more brittle than correctness constraints: they have higher false-positive rates and are sensitive to legitimate refactoring. Adding ratchet constraints on structural metrics risks triggering the ossification pathology (the Governance pillar's Ossification Theorem), where the constraint set grows until the allowed change set becomes empty or effectively so. The calibration question is: at what threshold should structural health metrics be ratcheted, and how should evidence expiry windows be set relative to the accretion rate $\alpha(t)$? The Compound Degradation Theorem (Theorem~\ref{thm:compound-degradation}) provides the growth rate; the Ratchet Convergence theorem provides the stabilization guarantee; what is missing is the bridging analysis showing how to set ratchet parameters that prevent accretion without inducing ossification.
+
+\paragraph{2. Staleness compounds with coordination.}
+The Temporal pillar's context fidelity decay $\Phi(t) = e^{-\Lambda(t-t_0)}$ interacts multiplicatively with the Coordination pillar's error amplification. In multi-agent settings, the effective decay rate $\Lambda$ is not a constant; it increases with the number of concurrent agents, because more agents means faster codebase evolution and therefore faster context invalidation. Specifically, if $k$ agents each commit at rate $\lambda_c$, the effective decay rate for any one agent's context is $\Lambda_{\text{eff}} \approx (k-1)\lambda_c \alpha$, where $\alpha$ is the fraction of commits that modify files in the agent's active context. This creates a feedback loop: more agents $\to$ faster staleness $\to$ higher per-agent error rate $\to$ more rework $\to$ more commits $\to$ even faster staleness. The Extended Amdahl's Law (Theorem~\ref{thm:extended-amdahl}) does not account for this feedback; incorporating staleness-induced error rate inflation into the reliability factor $(1-\delta_a)^n$ would likely reduce $n^*$ below the current estimate $1/\sqrt{\delta_a}$, particularly for tightly coupled codebases where $\alpha$ is large.
+
+\paragraph{3. Lattice parallels across Abstraction and Governance.}
+Both the Abstraction pillar and the Governance pillar employ lattice-theoretic structures, but with different orientations. The Abstraction pillar's refinement lattice orders specifications from most abstract (top, natural language) to most concrete (bottom, executable code), with the Galois connection $(\alpha, \gamma)$ mediating between specifications and programs. The Governance pillar's constraint lattice orders constraint sets by inclusion, with the ratchet as a closure operator that moves the system toward the join (more constrained). These two lattices are not independent: every specification in the refinement lattice \emph{induces} a constraint in the governance lattice (the specification constrains which programs are acceptable). A formal bridge would establish that the Galois connection on the refinement lattice is compatible with the closure operator on the constraint lattice; that is, refining a specification (descending the refinement lattice) should tighten constraints (ascending the constraint lattice) monotonically. If this compatibility holds, then the act of specification refinement automatically generates governance constraints, providing a formal foundation for ``specification as governance.''
+
+\paragraph{4. Decomposition enables reuse discovery.}
+The Coordination pillar's task decomposition (balanced min-cut on the coupling graph) and the Information pillar's reuse discovery problem are connected through the structure of the coupling graph itself. Balanced min-cut partitions identify clusters of highly coupled files; these clusters are also the natural units for reuse discovery, because semantic similarity concentrates within clusters. An agent assigned to a cluster via the decomposition has, by construction, the most relevant context for discovering reuse opportunities within that cluster. This suggests that coordination topology should be co-designed with the context architecture: the partition that minimizes merge conflicts (Coordination) simultaneously maximizes reuse-relevant context concentration (Information). The formal connection is that the coupling graph's cluster structure determines both the optimal decomposition and the natural reuse neighborhoods, and a single spectral analysis of the coupling graph can serve both objectives.
+
+\paragraph{5. FKG amplification across coordination boundaries.}
+The Quality pillar's FKG inequality (Proposition~\ref{prop:fkg}), which establishes that same-family LLM judges underestimate escape probabilities due to correlated blind spots, has a multi-agent analog that the current framework does not address. When $k$ agents from the same model family work on a shared codebase, their errors are positively correlated not only within each agent's pipeline (the Quality pillar's concern) but \emph{across} agents (the Coordination pillar's concern). The FKG inequality implies:
+\begin{equation}
+    P\!\left(\bigcap_{i=1}^k E_i\right) \geq \prod_{i=1}^k P(E_i)
+\end{equation}
+where $E_i$ is the event that agent $i$ introduces a defect in the shared semantic category. This means the Coordination pillar's independence assumption ($A_e \to k$) not only underestimates amplification (as the Kim et al.\ empirical data shows) but does so in a structurally predictable way: the FKG framework provides an \emph{upper} bound on the independence gap. Combining the FKG inequality with the coordination error amplification model would yield tighter bounds on multi-agent defect rates, explaining part of the $6\times$ discrepancy between the theoretical independence prediction and the empirical $17.2\times$ amplification.
+
+\subsection{The Governance Information Budget}
+\label{sec:gib}
+
+We propose the \emph{Governance Information Budget} as the integrating concept across all seven pillars. The idea is that every harness operates under a total information budget, and the pillars decompose how that budget is allocated:
+
+\begin{equation}
+\label{eq:gib}
+    \underbrace{K(P \mid S)}_{\text{Abstraction gap}} = \underbrace{I(P; C \mid S, \theta)}_{\text{Context (Information)}} + \underbrace{I(P; \theta \mid S)}_{\text{Prior (Model)}} + \underbrace{H(P \mid S, C, \theta)}_{\text{Residual (Harness must handle)}}
+\end{equation}
+
+The residual term $H(P \mid S, C, \theta)$ is the information that neither the context nor the model provides. This residual must be filled by the agent's exploration and reasoning, which is subject to:
+\begin{itemize}[nosep]
+    \item Compound error sensitivity (Reliability): each exploratory step has failure probability $q$, compounding as $(1-q)^n$.
+    \item Error amplification (Coordination): multi-agent exploration amplifies errors by up to $17.2\times$.
+    \item Context staleness (Temporal): the residual grows as context decays, $\Phi(t) = e^{-\Lambda t}$.
+    \item Detection limits (Quality): some errors in filling the residual are undetectable, $d_{\ell,j} \leq I(X; D_j)/H(D_j)$.
+    \item Governance capacity (Governance): the total rate at which the residual is filled must not exceed governance capacity $C_{\text{gov}}$.
+\end{itemize}
+
+\begin{proposition}[Governance Information Budget Constraint]
+\label{prop:gib-constraint}
+For a harness operating at steady state with change rate $\lambda$ (changes per unit time), the Governance Information Budget imposes five simultaneous constraints, one from each execution-axis and assurance-axis pillar:
+\begin{align}
+    \text{(Reliability)} &\quad \lambda \leq \frac{-\ln R_{\min}}{n \cdot |\ln p|} \label{eq:gib-rel} \\
+    \text{(Coordination)} &\quad k \leq n^* \approx 1/\sqrt{\delta_a} \label{eq:gib-coord} \\
+    \text{(Temporal)} &\quad \lambda \leq \Lambda / \ln(1/\Phi_{\min}) \label{eq:gib-temp} \\
+    \text{(Quality)} &\quad \lambda \cdot P_{\text{esc}} \leq \mu_{\text{repair}} \label{eq:gib-qual} \\
+    \text{(Governance)} &\quad \lambda \cdot H_{\text{drift/change}} \leq C_{\text{gov}} \label{eq:gib-gov}
+\end{align}
+where $R_{\min}$ is the minimum acceptable pipeline reliability, $\Phi_{\min}$ is the minimum acceptable context fidelity, $P_{\text{esc}}$ is the escape probability past all defense layers, $\mu_{\text{repair}}$ is the defect repair rate, and $H_{\text{drift/change}}$ is the architectural drift per change (in bits). The binding constraint (the one that limits $\lambda$ most severely) determines which pillar is the system's current bottleneck.
+\end{proposition}
+
+\begin{remark}
+The five constraints in Proposition~\ref{prop:gib-constraint} are not independent. Increasing $k$ (more parallel agents) relaxes the Reliability constraint (more throughput) but tightens the Temporal constraint (faster staleness) and the Governance constraint (more drift per unit time). Increasing per-step quality $p$ relaxes the Reliability constraint but has no direct effect on the Governance constraint. This interdependence is the core reason that harness design requires simultaneous optimization across pillars, not sequential optimization of each pillar independently.
+\end{remark}
+
+The Governance Information Budget unifies the pillars by showing that they all constrain different aspects of the same fundamental problem: closing the abstraction gap reliably, efficiently, and coherently. The binding constraint rotates as the harness configuration changes: early in development (low $k$, high residual), the Abstraction and Information pillars dominate; at scale (high $k$, fast $\lambda$), the Coordination and Governance pillars dominate; for mature, stable systems (low $\lambda$, long-lived context), the Temporal pillar dominates through staleness accumulation.
+
+
+% ====================================================================
+% 10. EMPIRICAL FOUNDATIONS
+% ====================================================================
+\section{Empirical Foundations}
+\label{sec:empirical}
+
+The formal framework developed in Sections~\ref{sec:abstraction}--\ref{sec:synthesis} rests on empirical evidence of varying quality. An honest assessment of this evidence is essential.
+
+\subsection{Strong Empirical Foundations}
+
+\paragraph{GitClear 2025.} Analysis of 211 million changed lines across a multi-year period \citep{gitclear2025}. Key findings: code blocks with 5+ duplicated lines increased approximately 8$\times$ (overall duplication rate rose from 8.3\% to 12.3\%); refactoring collapsed from roughly 25\% to under 10\% of changed lines. Strengths: large sample, longitudinal design, objective metrics. Limitations: observational (no causal identification), single platform, code-level metrics only (no quality assessment).
+
+\paragraph{DORA 2025.} Telemetry from over 10,000 developers \citep{dora2025}. Key finding: individual task completion increased 21\% with AI adoption, but organizational-level throughput stayed flat and software delivery stability showed a negative correlation with AI usage. Strengths: large sample, standardized metrics, multi-organization. Limitations: survey-based components, correlation not causation, no controlled intervention.
+
+\paragraph{Kim et al.\ 2025.} 180 configurations across 5 architectures, 3 LLM families, and 4 benchmarks \citep{kim2025scaling}. Key finding: $17.2\times$ error amplification for independent agents, saturation of scaling benefits at approximately 45\% of the task completion rate. Strengths: systematic, controlled, comprehensive coverage of configuration space. Limitations: benchmark tasks (not production code), specific models and benchmarks.
+
+\paragraph{METR 2026.} Expert evaluation of SWE-bench test-passing pull requests \citep{metr2026swebench}. Key finding: roughly 50\% of test-passing PRs would not be merged by repository maintainers (but only 68\% of human-written golden patches would be merged on re-review, so the AI-attributable gap is approximately 18 percentage points). Strengths: expert evaluation, direct relevance to the circular validation problem. Limitations: subjective judgments, small evaluator pool (4 maintainers, 3 repositories), specific benchmark context.
+
+\subsection{Moderate Empirical Foundations}
+
+\paragraph{Context degradation studies.} Multiple studies \citep{chroma2025contextrot, liu2024lost, du2025context} demonstrating monotonic performance degradation with context length. The power-law model $\delta(n) = (n/W_{\text{eff}})^{\alpha_d}$ with $\alpha_d \in [0.3, 0.5]$ is a fit to this data, not a derived result. The fit is reasonable but not definitive.
+
+\paragraph{CodeRabbit 2025.} Analysis of 470 pull requests \citep{coderabbit2025}. Findings: 1.68$\times$ more issues in AI-generated PRs; 2.74$\times$ more XSS vulnerabilities. Strengths: direct comparison, automated analysis. Limitations: modest sample size, single tool, potential selection bias.
+
+\paragraph{Hariharan et al.\ 2025.} Evaluation of plan-and-execute agent architectures \citep{hariharan2025plan}. Key finding: 63\% failure rate on 100-step tasks. Strengths: systematic scaling study. Limitations: specific agent architecture, benchmark-only evaluation.
+
+\subsection{Weak or Missing Empirical Foundations}
+
+Several key claims in the framework lack strong empirical support:
+
+\begin{itemize}
+    \item The optimal context budget ($|C^*| \approx 0.15W$ to $0.40W$) is derived from model fits, not from direct optimization experiments.
+    \item The structural enforcement compliance gap $(1-\epsilon)^T$ is a theoretical prediction; no controlled study has measured $\epsilon$ for different enforcement mechanisms.
+    \item The governance capacity bound (Theorem~\ref{thm:governance-capacity}) is a theoretical result by construction; calibrating $R_{\text{drift}}$ and $C_{\text{gov}}$ for real systems remains an open challenge.
+    \item The Accretion Category is well-motivated by observational data but has not been validated through controlled experiments.
+    \item VIH has not been measured in production harness settings.
+    \item The cache-staleness EOQ theorem has not been empirically validated.
+\end{itemize}
+
+\subsection{Evidence Quality Assessment}
+\label{sec:evidence-quality}
+
+Table~\ref{tab:evidence-quality} provides a systematic quality assessment of the empirical foundations supporting the framework. Quality ratings follow a four-tier scheme: \textbf{High} (large sample, controlled or quasi-experimental, replicable); \textbf{Medium} (moderate sample, systematic but observational, partially replicable); \textbf{Low} (small sample, anecdotal or single-platform, limited replicability); \textbf{Very Low} (theoretical prediction only, no direct empirical measurement).
+
+\begin{table}[H]
+\centering
+\caption{Evidence quality assessment for major empirical sources and theoretical claims. ``Key Gap'' identifies the most important missing piece for each data category.}
+\label{tab:evidence-quality}
+\small
+\begin{tabular}{p{3cm}cccp{4.2cm}}
+\toprule
+\textbf{Data Category} & \textbf{Quality} & \textbf{Sample} & \textbf{Design} & \textbf{Key Gap} \\
+\midrule
+GitClear (duplication, refactoring) & High & 211M lines & Longitudinal, observational & No causal identification; single platform; no direct quality measure \\
+\addlinespace
+DORA 2025 (throughput, stability) & High & 10,000+ devs & Cross-sectional survey + telemetry & Survey components; no controlled intervention; correlation only \\
+\addlinespace
+Kim et al.\ (error amplification) & High & 180 configs & Controlled, systematic & Benchmark tasks only; 3 model families; not production code \\
+\addlinespace
+METR (merge gap) & Medium & $\sim$100 PRs & Expert evaluation & 4 evaluators, 3 repos; subjective criteria; small sample \\
+\addlinespace
+Liu et al.\ (Lost in Middle) & Medium & Multiple models & Controlled, synthetic tasks & Synthetic needle tasks; unclear production generalization \\
+\addlinespace
+Chroma (context rot) & Medium & 18 models & Controlled, multi-provider & Synthetic benchmarks; degradation model is a fit, not derived \\
+\addlinespace
+JetBrains (complexity) & Medium & Survey + metrics & Cross-sectional & Self-reported AI usage; single IDE ecosystem \\
+\addlinespace
+CodeRabbit (PR quality) & Medium & 470 PRs & Comparative & Single tool; potential selection bias; modest sample \\
+\addlinespace
+Veracode (security) & Medium & Undisclosed & Static analysis comparison & Methodology details limited; no controlled experiment \\
+\addlinespace
+Apollo Research (scheming) & Low & Case studies & Behavioral evaluation & Small-scale; specific models; adversarial setup \\
+\addlinespace
+NIST CAISI (cheating) & Low & Workshop report & Expert panel consensus & No quantitative data; policy-oriented rather than empirical \\
+\addlinespace
+Optimal context budget & Very Low & None & Model fit to degradation data & No direct optimization experiment; parameter sensitivity unknown \\
+\addlinespace
+Structural enforcement $\epsilon$ & Very Low & None & Theoretical prediction & No measurement of per-step violation probability \\
+\addlinespace
+VIH in production & Very Low & None & Proposed metric, unmeasured & No harness instrumentation; no baseline data \\
+\addlinespace
+Governance capacity ($C_{\text{gov}}$) & Very Low & None & Theoretical construction & $R_{\text{drift}}$ and $C_{\text{gov}}$ undefined operationally \\
+\addlinespace
+Accretion detection & Very Low & None & Category proposed, unvalidated & No labeled dataset; no precision/recall measurement \\
+\addlinespace
+Cache-staleness EOQ & Very Low & None & Theoretical analog & No measurement of staleness cost or optimal refresh interval \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The Calibration Gap}
+
+A recurring pattern across all seven pillars is the gap between theoretical models and empirical calibration. The models are well-grounded in established formal machinery, and the qualitative predictions align with practitioner experience. But the quantitative parameters (decay rates, threshold values, optimal counts) are either estimated from limited data or derived from model assumptions rather than measured directly.
+
+This gap is not a criticism of the framework; it is a statement of the current state of the field. Closing this gap requires controlled experiments, which in turn requires access to production harness telemetry. Section~\ref{sec:limitations} proposes specific experiments, organized as a concrete verification roadmap with falsification criteria for each major formal result.
+
+
+% ====================================================================
+% 12. LIMITATIONS AND OPEN PROBLEMS
+% ====================================================================

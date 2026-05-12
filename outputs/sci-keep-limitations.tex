@@ -1,0 +1,228 @@
+\section{Limitations and Open Problems}
+\label{sec:limitations}
+
+\subsection{Empirical Validation Gaps}
+
+The most significant limitation of this framework is the gap between formal models and empirical validation. The following experiments are needed to close this gap:
+
+\begin{enumerate}
+    \item \textbf{Context budget validation}: controlled experiments measuring task success as a function of context size, across multiple models and task types, to validate the optimal budget estimates ($|C^*| \approx 0.15W$ to $0.40W$).
+    \item \textbf{Structural enforcement measurement}: controlled comparison of instructional vs. structural enforcement, measuring compliance rates $\epsilon$ across different enforcement mechanisms and pipeline lengths $T$.
+    \item \textbf{VIH measurement}: instrumentation of production harnesses to measure raw iteration rate, verification pass rate, and their product across different verification configurations.
+    \item \textbf{Governance capacity calibration}: measurement of $R_{\text{drift}}$ and $C_{\text{gov}}$ in production settings, to test whether the capacity bound predicts the onset of architectural degradation.
+    \item \textbf{Accretion detection}: development and validation of detectors for the Accretion Category, measuring precision and recall against expert-labeled datasets.
+\end{enumerate}
+
+\subsection{Empirical Verification Roadmap}
+\label{sec:verification-roadmap}
+
+This subsection provides a concrete verification roadmap for the five most important formal results in the framework. For each result, we specify the data to collect, the testable prediction, and the falsification criterion. This roadmap was developed in direct response to peer review feedback identifying the empirical gap as the framework's most significant weakness.
+
+\subsubsection{Result 1: Compound Error Sensitivity (Theorem~\ref{thm:compound-sensitivity})}
+
+\paragraph{Formal claim.} For an $n$-step agent pipeline with homogeneous per-step success probability $p$, the end-to-end reliability is $R(n) = p^n$, and the elasticity of $R$ with respect to $p$ equals the pipeline length: $\mathcal{E}(R,p) = n$.
+
+\paragraph{Data to collect.}
+\begin{enumerate}[nosep]
+    \item Instrument a production agent harness (e.g., Claude Code, Cursor, Codex) to log, for each pipeline execution: (a) the number of discrete steps $n$, (b) a binary success/failure indicator for each step (judged by automated tests plus human spot-checks on a stratified subsample), and (c) the end-to-end success indicator.
+    \item Collect at least 500 pipeline executions per pipeline-length bin, with bins at $n \in \{5, 10, 15, 20, 30, 50\}$.
+    \item For each bin, estimate $\hat{p}$ (the empirical per-step success rate) and $\hat{R}(n)$ (the empirical end-to-end success rate).
+    \item Additionally, collect data on step-to-step error correlation by recording whether failure at step $i$ predicts failure at step $i+1$ (beyond the base rate). This tests the independence assumption.
+\end{enumerate}
+
+\paragraph{Testable prediction.}
+\begin{itemize}[nosep]
+    \item Plot $\ln \hat{R}(n)$ against $n$. Under the model, this should be approximately linear with slope $\ln \hat{p}$.
+    \item For each pipeline-length bin, compute the empirical elasticity $\hat{\mathcal{E}} = \Delta \ln \hat{R} / \Delta \ln \hat{p}$ (using within-bin variation in $p$ due to model differences or task difficulty). The prediction is $\hat{\mathcal{E}} \approx n$.
+    \item Specifically: for $n = 20$ and $\hat{p} = 0.95$, the predicted reliability is $0.95^{20} = 0.36$, with 95\% CI bounds derivable from the binomial model.
+\end{itemize}
+
+\paragraph{Falsification criterion.} The result is falsified if \emph{any} of the following hold:
+\begin{enumerate}[nosep]
+    \item The relationship between $\ln \hat{R}(n)$ and $n$ is not approximately linear (e.g., $R^2 < 0.7$ for the linear fit), indicating that the series reliability model is structurally wrong (not merely noisy).
+    \item The empirical elasticity $\hat{\mathcal{E}}$ differs from $n$ by more than a factor of 2 across at least 3 pipeline-length bins, indicating that the elasticity claim is quantitatively misleading.
+    \item Step-to-step error correlations are so strong (correlation coefficient $> 0.5$) that the independence model provides a poor approximation, in which case the common-cause model from the Reliability pillar must be used as the baseline.
+\end{enumerate}
+
+\paragraph{Expected timeline and resources.} Requires partnership with a harness vendor or access to open-source harness telemetry. Estimated: 3--6 months for instrumentation and data collection; 1--2 months for analysis. Minimum viable dataset: 3,000 pipeline executions across 3+ pipeline-length bins.
+
+\subsubsection{Result 2: Optimal Context Budget (Theorem~\ref{thm:context-budget})}
+
+\paragraph{Formal claim.} Under the power-law degradation model $\delta(n) = (n/W_{\text{eff}})^{\alpha_d}$, the optimal context size satisfies $|C^*| < W$, with practical estimates $|C^*| \approx 0.15W$ to $0.40W$.
+
+\paragraph{Data to collect.}
+\begin{enumerate}[nosep]
+    \item Select a benchmark of 200+ coding tasks spanning five difficulty levels and three code domains (web, systems, data). Tasks must have known-correct solutions for automated evaluation.
+    \item For each task, prepare context sets at 10 sizes: 5\%, 10\%, 15\%, 20\%, 30\%, 40\%, 50\%, 60\%, 80\%, 100\% of the model's effective context window $W_{\text{eff}}$.
+    \item Context content at each size level should be selected by the same retrieval algorithm (e.g., BM25 + reranking), adding lower-relevance items as size increases, to ensure that the size variation reflects the natural relevance gradient.
+    \item For each (task, context-size) pair, run the agent 5 times (to estimate variance) and record: (a) task success (binary), (b) code quality score (0--10, via automated rubric), (c) token usage.
+    \item Repeat across at least 3 frontier models from different providers.
+\end{enumerate}
+
+\paragraph{Testable prediction.}
+\begin{itemize}[nosep]
+    \item Plot mean task success against context size (as fraction of $W_{\text{eff}}$). Under the model, this curve should be unimodal: increasing for small context (more relevant information), peaking at $|C^*|/W_{\text{eff}} \in [0.15, 0.40]$, and declining for large context (degradation dominates).
+    \item The peak location should be robust across models (within 15 percentage points), though the peak height will vary.
+    \item For tasks where the model's prior is strong (boilerplate, common patterns), the peak should shift left (less context needed). For tasks requiring novel logic, the peak should shift right.
+\end{itemize}
+
+\paragraph{Falsification criterion.} The result is falsified if \emph{any} of the following hold:
+\begin{enumerate}[nosep]
+    \item Task success is monotonically non-decreasing in context size for a majority ($>60\%$) of tasks and models, indicating that degradation is not a binding constraint in practice.
+    \item The peak, when it exists, occurs above $0.60 W_{\text{eff}}$ for the majority of tasks, indicating that the $[0.15, 0.40]$ range is too conservative.
+    \item The peak location varies by more than 40 percentage points across models (e.g., 0.10 for one model and 0.55 for another), indicating that the ``optimal budget'' is model-specific rather than a general property of context selection.
+\end{enumerate}
+
+\paragraph{Expected timeline and resources.} Can be conducted with API access to frontier models. Estimated: 2--4 months for benchmark construction and execution; 1 month for analysis. Cost: approximately \$5,000--\$15,000 in API fees depending on model pricing and repetition count.
+
+\subsubsection{Result 3: Structural Enforcement Threshold (Theorem~\ref{thm:structural-boundary})}
+
+\paragraph{Formal claim.} Instructional enforcement (prompts, rules files) achieves compliance $(1-\epsilon)^T$, decaying exponentially in pipeline length $T$. Structural enforcement achieves compliance 1. The threshold for cost-effectiveness is $L > L^* = (c_s - c_p)/\epsilon$, which drops as $L^*/n$ for multi-step pipelines.
+
+\paragraph{Data to collect.}
+\begin{enumerate}[nosep]
+    \item Define 10 invariants spanning the decidability spectrum: 4 decidable (e.g., ``never import package X,'' ``all functions have type annotations,'' ``no files exceed 500 lines,'' ``API keys never appear in source''); 3 semi-decidable (e.g., ``all error paths return appropriate status codes,'' ``no race conditions in shared state access,'' ``all user inputs are sanitized''); 3 undecidable (e.g., ``no unnecessary abstraction layers,'' ``naming conventions reflect domain semantics,'' ``code follows the existing architectural style'').
+    \item For each invariant, implement both an instructional enforcement mechanism (system prompt instruction, CLAUDE.md rule, or rules file entry) and, where possible, a structural enforcement mechanism (linter rule, pre-commit hook, file-system permission, CI gate).
+    \item Run a standardized coding agent through 50-step pipelines on a realistic codebase, with $T \in \{10, 20, 30, 50, 75, 100\}$ steps. At each step, record whether the invariant holds. Use 3 different frontier models.
+    \item For each (invariant, enforcement-type, model, $T$) combination, compute the compliance rate. Minimum 30 trials per combination to achieve adequate statistical power.
+\end{enumerate}
+
+\paragraph{Testable prediction.}
+\begin{itemize}[nosep]
+    \item For structural enforcement on decidable invariants, compliance should be $\geq 0.99$ regardless of $T$ and model.
+    \item For instructional enforcement, compliance should decay exponentially. Specifically, plotting $\ln(\text{compliance})$ against $T$ should yield an approximately linear relationship with slope $\approx \ln(1-\hat{\epsilon})$, from which $\hat{\epsilon}$ can be estimated.
+    \item The estimated $\hat{\epsilon}$ should fall in the range $[0.005, 0.10]$ for decidable invariants and $[0.05, 0.30]$ for semi-decidable invariants.
+    \item The compliance gap between structural and instructional enforcement should be statistically significant ($p < 0.01$) for $T \geq 20$.
+\end{itemize}
+
+\paragraph{Falsification criterion.} The result is falsified if \emph{any} of the following hold:
+\begin{enumerate}[nosep]
+    \item Instructional compliance does not decay with $T$ (i.e., compliance is approximately constant across pipeline lengths), indicating that the $(1-\epsilon)^T$ model is wrong and agents may have mechanisms (e.g., in-context learning, self-correction) that counteract exponential decay.
+    \item Structural enforcement on decidable invariants fails at rates $> 5\%$ (due to agent workarounds, tool limitations, or enforcement gaps), indicating that the ``compliance = 1'' claim is practically false.
+    \item The compliance gap between structural and instructional enforcement is not statistically significant for $T \leq 50$, indicating that the theoretical advantage of structural enforcement is too small to matter in practice.
+\end{enumerate}
+
+\paragraph{Additional test: $T$-dependent $\epsilon$.} A critical assumption of the $(1-\epsilon)^T$ model is that $\epsilon$ is constant across pipeline steps. If agents exhibit in-context learning (improved rule-following as the pipeline progresses) or rule fatigue (degraded compliance as context accumulates), $\epsilon$ would depend on $T$. The experiment should explicitly test this by fitting a model with $\epsilon(t) = \epsilon_0 + \epsilon_1 t$ and comparing AIC/BIC against the constant-$\epsilon$ model. If the $T$-dependent model fits significantly better, the exponential decay prediction must be revised.
+
+\paragraph{Expected timeline and resources.} Requires moderate engineering to implement enforcement mechanisms and instrumentation. Estimated: 4--6 months including implementation and data collection. Minimum viable dataset: 10 invariants $\times$ 2 enforcement types $\times$ 3 models $\times$ 6 pipeline lengths $\times$ 30 trials = 10,800 pipeline executions.
+
+\subsubsection{Result 4: Optimal Agent Count (Theorem~\ref{thm:extended-amdahl})}
+
+\paragraph{Formal claim.} For $n$ agents with per-agent defect injection rate $\delta_a$ and serial fraction $s$, effective speedup is $S_{\text{eff}}(n) = [1/(s + (1-s)/n)] \cdot (1-\delta_a)^n$, with optimal agent count $n^* \approx 1/\sqrt{\delta_a}$.
+
+\paragraph{Data to collect.}
+\begin{enumerate}[nosep]
+    \item Select 30+ software engineering tasks of moderate complexity (2--8 hours of human developer time), covering feature implementation, bug fixing, and refactoring. Tasks must be decomposable into parallel subtasks of varying granularity.
+    \item For each task, execute with $k \in \{1, 2, 3, 4, 5, 7, 10, 15, 20\}$ agents. Use at least two coordination topologies: (a) independent (no inter-agent communication) and (b) centrally coordinated (orchestrator assigns subtasks, reviews outputs, resolves conflicts).
+    \item For each (task, $k$, topology) configuration, measure: (a) wall-clock time $T_k$, (b) code quality score $Q_k$ (via automated tests + human review on a subsample), (c) merge conflict count and resolution time, (d) rework iterations (code that was written, then reverted or rewritten).
+    \item Compute Quality-Adjusted Speedup: $\text{QAS}(k) = (T_1 \cdot Q_1) / (T_k \cdot Q_k)$.
+    \item Estimate $\hat{\delta}_a$ from the per-agent defect rate and $\hat{s}$ from the serial fraction of each task (via dependency analysis of the task decomposition).
+\end{enumerate}
+
+\paragraph{Testable prediction.}
+\begin{itemize}[nosep]
+    \item QAS should be unimodal in $k$: increasing for $k \leq n^*$, then decreasing.
+    \item The peak should occur at $\hat{k}^* \approx 1/\sqrt{\hat{\delta}_a}$, within a factor of 2.
+    \item For independent coordination with typical $\delta_a \approx 0.03$--$0.07$, the peak should be at $k^* \in [3, 6]$.
+    \item At $k = 2n^*$, QAS should be measurably below its peak value (by at least 20\%), confirming that over-parallelization is costly.
+    \item For the centrally coordinated topology, $\delta_a$ should be lower (better error correction), yielding a higher $n^*$.
+\end{itemize}
+
+\paragraph{Falsification criterion.} The result is falsified if \emph{any} of the following hold:
+\begin{enumerate}[nosep]
+    \item QAS is monotonically non-decreasing in $k$ up to $k = 20$ for a majority of tasks, indicating that the reliability penalty $(1-\delta_a)^n$ does not dominate within the tested range and the optimal agent count is much higher than predicted.
+    \item The observed peak $\hat{k}^*$ differs from $1/\sqrt{\hat{\delta}_a}$ by more than a factor of 3 across a majority of tasks, indicating that the Extended Amdahl model is a poor predictor.
+    \item QAS $< 1$ for $k = 2$ (i.e., even minimal parallelism is net-negative) for a majority of tasks and topologies, indicating a qualitative failure of the parallelism model that suggests coordination overhead dominates even before reliability penalties matter.
+\end{enumerate}
+
+\paragraph{Expected timeline and resources.} The most resource-intensive experiment in this roadmap, requiring either a multi-agent harness platform or substantial API costs. Estimated: 6--12 months. Cost: \$20,000--\$50,000 in compute. Minimum viable dataset: 30 tasks $\times$ 9 agent counts $\times$ 2 topologies = 540 configurations, each with quality evaluation.
+
+\subsubsection{Result 5: Governance Capacity Bound (Theorem~\ref{thm:governance-capacity})}
+
+\paragraph{Formal claim.} If the architectural drift rate $R_{\text{drift}}$ (bits per unit time) exceeds the governance channel capacity $C_{\text{gov}}$ (bits per unit time), no governance scheme prevents unbounded divergence from the intended architecture.
+
+\paragraph{Data to collect.}
+\begin{enumerate}[nosep]
+    \item Select 20+ open-source repositories that (a) have Architecture Decision Records or equivalent governance artifacts, (b) have measurable AI adoption (via commit metadata, co-author tags, or tool integration logs), and (c) span at least 12 months of history pre- and post-AI adoption.
+    \item For each repository, construct proxy measures for the two key quantities:
+    \begin{itemize}[nosep]
+        \item \textbf{Drift rate proxy} ($\hat{R}_{\text{drift}}$): rate of architectural violations per month, measured as: (a) ADR compliance violations (commits that contradict accepted ADRs, detected by automated pattern matching), (b) layer boundary violations (imports across declared layer boundaries), (c) dependency direction violations (detected by dependency analysis tools), (d) style/convention violations in new code. Each violation category receives a weight proportional to its severity. The composite is normalized to bits per month using $\hat{R}_{\text{drift}} = \sum_i w_i \cdot r_i$, where $r_i$ is the violation rate for category $i$.
+        \item \textbf{Governance capacity proxy} ($\hat{C}_{\text{gov}}$): governance throughput per month, measured as: (a) code review throughput (PRs reviewed per month $\times$ mean review depth), (b) ADR update rate, (c) architectural review meeting frequency $\times$ mean decision output, (d) automated governance gate coverage (fraction of invariants enforced structurally). The composite is $\hat{C}_{\text{gov}} = \sum_j v_j \cdot g_j$, where $g_j$ is the governance activity rate for category $j$.
+    \end{itemize}
+    \item For each repository, measure \textbf{architectural health} over time using: (a) coupling density (mean module coupling, measured monthly), (b) abstraction stability (rate of interface changes per month), (c) technical debt proxies (TODO density, code duplication rate, cyclomatic complexity growth rate), (d) developer satisfaction with architecture (from surveys, if available).
+    \item Compute the ratio $\hat{R}_{\text{drift}} / \hat{C}_{\text{gov}}$ monthly for each repository and plot against architectural health metrics.
+\end{enumerate}
+
+\paragraph{Testable prediction.}
+\begin{itemize}[nosep]
+    \item Repositories where $\hat{R}_{\text{drift}} / \hat{C}_{\text{gov}} > 1$ (drift exceeds governance) for sustained periods ($\geq$ 3 consecutive months) should show measurable architectural degradation: increasing coupling density, rising duplication, growing technical debt proxies.
+    \item Repositories where $\hat{R}_{\text{drift}} / \hat{C}_{\text{gov}} < 1$ consistently should show stable or improving architectural health.
+    \item The transition should be relatively sharp: repositories near the threshold ($0.8 < \hat{R}_{\text{drift}} / \hat{C}_{\text{gov}} < 1.2$) should show mixed signals, while those clearly above or below should show consistent degradation or stability.
+    \item Repositories that increased AI adoption (higher commit velocity) without increasing governance capacity should show a transition from sub-threshold to super-threshold, with architectural degradation following the transition with a lag of 2--6 months.
+\end{itemize}
+
+\paragraph{Falsification criterion.} The result is falsified if \emph{any} of the following hold:
+\begin{enumerate}[nosep]
+    \item No measurable relationship exists between the $\hat{R}_{\text{drift}} / \hat{C}_{\text{gov}}$ ratio and architectural health metrics (correlation $< 0.2$ across repositories), indicating that the governance capacity framing has no predictive power.
+    \item Repositories sustain $\hat{R}_{\text{drift}} / \hat{C}_{\text{gov}} > 1.5$ for 6+ months without measurable architectural degradation, indicating that the ``unbounded divergence'' prediction is too pessimistic and self-correcting mechanisms (developer workarounds, organic refactoring, competitive pressure) prevent divergence even without formal governance capacity.
+    \item The proxy measures $\hat{R}_{\text{drift}}$ and $\hat{C}_{\text{gov}}$ cannot be operationalized with inter-rater reliability $> 0.6$ (Cohen's $\kappa$), indicating that the theoretical quantities are too vague to measure, which would itself be a significant finding about the framework's practical applicability.
+\end{enumerate}
+
+\paragraph{Methodological limitation.} This experiment is the methodologically weakest in the roadmap. The proxy measures $\hat{R}_{\text{drift}}$ and $\hat{C}_{\text{gov}}$ are composite indices with tunable weights $w_i$ and $v_j$. The weights can be adjusted post hoc to fit the data, which undermines the experiment's falsifiability. A stronger design would use a single, pre-registered proxy for each quantity (e.g., layer violation rate for $\hat{R}_{\text{drift}}$ and code review throughput for $\hat{C}_{\text{gov}}$), sacrificing coverage for testability. Additionally, the governance capacity bound is a threshold result (above the threshold, divergence is unbounded), but the experiment tests for a correlation, which is a weaker claim. A proper threshold test would identify repositories that crossed the threshold and verify that architectural health degraded sharply (not gradually) afterward.
+
+\paragraph{Expected timeline and resources.} The most methodologically challenging experiment, requiring careful proxy construction and validation. Estimated: 12--18 months for the longitudinal component; initial cross-sectional results possible in 6 months. Requires access to repository history and governance artifacts for 20+ projects. No significant compute cost, but substantial research analyst time.
+
+\paragraph{Summary of the verification roadmap.} Table~\ref{tab:roadmap-summary} summarizes the five experiments.
+
+\begin{table}[H]
+\centering
+\caption{Verification roadmap summary. Each row identifies the formal result, the core prediction, the falsification standard, and the estimated resource requirement.}
+\label{tab:roadmap-summary}
+\small
+\begin{tabular}{p{2.5cm}p{3.5cm}p{4cm}p{2.5cm}}
+\toprule
+\textbf{Result} & \textbf{Core Prediction} & \textbf{Falsification Standard} & \textbf{Est. Resources} \\
+\midrule
+Compound error sensitivity & $\ln R$ linear in $n$; elasticity $= n$ & $R^2 < 0.7$ or elasticity off by $>2\times$ & 3--6 months; vendor partnership \\
+\addlinespace
+Optimal context budget & Unimodal success in context size; peak at $[0.15, 0.40]W$ & Monotonic success or peak $> 0.60W$ for majority & 2--4 months; \$5--15K API cost \\
+\addlinespace
+Structural enforcement threshold & Instructional compliance decays as $(1-\epsilon)^T$; structural = 1 & No decay with $T$, or structural fails $> 5\%$ & 4--6 months; moderate engineering \\
+\addlinespace
+Optimal agent count & QAS unimodal; peak at $\approx 1/\sqrt{\delta_a}$ & Monotonic QAS or peak off by $> 3\times$ & 6--12 months; \$20--50K compute \\
+\addlinespace
+Governance capacity & Drift/capacity ratio predicts arch. health & Correlation $< 0.2$ or sustained excess without degradation & 12--18 months; analyst time \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Uncomputability of Idealized Metrics}
+
+Several foundational quantities in the framework are uncomputable:
+
+\begin{itemize}
+    \item $K(P \mid S)$ (Kolmogorov complexity) is uncomputable by definition. The Shannon operationalization $H(P \mid S)$ is computable but distribution-dependent.
+    \item The decidability classification (Section~\ref{sec:quality}) establishes that 4 of 18 slop types are undecidable in general. No automated system can achieve complete detection for these types.
+    \item The Detection Ceiling (Theorem~\ref{thm:detection-ceiling}) is an information-theoretic bound, but computing $I(X; D_j)$ for a specific defect type and feature set requires knowing the joint distribution, which is not available in practice.
+\end{itemize}
+
+These uncomputability results are not limitations of the framework; they are features. They identify hard boundaries that no engineering effort can overcome, focusing design attention on what is achievable.
+
+\subsection{The Theory Preservation Problem}
+
+The Governance pillar identifies theory preservation as fundamentally open. If the Tacit Divergence Conjecture (Conjecture~\ref{conj:tacit}) holds, then perfect externalization of program theory is impossible in principle. Current approaches (ADRs, ARCHITECTURE.md, inline documentation) capture explicit knowledge but not tacit knowledge.
+
+This problem becomes more acute with AI agents: the ``theory'' held by an agent exists only during a context window and is lost when the conversation ends. There is no persistent memory that preserves the agent's understanding of design rationale, rejected alternatives, or the causal model of change propagation. The theory preservation problem is arguably the most important open problem in the field.
+
+\subsection{Scale-Dependent Governance ROI}
+
+The governance capacity bound (Theorem~\ref{thm:governance-capacity}) establishes a threshold, but the return on governance investment is highly scale-dependent. For small projects with low change velocity, the drift rate $R_{\text{drift}}$ is naturally low, and minimal governance suffices. For large projects with high AI-driven change velocity, governance investment must scale, but the cost of governance also scales. The optimal governance investment as a function of project scale is not well characterized.
+
+\subsection{The Measurement Problem (Goodhart's Law)}
+
+Several metrics in the framework (VIH, QAS, detection rates) are susceptible to Goodhart's Law: when a measure becomes a target, it ceases to be a good measure. If harnesses are optimized for VIH, agents may learn to produce code that passes verification gates without being genuinely correct. If QAS becomes a target, teams may game quality metrics. The framework does not address this reflexivity problem, and it is unclear whether any formal framework can.
+
+
+% ====================================================================
+% 13. CONCLUSION
+% ====================================================================
