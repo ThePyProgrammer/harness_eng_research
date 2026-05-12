@@ -1,0 +1,415 @@
+% ============================================================
+% Foundations
+% ============================================================
+
+@article{shannon1948mathematical,
+  title={A mathematical theory of communication},
+  author={Shannon, Claude E.},
+  journal={Bell System Technical Journal},
+  volume={27},
+  number={3},
+  pages={379--423},
+  year={1948}
+}
+
+@article{shannon1951prediction,
+  title={Prediction and entropy of printed {E}nglish},
+  author={Shannon, Claude E.},
+  journal={Bell System Technical Journal},
+  volume={30},
+  number={1},
+  pages={50--64},
+  year={1951}
+}
+
+@article{nemhauser1978analysis,
+  title={An analysis of approximations for maximizing submodular set functions---{I}},
+  author={Nemhauser, George L. and Wolsey, Laurence A. and Fisher, Marshall L.},
+  journal={Mathematical Programming},
+  volume={14},
+  number={1},
+  pages={265--294},
+  year={1978}
+}
+
+@article{sweller1988cognitive,
+  title={Cognitive load during problem solving: Effects on learning},
+  author={Sweller, John},
+  journal={Cognitive Science},
+  volume={12},
+  number={2},
+  pages={257--285},
+  year={1988}
+}
+
+@inproceedings{tishby2000information,
+  title={The information bottleneck method},
+  author={Tishby, Naftali and Pereira, Fernando C. and Bialek, William},
+  booktitle={37th Allerton Conference on Communication, Control, and Computing},
+  year={2000}
+}
+
+% ============================================================
+% Code Entropy and Naturalness
+% ============================================================
+
+@inproceedings{hindle2012naturalness,
+  title={On the naturalness of software},
+  author={Hindle, Abram and Barr, Earl T. and Su, Zhendong and Gabel, Mark and Devanbu, Premkumar},
+  booktitle={Proceedings of the 34th International Conference on Software Engineering (ICSE)},
+  pages={837--847},
+  year={2012}
+}
+
+@inproceedings{hellendoorn2017deep,
+  title={Are deep neural networks the best choice for modeling source code?},
+  author={Hellendoorn, Vincent J. and Devanbu, Premkumar},
+  booktitle={Proceedings of the 2017 11th Joint Meeting on Foundations of Software Engineering (FSE)},
+  pages={763--773},
+  year={2017}
+}
+
+@article{bialek2025entropy,
+  title={Large language models and the entropy of {E}nglish},
+  author={Bialek, William and others},
+  journal={arXiv preprint arXiv:2512.24969},
+  year={2025}
+}
+
+% ============================================================
+% Context Degradation and Long-Context
+% ============================================================
+
+@article{liu2024lost,
+  title={Lost in the middle: How language models use long contexts},
+  author={Liu, Nelson F. and Lin, Kevin and Hewitt, John and Paranjape, Ashwin and Bevilacqua, Michele and Petroni, Fabio and Liang, Percy},
+  journal={Transactions of the Association for Computational Linguistics},
+  volume={12},
+  pages={157--173},
+  year={2024}
+}
+
+@article{chroma2025contextrot,
+  title={Context rot: How increasing input tokens impacts {LLM} performance},
+  author={Hong, Kelly and Troynikov, Anton and Huber, Jeff},
+  journal={Chroma Research},
+  year={2025},
+  note={\url{https://www.trychroma.com/research/context-rot}}
+}
+
+@inproceedings{du2025context,
+  title={Context length alone hurts},
+  author={Du, Yichao and others},
+  booktitle={Findings of EMNLP},
+  year={2025}
+}
+
+@inproceedings{xiao2024efficient,
+  title={Efficient streaming language models with attention sinks},
+  author={Xiao, Guangxuan and others},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2024}
+}
+
+@inproceedings{kim2024working,
+  title={Self-attention limits working memory capacity of transformer-based models},
+  author={Kim, Junhyuk and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2024}
+}
+
+@inproceedings{kuratov2024babilong,
+  title={{BABILong}: Testing the limits of {LLMs} in long context reasoning},
+  author={Kuratov, Yuri and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2024}
+}
+
+@inproceedings{hsieh2024ruler,
+  title={{RULER}: What's the real context size of your long-context language models?},
+  author={Hsieh, Cheng-Ping and others},
+  booktitle={Conference on Language Modeling (COLM)},
+  year={2024}
+}
+
+% ============================================================
+% Context Engineering and Harness Design
+% ============================================================
+
+@misc{anthropic2025context,
+  title={Effective context engineering for {AI} agents},
+  author={{Anthropic Engineering}},
+  year={2025},
+  note={\url{https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents}}
+}
+
+@article{gloaguen2026agents,
+  title={Evaluating {AGENTS.md}: Are repository-level context files helpful for coding agents?},
+  author={Gloaguen, Tristan and Mundler, Niels and Muller, Martin and Raychev, Veselin and Vechev, Martin},
+  journal={arXiv preprint arXiv:2602.11988},
+  year={2026}
+}
+
+@inproceedings{jetbrains2025complexity,
+  title={The complexity trap: Simple observation masking is as efficient as {LLM} summarization for agent context management},
+  author={{JetBrains Research}},
+  booktitle={Fourth Deep Learning for Code Workshop, NeurIPS},
+  year={2025},
+  note={arXiv:2508.21433}
+}
+
+@misc{factory2025context,
+  title={The context window problem: Scaling agents beyond token limits},
+  author={{Factory.ai}},
+  year={2025},
+  note={\url{https://www.factory.ai/context-window-problem}}
+}
+
+@misc{spotify2025honk,
+  title={Background coding agents: Context engineering ({Honk}, Part 2)},
+  author={{Spotify Engineering}},
+  year={2025},
+  note={\url{https://engineering.atspotify.com/2025/11/context-engineering-background-coding-agents-part-2}}
+}
+
+@misc{humanlayer2025skillissue,
+  title={Skill issue: Harness engineering for coding agents},
+  author={{HumanLayer}},
+  year={2025},
+  note={\url{https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents}}
+}
+
+@misc{openai2025codex,
+  title={Harness engineering: Leveraging {Codex} in an agent-first world},
+  author={{OpenAI Engineering}},
+  year={2025},
+  note={\url{https://openai.com/index/harness-engineering/}}
+}
+
+@article{bui2026opendev,
+  title={Building effective {AI} coding agents for the terminal},
+  author={Bui, Nghi D. Q.},
+  journal={arXiv preprint arXiv:2603.05344},
+  year={2026}
+}
+
+% ============================================================
+% Submodular Optimization
+% ============================================================
+
+@article{buchbinder2015tight,
+  title={A tight linear time (1/2)-approximation for unconstrained submodular maximization},
+  author={Buchbinder, Niv and Feldman, Moran and Naor, Joseph and Schwartz, Roy},
+  journal={SIAM Journal on Computing},
+  volume={44},
+  number={5},
+  pages={1384--1402},
+  year={2015}
+}
+
+@article{calinescu2011maximizing,
+  title={Maximizing a monotone submodular function subject to a matroid constraint},
+  author={Calinescu, Gruia and Chekuri, Chandra and P{\'a}l, Martin and Vondr{\'a}k, Jan},
+  journal={SIAM Journal on Computing},
+  volume={40},
+  number={6},
+  pages={1740--1766},
+  year={2011}
+}
+
+@article{krause2008near,
+  title={Near-optimal sensor placements in {G}aussian processes: Theory, efficient algorithms and empirical studies},
+  author={Krause, Andreas and Singh, Ajit and Guestrin, Carlos},
+  journal={Journal of Machine Learning Research},
+  volume={9},
+  pages={235--284},
+  year={2008}
+}
+
+@inproceedings{lin2011submodular,
+  title={A class of submodular functions for document summarization},
+  author={Lin, Hui and Bilmes, Jeff},
+  booktitle={Proceedings of ACL-HLT},
+  pages={510--520},
+  year={2011}
+}
+
+@inproceedings{das2011submodular,
+  title={Submodular meets spectral: Greedy algorithms for subset selection, sparse approximation and dictionary selection},
+  author={Das, Abhimanyu and Kempe, David},
+  booktitle={Proceedings of ICML},
+  year={2011}
+}
+
+% ============================================================
+% Code Embeddings and Clone Detection
+% ============================================================
+
+@inproceedings{feng2020codebert,
+  title={{CodeBERT}: A pre-trained model for programming and natural languages},
+  author={Feng, Zhangyin and others},
+  booktitle={Findings of EMNLP},
+  year={2020}
+}
+
+@inproceedings{guo2021graphcodebert,
+  title={{GraphCodeBERT}: Pre-training code representations with data flow},
+  author={Guo, Daya and others},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2021}
+}
+
+@inproceedings{guo2022unixcoder,
+  title={{UniXcoder}: Unified cross-modal pre-training for code representation},
+  author={Guo, Daya and others},
+  booktitle={Proceedings of ACL},
+  year={2022}
+}
+
+@inproceedings{wang2023codet5plus,
+  title={{CodeT5+}: Open code large language models for code understanding and generation},
+  author={Wang, Yue and others},
+  booktitle={Proceedings of EMNLP},
+  year={2023}
+}
+
+@article{li2023starcoder,
+  title={{StarCoder}: May the source be with you!},
+  author={Li, Raymond and others},
+  journal={arXiv preprint arXiv:2305.06161},
+  year={2023}
+}
+
+@article{ain2019systematic,
+  title={A systematic review on code clone detection},
+  author={Ain, Qurat Ul and others},
+  journal={IEEE Access},
+  volume={7},
+  pages={86121--86144},
+  year={2019}
+}
+
+@inproceedings{svajlenko2015bigclonebench,
+  title={Evaluating clone detection tools with {BigCloneBench}},
+  author={Svajlenko, Jeffrey and Roy, Chanchal K.},
+  booktitle={International Conference on Software Maintenance and Evolution (ICSME)},
+  pages={131--140},
+  year={2015}
+}
+
+@inproceedings{saieva2024reinforest,
+  title={{REINFOREST}: Reinforcing semantic code similarity for cross-lingual code search models},
+  author={Saieva, Anthony and Chakraborty, Saikat and Kaiser, Gail},
+  booktitle={International Working Conference on Source Code Analysis and Manipulation (SCAM)},
+  year={2024}
+}
+
+% ============================================================
+% Agent Evaluation and Meta-Prompting
+% ============================================================
+
+@inproceedings{suzgun2024metaprompting,
+  title={Meta-prompting: Enhancing language models with task-agnostic scaffolding},
+  author={Suzgun, Mirac and Kalai, Adam Tauman},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2024}
+}
+
+@inproceedings{kim2025scaling,
+  title={Scaling {LLM} agents: From single to multi-agent systems},
+  author={Kim, Jinheon and others},
+  booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+  year={2025}
+}
+
+% ============================================================
+% RAG and Structural Code Search
+% ============================================================
+
+@article{polpichai2026graphrag,
+  title={Reliable graph-{RAG} for codebases: {AST}-derived graphs vs {LLM}-extracted knowledge graphs},
+  author={Polpichai, Narongsak and others},
+  journal={arXiv preprint arXiv:2601.08773},
+  year={2026}
+}
+
+@misc{byterover2025vectorrag,
+  title={Why vector {RAG} fails for code: We tested it on 1,300 files},
+  author={{ByteRover}},
+  year={2025},
+  note={\url{https://www.byterover.dev/blog/why-vector-rag-fails-for-code-we-tested-it-on-1-300-files}}
+}
+
+% ============================================================
+% Cognitive Overload and Security
+% ============================================================
+
+@article{guo2024cognitive,
+  title={Cognitive overload attack: Prompt injection for long context},
+  author={Guo, Changyue and others},
+  journal={arXiv preprint arXiv:2410.11272},
+  year={2024}
+}
+
+% ============================================================
+% Information Theory and Compression
+% ============================================================
+
+@article{pan2025compression,
+  title={Understanding {LLM} behaviors via compression},
+  author={Pan, Yining and others},
+  journal={arXiv preprint arXiv:2504.09597},
+  year={2025}
+}
+
+@article{vitanyi2020incomputable,
+  title={How incomputable is {K}olmogorov complexity?},
+  author={Vit{\'a}nyi, Paul M.B.},
+  journal={arXiv preprint arXiv:2002.07674},
+  year={2020}
+}
+
+@techreport{vitanyi2004shannon,
+  title={Shannon information and {K}olmogorov complexity},
+  author={Vit{\'a}nyi, Paul M.B. and Li, Ming},
+  institution={CWI},
+  year={2004}
+}
+
+@misc{jina2025submodular,
+  title={Submodular optimization for text selection, passage reranking and context engineering},
+  author={{Jina AI}},
+  year={2025},
+  note={\url{https://jina.ai/news/submodular-optimization-for-text-selection-passage-reranking-context-engineering/}}
+}
+
+@article{contextdiscipline2025,
+  title={Context discipline in long-context {LLMs}},
+  author={Anonymous},
+  journal={arXiv preprint arXiv:2601.11564},
+  year={2025}
+}
+
+@misc{mitchell2008hoogle,
+  title={Hoogle: Fast type searching},
+  author={Mitchell, Neil},
+  year={2008},
+  note={Haskell Symposium}
+}
+
+@article{howard1966information,
+  title={Information value theory},
+  author={Howard, Ronald A.},
+  journal={IEEE Transactions on Systems Science and Cybernetics},
+  volume={2},
+  number={1},
+  pages={22--26},
+  year={1966}
+}
+
+@article{dai2019transformerxl,
+  title={{Transformer-XL}: Attentive language models beyond a fixed-length context},
+  author={Dai, Zihang and others},
+  journal={Proceedings of ACL},
+  year={2019}
+}
