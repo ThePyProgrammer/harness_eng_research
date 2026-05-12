@@ -1,0 +1,30 @@
+{
+	"nodes":[
+		{"id":"ki_title","type":"text","text":"# Kiro\n\n**Philosophy:** Purpose-built SDD IDE\n**Creator:** Amazon (not an AWS service)\n**Platform:** Code OSS · Amazon Bedrock · Claude Sonnet\n**Status:** Public preview (not open-source)\n**Site:** kiro.dev","x":200,"y":-460,"width":600,"height":180,"color":"2"},
+		{"id":"ki_spec_group","type":"group","x":-400,"y":-220,"width":1800,"height":360,"color":"4","label":"Three-Phase Spec Workflow"},
+		{"id":"ki_spec_1","type":"text","text":"## Phase 1: Requirements\n\n**Feature Specs:**\n- User stories with acceptance criteria\n- Two variants:\n  - Requirements-First approach\n  - Design-First approach\n\n**Bugfix Specs:**\n- Current vs expected behavior\n- Root cause identification\n- Regression prevention plan\n\nOutput: `requirements.md` or `bugfix.md`","x":-380,"y":-170,"width":360,"height":260,"color":"2"},
+		{"id":"ki_spec_2","type":"text","text":"## Phase 2: Design\n\n- Technical architecture\n- Component design\n- Sequence diagrams\n- Data flow visualization\n- Error handling strategy\n- Testing strategy\n\nOutput: `design.md`\n\nBridges requirements\nto implementation","x":20,"y":-170,"width":360,"height":260,"color":"4"},
+		{"id":"ki_spec_3","type":"text","text":"## Phase 3: Tasks\n\n- Discrete, executable tasks\n- Real-time status tracking\n  (in-progress / completed)\n- Run individually or collectively\n- Each task independently verifiable\n\nOutput: `tasks.md`\n\nAgent executes tasks\nwith spec + design context","x":420,"y":-170,"width":360,"height":260,"color":"5"},
+		{"id":"ki_spec_trigger","type":"text","text":"## How to Start\n\n1. Click `+` under Specs pane\n   —or— select \"Spec\" from chat\n2. Choose: Feature or Bug\n3. Describe requirement\n4. Select workflow variant\n5. Follow through all phases\n\n**Specs vs Vibe:**\nSpecs = complex features, costly bugs\nVibe = quick prototyping, exploration","x":820,"y":-170,"width":360,"height":260,"color":"6"},
+		{"id":"ki_types_group","type":"group","x":-400,"y":200,"width":880,"height":340,"color":"3","label":"Spec Types"},
+		{"id":"ki_type_feature","type":"text","text":"## Feature Specs\n\nFor new capabilities:\n\n**Requirements-First:**\nDefine what → then design how\nBest for well-understood domains\n\n**Design-First:**\nExplore architecture → then formalize requirements\nBest for novel/experimental features\n\nBoth converge to same artifact set:\nrequirements.md → design.md → tasks.md","x":-380,"y":250,"width":400,"height":260,"color":"3"},
+		{"id":"ki_type_bugfix","type":"text","text":"## Bugfix Specs\n\nFor systematic bug resolution:\n\n**Analysis Phase:**\n- Document current behavior\n- Document expected behavior\n- Identify root cause\n\n**Fix Phase:**\n- Surgical fix design\n- Minimal blast radius\n- Regression prevention\n\n**Validation Phase:**\n- Verify fix works\n- Confirm no regressions","x":40,"y":250,"width":400,"height":260,"color":"1"},
+		{"id":"ki_features_group","type":"group","x":520,"y":200,"width":880,"height":340,"color":"5","label":"IDE Features Beyond Specs"},
+		{"id":"ki_feat_1","type":"text","text":"## Agentic Chat\n\nAd-hoc coding tasks with context:\n- File context providers\n- URL context providers\n- Doc context providers\n\nFor when you don't need\nfull spec formality\n\n## Steering Rules\n\nGuide AI behavior across project:\n- Code style enforcement\n- Architecture constraints\n- Framework preferences","x":540,"y":250,"width":400,"height":260,"color":"5"},
+		{"id":"ki_feat_2","type":"text","text":"## MCP Support\n\nModel Context Protocol for\nconnecting specialized tools:\n- Database tools\n- API clients\n- Custom integrations\n\n## Hooks System\n\nLifecycle event automation:\n- Pre/post task execution\n- Quality checks\n- Custom validation\n\n## Technology Agnostic\n\nDespite Amazon backing,\nworks with any stack/cloud","x":960,"y":250,"width":420,"height":260,"color":"4"},
+		{"id":"ki_diff","type":"text","text":"### Key Differentiator: Only purpose-built IDE for spec-driven development · Not a plugin/extension · Not open-source · Built on Claude Sonnet via Bedrock · Combines specs + agentic chat + hooks + MCP in one integrated environment","x":-400,"y":600,"width":1800,"height":60,"color":"2"}
+	],
+	"edges":[
+		{"id":"ki_e1","fromNode":"ki_title","fromSide":"bottom","toNode":"ki_spec_group","toSide":"top"},
+		{"id":"ki_e2","fromNode":"ki_spec_1","fromSide":"right","toNode":"ki_spec_2","toSide":"left","label":"→"},
+		{"id":"ki_e3","fromNode":"ki_spec_2","fromSide":"right","toNode":"ki_spec_3","toSide":"left","label":"→"},
+		{"id":"ki_e4","fromNode":"ki_spec_group","fromSide":"bottom","toNode":"ki_types_group","toSide":"top","label":"spec types"},
+		{"id":"ki_e5","fromNode":"ki_spec_group","fromSide":"bottom","toNode":"ki_features_group","toSide":"top","label":"beyond specs"},
+		{"id":"ki_e6","fromNode":"ki_types_group","fromSide":"bottom","toNode":"ki_diff","toSide":"top"},
+		{"id":"ki_e7","fromNode":"ki_features_group","fromSide":"bottom","toNode":"ki_diff","toSide":"top"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
+}

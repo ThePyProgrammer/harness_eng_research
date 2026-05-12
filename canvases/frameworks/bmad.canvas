@@ -1,0 +1,30 @@
+{
+	"nodes":[
+		{"id":"bm_title","type":"text","text":"# BMAD Method\n\n**Philosophy:** Role-first, agile AI-driven development\n**Full Name:** Breakthrough Method for Agile AI-Driven Development\n**Install:** `npx bmad-method install`\n**Runtime:** Claude Code, Cursor, generic AI IDEs\n**Prereqs:** Node.js v20+","x":200,"y":-480,"width":600,"height":200,"color":"1"},
+		{"id":"bm_phases_group","type":"group","x":-400,"y":-220,"width":1800,"height":340,"color":"4","label":"Two-Phase Architecture"},
+		{"id":"bm_phase1","type":"text","text":"## Phase 1: Agentic Planning\n\nSpecialized AI agents collaborate with human:\n\n**Analyst Agent** → Requirements analysis\n- Feasibility assessment\n- Constraint identification\n- Stakeholder alignment\n\n**PM Agent** → Product management\n- PRD creation\n- Priority decisions\n- Scope management\n\n**Architect Agent** → System design\n- Architecture decisions\n- Component design\n- Integration planning","x":-380,"y":-170,"width":500,"height":260,"color":"2"},
+		{"id":"bm_phase2","type":"text","text":"## Phase 2: Context-Engineered Development\n\n**Scrum Master Agent** transforms plans into:\n\n**\"Hyper-Detailed Story Files\"** containing:\n- Full architectural context\n- Implementation guidelines\n- Embedded rationale (why, not just what)\n- Testing criteria for QA validation\n- Dependencies and constraints\n\nEach story = complete knowledge package\nEliminating ambiguity for the Dev agent\n\n**Dev Agent** → Implements each story\nwith full context embedded in the story file","x":160,"y":-170,"width":500,"height":260,"color":"4"},
+		{"id":"bm_sharding","type":"text","text":"## Epic Sharding\n\nThe bridge between phases:\n\n1. Comprehensive PRD from Phase 1\n2. Scrum Master decomposes into epics\n3. Each epic → focused story files\n4. Story files are self-contained\n5. No external context needed\n\n**Goal:** Zero ambiguity handoff\nfrom planning to development\n\nScale-adaptive: bug fixes\nto enterprise platforms","x":700,"y":-170,"width":320,"height":260,"color":"5"},
+		{"id":"bm_loop","type":"text","text":"## Human-in-Loop\n\nHuman reviews at:\n- PRD approval\n- Architecture sign-off\n- Story approval\n- Implementation review\n\nNot fully autonomous;\nhuman gates at each\nmajor transition","x":1060,"y":-170,"width":300,"height":260,"color":"3"},
+		{"id":"bm_agents_group","type":"group","x":-400,"y":180,"width":1200,"height":340,"color":"5","label":"12+ Specialized Agent Personas"},
+		{"id":"bm_agent_1","type":"text","text":"## Planning Agents\n\n**Analyst**\n- Requirements elicitation\n- Feasibility analysis\n- Constraint mapping\n\n**Product Manager**\n- PRD authoring\n- Feature prioritization\n- Scope negotiation\n\n**Architect**\n- System design\n- Tech stack selection\n- Integration architecture","x":-380,"y":230,"width":360,"height":260,"color":"2"},
+		{"id":"bm_agent_2","type":"text","text":"## Execution Agents\n\n**Scrum Master**\n- Epic sharding\n- Story file generation\n- Sprint orchestration\n- Quality gates\n\n**Developer**\n- Code implementation\n- Following story specs\n- Unit testing\n\n**UX Designer**\n- Interface design\n- User flow mapping\n- Accessibility","x":0,"y":230,"width":360,"height":260,"color":"4"},
+		{"id":"bm_agent_3","type":"text","text":"## Key Principle\n\nEach agent has:\n- Distinct persona\n- Responsibility boundary\n- Defined inputs/outputs\n- No role overlap\n\n**Separation of concerns**\napplied to AI agents\n\nMirrors human team roles:\nanalyst ≠ architect ≠ dev\n\n34+ workflows documented\nacross all agent types","x":380,"y":230,"width":400,"height":260,"color":"6"},
+		{"id":"bm_wf_group","type":"group","x":860,"y":180,"width":540,"height":340,"color":"3","label":"Full Lifecycle Coverage"},
+		{"id":"bm_wf","type":"text","text":"## Six Stages\n\n1. **Brainstorming** — Initial ideation\n2. **Analysis** — Requirements & feasibility\n3. **Planning** — Structured roadmapping\n4. **Architecture** — System design\n5. **Implementation** — Development execution\n6. **Deployment** — Release management\n\n## Installation Modes\n\n`npx bmad-method install`\nInteractive: select modules + tools\n\n`npx bmad-method install --directory /path\n  --modules bmm --tools claude-code --yes`\nNon-interactive (CI/CD)\n\n`npx bmad-method@next install`\nPrerelease builds","x":880,"y":230,"width":500,"height":260,"color":"3"},
+		{"id":"bm_diff","type":"text","text":"### Key Differentiator: Most role-heavy framework — each AI agent has a distinct persona mirroring human team roles · \"Epic sharding\" produces self-contained story files with zero-ambiguity context · Two-phase approach separates planning intelligence from execution intelligence","x":-400,"y":580,"width":1800,"height":60,"color":"1"}
+	],
+	"edges":[
+		{"id":"bm_e1","fromNode":"bm_title","fromSide":"bottom","toNode":"bm_phases_group","toSide":"top"},
+		{"id":"bm_e2","fromNode":"bm_phase1","fromSide":"right","toNode":"bm_phase2","toSide":"left","label":"PRD →"},
+		{"id":"bm_e3","fromNode":"bm_phase2","fromSide":"right","toNode":"bm_sharding","toSide":"left","label":"epic sharding"},
+		{"id":"bm_e4","fromNode":"bm_phases_group","fromSide":"bottom","toNode":"bm_agents_group","toSide":"top","label":"powered by"},
+		{"id":"bm_e5","fromNode":"bm_phases_group","fromSide":"bottom","toNode":"bm_wf_group","toSide":"top","label":"covers"},
+		{"id":"bm_e6","fromNode":"bm_agents_group","fromSide":"bottom","toNode":"bm_diff","toSide":"top"},
+		{"id":"bm_e7","fromNode":"bm_wf_group","fromSide":"bottom","toNode":"bm_diff","toSide":"top"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
+}

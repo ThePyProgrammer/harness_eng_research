@@ -1,0 +1,34 @@
+{
+	"nodes":[
+		{"id":"os_title","type":"text","text":"# OpenSpec\n\n**Philosophy:** Spec-first, lightweight, universal\n**Creator:** Fission AI (YC-backed)\n**Install:** `npm install -g @fission-ai/openspec@latest`\n**Runtime:** Works with 20+ AI tools (Claude Code, Cursor, Copilot, etc.)\n**Stack:** TypeScript (98.7%) · Node.js CLI · Markdown artifacts","x":150,"y":-460,"width":600,"height":200,"color":"2"},
+		{"id":"os_wf_group","type":"group","x":-350,"y":-200,"width":1600,"height":340,"color":"4","label":"Workflow: Propose → Specify → Design → Task → Implement"},
+		{"id":"os_wf_1","type":"text","text":"## 1. Propose\n\n`/opsx:propose`\n\nGenerate `proposal.md`:\n- Why are we doing this?\n- What's changing?\n- Scope boundaries\n- Success criteria\n\nHuman reviews & approves","x":-330,"y":-150,"width":280,"height":240,"color":"2"},
+		{"id":"os_wf_2","type":"text","text":"## 2. Specify\n\nGenerate `specs/` directory:\n- Requirements by capability\n- User scenarios\n- Acceptance criteria\n- Edge cases\n\nSpecs organized as\n\"living documentation\"\nin Git","x":-30,"y":-150,"width":280,"height":240,"color":"2"},
+		{"id":"os_wf_3","type":"text","text":"## 3. Design\n\nGenerate `design.md`:\n- Technical approach\n- Architecture decisions\n- Component interactions\n- Data flow\n- Error handling strategy\n\nBridges spec → implementation","x":270,"y":-150,"width":280,"height":240,"color":"4"},
+		{"id":"os_wf_4","type":"text","text":"## 4. Task\n\nGenerate `tasks.md`:\n- Implementation checklist\n- Subtask breakdown\n- Dependencies noted\n- Each task testable\n  in isolation\n\nChecklist format for\nAI agent consumption","x":570,"y":-150,"width":280,"height":240,"color":"3"},
+		{"id":"os_wf_5","type":"text","text":"## 5. Apply\n\n`/opsx:apply`\n\nImplement proposed tasks\nautomatically via AI agent\n\nAgent follows:\n- specs/ for requirements\n- design.md for architecture\n- tasks.md for work items\n\n`/opsx:verify` to validate","x":870,"y":-150,"width":280,"height":240,"color":"5"},
+		{"id":"os_dir_group","type":"group","x":-350,"y":200,"width":760,"height":380,"color":"3","label":"Directory Structure"},
+		{"id":"os_dir","type":"text","text":"## Project Layout\n\n```\nproject-root/\n├── openspec/\n│   ├── specs/          # Spec library by capability\n│   │   ├── auth.md\n│   │   ├── billing.md\n│   │   └── ...\n│   └── changes/        # Per-feature tracking\n│       ├── add-oauth/\n│       │   ├── proposal.md\n│       │   ├── specs/\n│       │   ├── design.md\n│       │   └── tasks.md\n│       └── archive/    # Completed work\n│           └── 2026-03-15-fix-login/\n└── src/                # Your code\n```","x":-330,"y":250,"width":380,"height":310,"color":"3"},
+		{"id":"os_dir_notes","type":"text","text":"## Key Principles\n\n**Fluid not rigid**\nIterative updates without phase gates\nNo strict waterfall enforcement\n\n**Brownfield compatible**\nWorks with existing projects\nNo restructuring required\n\n**Git-native**\nSpecs live alongside code\nVersion-controlled \"living docs\"\nSpec deltas show requirement evolution\n\n**No lock-in**\nNo API keys needed\nNo MCP required\nPure markdown artifacts","x":70,"y":250,"width":320,"height":310,"color":"6"},
+		{"id":"os_cmds_group","type":"group","x":450,"y":200,"width":400,"height":380,"color":"1","label":"All Commands"},
+		{"id":"os_cmds","type":"text","text":"## Primary\n\n`/opsx:propose` — Initiate feature proposal\n`/opsx:apply` — Implement tasks\n`/opsx:archive` — Store completed changes\n\n## Extended\n\n`/opsx:new` — New change from scratch\n`/opsx:continue` — Resume work\n`/opsx:ff` — Fast-forward (skip steps)\n`/opsx:verify` — Validate implementation\n`/opsx:sync` — Sync specs with code\n`/opsx:bulk-archive` — Archive multiple\n`/opsx:onboard` — Onboard to existing project\n\n## CLI\n\n`openspec init` — Initialize project\n`openspec config profile` — Select profile\n`openspec update` — Regenerate instructions","x":470,"y":250,"width":360,"height":310,"color":"1"},
+		{"id":"os_diff_group","type":"group","x":-350,"y":640,"width":1200,"height":180,"color":"5","label":"What OpenSpec Does NOT Do"},
+		{"id":"os_diff","type":"text","text":"### Scope Boundary\n\nOpenSpec is **purely a specification layer**. It does NOT provide:\n- Agent orchestration or sub-agents\n- Execution engines or task runners\n- Testing frameworks or verification\n- Git workflow management\n- Context window management\n- Cost/token tracking\n\n**Composable:** Can layer OpenSpec specs underneath GSD execution or Superpowers methodology","x":-330,"y":680,"width":760,"height":120,"color":"1"},
+		{"id":"os_compat","type":"text","text":"### Compatible With\n\nClaude Code · Cursor · GitHub Copilot\nGemini · Windsurf · Kilo Code\nRoo Code · VS Code · JetBrains\nAugment · Tabnine · Cody\n+ any tool that reads markdown\n\n**20+ integrations total**","x":450,"y":680,"width":380,"height":120,"color":"4"}
+	],
+	"edges":[
+		{"id":"os_e1","fromNode":"os_title","fromSide":"bottom","toNode":"os_wf_group","toSide":"top"},
+		{"id":"os_e2","fromNode":"os_wf_1","fromSide":"right","toNode":"os_wf_2","toSide":"left","label":"→"},
+		{"id":"os_e3","fromNode":"os_wf_2","fromSide":"right","toNode":"os_wf_3","toSide":"left","label":"→"},
+		{"id":"os_e4","fromNode":"os_wf_3","fromSide":"right","toNode":"os_wf_4","toSide":"left","label":"→"},
+		{"id":"os_e5","fromNode":"os_wf_4","fromSide":"right","toNode":"os_wf_5","toSide":"left","label":"→"},
+		{"id":"os_e6","fromNode":"os_wf_group","fromSide":"bottom","toNode":"os_dir_group","toSide":"top","label":"produces"},
+		{"id":"os_e7","fromNode":"os_wf_group","fromSide":"bottom","toNode":"os_cmds_group","toSide":"top","label":"via"},
+		{"id":"os_e8","fromNode":"os_dir_group","fromSide":"bottom","toNode":"os_diff_group","toSide":"top"},
+		{"id":"os_e9","fromNode":"os_cmds_group","fromSide":"bottom","toNode":"os_diff_group","toSide":"top"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
+}

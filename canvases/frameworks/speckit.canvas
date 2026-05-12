@@ -1,0 +1,35 @@
+{
+	"nodes":[
+		{"id":"sk_title","type":"text","text":"# GitHub Spec Kit\n\n**Philosophy:** Agent-agnostic spec-driven development\n**Creator:** GitHub (official)\n**Install:** `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`\n**Runtime:** 20+ AI assistants via AGENT_CONFIG registry\n**Coverage:** Martin Fowler, Microsoft Dev Blog","x":200,"y":-460,"width":600,"height":200,"color":"2"},
+		{"id":"sk_wf_group","type":"group","x":-400,"y":-200,"width":1800,"height":340,"color":"4","label":"Workflow: Constitution → Specify → Clarify → Plan → Tasks → Implement"},
+		{"id":"sk_wf_1","type":"text","text":"## 1. Constitution\n\n`/speckit.constitution`\n\nEstablish governing principles:\n- Project values\n- Development guidelines\n- Quality standards\n- Architectural constraints\n\nOptional but recommended\nfor team alignment","x":-380,"y":-150,"width":260,"height":240,"color":"6"},
+		{"id":"sk_wf_2","type":"text","text":"## 2. Specify\n\n`/speckit.specify`\n\nDefine requirements:\n- User stories\n- What & why (not how)\n- Acceptance criteria\n- Constraints\n\nResearch agents gather\ntechnical context during\nspecification","x":-100,"y":-150,"width":260,"height":240,"color":"2"},
+		{"id":"sk_wf_3","type":"text","text":"## 3. Clarify (optional)\n\n`/speckit.clarify`\n\nAddress underspecified areas:\n- Ambiguity resolution\n- Edge case discovery\n- Stakeholder alignment\n- Technical feasibility\n\nRun before /plan to\nreduce rework","x":180,"y":-150,"width":260,"height":240,"color":"3"},
+		{"id":"sk_wf_4","type":"text","text":"## 4. Plan\n\n`/speckit.plan`\n\nTechnical implementation:\n- Tech stack choices\n- Architecture decisions\n- Component design\n- Integration strategy\n\nProvide high-level direction,\nagent generates detail","x":460,"y":-150,"width":260,"height":240,"color":"4"},
+		{"id":"sk_wf_5","type":"text","text":"## 5. Tasks\n\n`/speckit.tasks`\n\nActionable work items:\n- Small, reviewable chunks\n- Each independently testable\n- Derived from plan\n- Clear completion criteria\n\nBreaks plan into\nAI-consumable units","x":740,"y":-150,"width":260,"height":240,"color":"5"},
+		{"id":"sk_wf_6","type":"text","text":"## 6. Implement\n\n`/speckit.implement`\n\nExecute all tasks:\n- Follows spec + plan\n- Respects constitution\n- Sequential task execution\n- Build features per plan\n\n## Quality Gates\n`/speckit.analyze`\n`/speckit.checklist`","x":1020,"y":-150,"width":260,"height":240,"color":"1"},
+		{"id":"sk_dir_group","type":"group","x":-400,"y":200,"width":760,"height":360,"color":"3","label":"Directory Structure (.speckit/)"},
+		{"id":"sk_dir","type":"text","text":"## Project Layout\n\n```\nproject-root/\n├── .speckit/\n│   ├── constitution.md    # Project principles\n│   ├── spec.md            # Requirements\n│   ├── plan.md            # Technical approach\n│   └── tasks/             # Individual work units\n│       ├── 001-setup.md\n│       ├── 002-auth.md\n│       └── ...\n├── .github/               # GitHub integration\n├── docs/                  # Documentation\n├── presets/               # Dev presets\n├── templates/             # Project templates\n└── scripts/               # Agent integration scripts\n```","x":-380,"y":250,"width":380,"height":290,"color":"3"},
+		{"id":"sk_agents","type":"text","text":"## Supported Agents (20+)\n\n**Fully Supported:**\nClaude Code · Gemini CLI · Codex CLI\nCursor · Windsurf · GitHub Copilot\nKilo Code · Roo Code · Kiro CLI\nopencode · Amp · Auggie CLI\nCodeBuddy CLI · Jules · Qwen Code\nTabnine CLI · Mistral Vibe\nKimi Code · SHAI · Qoder CLI\nAntigravity\n\n**Generic Support:**\n`--ai generic --ai-commands-dir <path>`\nBring your own agent","x":-380,"y":550,"width":380,"height":60,"color":"5"},
+		{"id":"sk_init","type":"text","text":"## Init Options\n\n`specify init <name>`\n\n`--ai claude|copilot|gemini|cursor-agent|...`\n`--script sh|ps` (shell type)\n`--here` (current directory)\n`--force` (merge into existing)\n`--no-git` (skip git init)\n`--ai-skills` (install Prompt.MD templates)\n`--ignore-agent-tools` (skip tool checks)\n\n`specify check` — Verify installed tools","x":20,"y":250,"width":320,"height":290,"color":"1"},
+		{"id":"sk_key_group","type":"group","x":400,"y":200,"width":1000,"height":360,"color":"5","label":"Key Differentiators"},
+		{"id":"sk_key_1","type":"text","text":"## AGENT_CONFIG Registry\n\nAbstraction layer that handles:\n- Command file generation per agent\n- Format variations across 20+ tools\n- Context management differences\n- Unified framework despite\n  heterogeneous agent conventions\n\nOne spec, many agents","x":420,"y":250,"width":300,"height":220,"color":"4"},
+		{"id":"sk_key_2","type":"text","text":"## Intent-Driven Development\n\n\"Specifications define the what\nbefore the how\"\n\nSupports:\n- **Greenfield**: New projects from scratch\n- **Creative exploration**: Prototyping\n- **Brownfield**: Modernizing existing code\n\nSpec = primary artifact\nCode = its expression","x":740,"y":250,"width":300,"height":220,"color":"2"},
+		{"id":"sk_key_3","type":"text","text":"## Quality Commands\n\n`/speckit.analyze`\nCross-artifact consistency validation\nCoverage analysis across spec/plan/tasks\n\n`/speckit.checklist`\nCustom quality checklists\nRequirements completeness checks\n\n`/speckit.clarify`\nPre-planning ambiguity resolution\nReduces downstream rework","x":1060,"y":250,"width":320,"height":220,"color":"3"},
+		{"id":"sk_env","type":"text","text":"### Environment: `SPECIFY_FEATURE` — Override feature detection for non-Git repos · Set to feature directory name before `/speckit.plan` · Enables per-feature specification tracking","x":-400,"y":620,"width":1000,"height":60,"color":"1"}
+	],
+	"edges":[
+		{"id":"sk_e1","fromNode":"sk_title","fromSide":"bottom","toNode":"sk_wf_group","toSide":"top"},
+		{"id":"sk_e2","fromNode":"sk_wf_1","fromSide":"right","toNode":"sk_wf_2","toSide":"left","label":"→"},
+		{"id":"sk_e3","fromNode":"sk_wf_2","fromSide":"right","toNode":"sk_wf_3","toSide":"left","label":"→"},
+		{"id":"sk_e4","fromNode":"sk_wf_3","fromSide":"right","toNode":"sk_wf_4","toSide":"left","label":"→"},
+		{"id":"sk_e5","fromNode":"sk_wf_4","fromSide":"right","toNode":"sk_wf_5","toSide":"left","label":"→"},
+		{"id":"sk_e6","fromNode":"sk_wf_5","fromSide":"right","toNode":"sk_wf_6","toSide":"left","label":"→"},
+		{"id":"sk_e7","fromNode":"sk_wf_group","fromSide":"bottom","toNode":"sk_dir_group","toSide":"top","label":"produces"},
+		{"id":"sk_e8","fromNode":"sk_wf_group","fromSide":"bottom","toNode":"sk_key_group","toSide":"top","label":"enables"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
+}

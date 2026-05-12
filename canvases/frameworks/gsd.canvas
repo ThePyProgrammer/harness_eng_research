@@ -1,0 +1,43 @@
+{
+	"nodes":[
+		{"id":"gsd_title","type":"text","text":"# GSD (Get Shit Done)\n\n**Philosophy:** Execution-first context engineering\n**Creator:** TACHES · **Stars:** ~23K\n**Runtime:** Claude Code, OpenCode, Gemini CLI, Codex, Copilot, Antigravity\n**Install:** `npx get-shit-done-cc@latest`\n**Built on:** Pi SDK (TypeScript, direct harness access)","x":200,"y":-500,"width":600,"height":200,"color":"4"},
+		{"id":"gsd_wf_group","type":"group","x":-400,"y":-220,"width":1800,"height":360,"color":"2","label":"Core Workflow: Six-Step Cycle (per phase)"},
+		{"id":"gsd_wf_1","type":"text","text":"## 1. Discuss\n\n`/gsd:discuss-phase [N]`\n\nSurface implementation gray areas:\n- Visual decisions\n- API design choices\n- Content questions\n- Org constraints\n\n`--batch` for non-interactive\n`--auto` for recommended defaults","x":-380,"y":-170,"width":280,"height":260,"color":"2"},
+		{"id":"gsd_wf_2","type":"text","text":"## 2. Plan\n\n`/gsd:plan-phase [N]`\n\nResearch → Create tasks → Verify\n- 4 parallel researcher agents\n- Plan checker validates (max 2 iterations)\n- XML-formatted atomic task plans\n- Size limits prevent context degradation\n\n`--auto` skips approval","x":-80,"y":-170,"width":280,"height":260,"color":"2"},
+		{"id":"gsd_wf_3","type":"text","text":"## 3. Execute\n\n`/gsd:execute-phase <N>`\n\nParallel wave execution:\n- Independent plans run simultaneously\n- Dependent plans wait in later waves\n- **Fresh 200K context per task**\n- File conflicts handled sequentially\n- Atomic git commits per task","x":220,"y":-170,"width":280,"height":260,"color":"4"},
+		{"id":"gsd_wf_4","type":"text","text":"## 4. Verify\n\n`/gsd:verify-work [N]`\n\nManual UAT + automated checks:\n- Verifier agent checks codebase vs phase goals\n- Creates VERIFICATION.md report\n- Goal-backward analysis\n- Checks delivery, not just task completion","x":520,"y":-170,"width":280,"height":260,"color":"3"},
+		{"id":"gsd_wf_5","type":"text","text":"## 5. Complete\n\n`/gsd:complete-milestone`\n`/gsd:audit-milestone`\n\nArchive milestone\nTag release in git\nPrepare for next version\n\nAudit verifies definition of done before archiving","x":820,"y":-170,"width":280,"height":260,"color":"5"},
+		{"id":"gsd_wf_6","type":"text","text":"## 6. Repeat\n\n`/gsd:autonomous`\n\nRun all remaining phases:\ndiscuss → plan → execute → verify\n\nPer phase, no human intervention\nMilestone-level autonomy\nStuck loop detection\nCrash recovery","x":1120,"y":-170,"width":260,"height":260,"color":"6"},
+		{"id":"gsd_agents_group","type":"group","x":-400,"y":200,"width":1800,"height":300,"color":"5","label":"Agent Architecture (12+ Specialized Agents)"},
+		{"id":"gsd_agent_1","type":"text","text":"## Researchers (x4 parallel)\n\nInvestigate simultaneously:\n- Stack & technology\n- Features & capabilities\n- Architecture & patterns\n- Pitfalls & oversights\n\nProduce `.planning/research/`","x":-380,"y":250,"width":280,"height":200,"color":"5"},
+		{"id":"gsd_agent_2","type":"text","text":"## Planner + Checker\n\n**Planner**: Creates atomic plans\nwith XML structure, verification steps\n\n**Plan Checker**: Validates against\nrequirements (max 2 iterations)\n\nGoal-backward verification loop","x":-80,"y":250,"width":280,"height":200,"color":"5"},
+		{"id":"gsd_agent_3","type":"text","text":"## Executors (parallel waves)\n\nFresh 200K context per task\nNo accumulated garbage context\nAtomic commits:\n```\nfeat(08-02): add email flow\nfeat(08-02): implement hashing\nfeat(08-02): create endpoint\n```","x":220,"y":250,"width":280,"height":200,"color":"4"},
+		{"id":"gsd_agent_4","type":"text","text":"## Verifier + Debugger\n\n**Verifier**: Checks codebase\ndelivers what phase promised\n(not just tasks completed)\n\n**Debugger**: Scientific method,\npersistent debug state across\ncontext resets","x":520,"y":250,"width":280,"height":200,"color":"3"},
+		{"id":"gsd_agent_5","type":"text","text":"## Orchestrator Pattern\n\nThin orchestrator spawns agents\nResults aggregated & routed\nNo single agent accumulates context\n\nContext engineering:\n- XML-formatted prompts\n- Modular file loading\n- Size limits enforced","x":820,"y":250,"width":280,"height":200,"color":"6"},
+		{"id":"gsd_agent_6","type":"text","text":"## UI Specialists\n\n`/gsd:ui-phase [N]`\nGenerate UI-SPEC.md design contract\n\n`/gsd:ui-review [N]`\n6-pillar visual audit:\n- Layout · Color · Typography\n- Spacing · Responsiveness · A11y","x":1120,"y":250,"width":260,"height":200,"color":"2"},
+		{"id":"gsd_artifacts_group","type":"group","x":-400,"y":560,"width":880,"height":360,"color":"3","label":"File Artifacts (.planning/)"},
+		{"id":"gsd_art_1","type":"text","text":"## Project-Level\n\n`PROJECT.md` — Vision (always loaded)\n`REQUIREMENTS.md` — Scoped v1/v2\n`ROADMAP.md` — Phases + status\n`STATE.md` — Decisions, blockers, position\n`.planning/research/` — Domain knowledge","x":-380,"y":610,"width":400,"height":180,"color":"3"},
+		{"id":"gsd_art_2","type":"text","text":"## Phase-Level\n\n`{N}-CONTEXT.md` — Discussion results\n`{N}-RESEARCH.md` — Investigation\n`{N}-{M}-PLAN.md` — Atomic task (XML)\n`{N}-{M}-SUMMARY.md` — Execution results\n`{N}-VERIFICATION.md` — Delivery check\n`{N}-UAT.md` — Acceptance testing","x":-380,"y":800,"width":400,"height":100,"color":"3"},
+		{"id":"gsd_art_3","type":"text","text":"## Quick Mode\n\n`.planning/quick/{seq}/`\n- `PLAN.md`\n- `SUMMARY.md`\n\n`/gsd:quick` for ad-hoc tasks\nFlags: `--discuss` `--research` `--full`\n\n## Extras\n`todos/` — Future ideas\nGit tags — Release markers","x":40,"y":610,"width":420,"height":290,"color":"6"},
+		{"id":"gsd_cmds_group","type":"group","x":520,"y":560,"width":880,"height":360,"color":"1","label":"Additional Commands"},
+		{"id":"gsd_cmd_1","type":"text","text":"## Project Init\n\n`/gsd:new-project [--auto]`\nQuestions → Research → Requirements → Roadmap\n\n`/gsd:map-codebase`\nParallel agents analyze existing code\n\n`/gsd:new-milestone [name]`\nStart next version cycle","x":540,"y":610,"width":400,"height":180,"color":"1"},
+		{"id":"gsd_cmd_2","type":"text","text":"## Management\n\n`/gsd:progress` — Current position + next steps\n`/gsd:stats` — Phases, plans, git metrics\n`/gsd:add-phase` — Append to roadmap\n`/gsd:insert-phase` — Decimal phases (72.1)\n`/gsd:remove-phase` — Remove + renumber\n`/gsd:pause-work` — Context handoff\n`/gsd:resume-work` — Restore context\n`/gsd:settings` — Workflow toggles\n`/gsd:set-profile` — Model profiles","x":540,"y":800,"width":400,"height":100,"color":"1"},
+		{"id":"gsd_cmd_3","type":"text","text":"## Key Differentiators\n\n- Solves context rot (fresh 200K per task)\n- Atomic git history (bisectable)\n- Modular workflow (add/skip phases)\n- Multi-runtime (6 runtimes)\n- No ceremony (no sprints/story points)\n- Stuck loop detection + crash recovery\n- Cost & token tracking\n- Auto-advance through milestones","x":960,"y":610,"width":420,"height":290,"color":"4"},
+		{"id":"gsd_sdlc","type":"text","text":"### SDLC Coverage: Only framework covering all 6 stages — Requirements · Roadmap · Discussion · Planning · Execution · Verification","x":-400,"y":960,"width":1800,"height":60,"color":"4"}
+	],
+	"edges":[
+		{"id":"gsd_e1","fromNode":"gsd_title","fromSide":"bottom","toNode":"gsd_wf_group","toSide":"top"},
+		{"id":"gsd_e2","fromNode":"gsd_wf_1","fromSide":"right","toNode":"gsd_wf_2","toSide":"left","label":"→"},
+		{"id":"gsd_e3","fromNode":"gsd_wf_2","fromSide":"right","toNode":"gsd_wf_3","toSide":"left","label":"→"},
+		{"id":"gsd_e4","fromNode":"gsd_wf_3","fromSide":"right","toNode":"gsd_wf_4","toSide":"left","label":"→"},
+		{"id":"gsd_e5","fromNode":"gsd_wf_4","fromSide":"right","toNode":"gsd_wf_5","toSide":"left","label":"→"},
+		{"id":"gsd_e6","fromNode":"gsd_wf_5","fromSide":"right","toNode":"gsd_wf_6","toSide":"left","label":"→"},
+		{"id":"gsd_e7","fromNode":"gsd_wf_group","fromSide":"bottom","toNode":"gsd_agents_group","toSide":"top","label":"powered by"},
+		{"id":"gsd_e8","fromNode":"gsd_agents_group","fromSide":"bottom","toNode":"gsd_artifacts_group","toSide":"top","label":"produces"},
+		{"id":"gsd_e9","fromNode":"gsd_agents_group","fromSide":"bottom","toNode":"gsd_cmds_group","toSide":"top","label":"managed via"}
+	],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
+}
