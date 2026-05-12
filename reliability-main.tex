@@ -1,0 +1,781 @@
+\documentclass[11pt, a4paper, logo, copyright]{googledeepmind}
+
+% === Packages (deduplicated) ===
+\usepackage[authoryear, sort&compress, round]{natbib}
+\bibliographystyle{abbrvnat}
+\usepackage{cleveref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{wrapfig}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{colortbl}
+\usepackage{arydshln}
+\usepackage{adjustbox}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{subfigure}
+\usepackage{graphicx}
+\usepackage{makecell, tabularx}
+\usepackage{minitoc}
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{stmaryrd}
+\usepackage{pifont}
+\usepackage{afterpage}
+\usepackage{float}
+\usepackage[toc,page,header]{appendix}
+\usepackage{array}
+\usepackage{placeins}
+\usepackage{titletoc}
+\usepackage{siunitx}
+
+% === Theorem environments ===
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem*{remark}{Remark}
+\newtheorem{example}{Example}[section]
+
+% === Minimal colours ===
+\definecolor{deemph}{gray}{0.55}
+\newcommand{\gc}[1]{\textcolor{deemph}{#1}}
+\definecolor{lightgray}{gray}{0.9}
+\definecolor{baselinecolor}{gray}{.95}
+\newcommand{\grayrow}{\rowcolor[gray]{.9}}
+\newcommand{\graycell}[1]{\cellcolor{baselinecolor}{#1}}
+\newcolumntype{L}{>{\RaggedRight}X}
+
+% === Custom commands ===
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calB}{\mathcal{B}}
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\calP}{\mathcal{P}}
+
+% Paper Title
+\title{Reliability Architecture for Multi-Step AI Agent Pipelines: Compound Errors, Verification Scheduling, and the Structural Enforcement Boundary}
+
+\renewcommand{\today}{}
+
+\author[1]{Prannay Agrawal}
+
+\affil[]{Pragnition Labs}
+\affil[1]{Pragnition Labs}
+
+
+\begin{abstract}
+\vspace{-0.2in}
+
+Multi-step AI agent pipelines face a fundamental reliability challenge: per-step success rates compound multiplicatively, producing exponential decay in end-to-end reliability.
+At 95\% per-step accuracy across 20 steps, pipeline success is 36\%.
+This paper develops a formal framework for reliability architecture in such pipelines, drawing on classical reliability theory, optimal inspection scheduling, and information-theoretic verification bounds.
+
+We contribute four formal results:
+(1)~a compound error sensitivity theorem showing that a 1\% relative improvement in per-step reliability yields an $n$\% relative improvement end-to-end, where $n$ is the pipeline length;
+(2)~an optimal verification scheduling formulation via dynamic programming, recovering the Young-Daly checkpoint interval as a special case and proving that three verification rounds capture over 96\% of detectable errors;
+(3)~a formal model of circular validation bias showing that same-author code and tests share blind spots, with empirical calibration against the METR finding that roughly 50\% of test-passing PRs would not be merged;
+and (4)~a cost-of-failure threshold theorem establishing when structural enforcement (deterministic, agent-proof constraints) becomes cost-effective over prompt-based instructions.
+
+We calibrate these models against published benchmarks (SWE-bench, RE-Bench, METR evaluations, AgentSpec) and derive practical design principles: a four-layer verification architecture ordered by efficiency, adaptive verification intensity based on risk and information gap, and the structural enforcement boundary separating deterministic from probabilistic quality assurance.
+The framework provides engineering guidance for building agent systems that degrade gracefully rather than catastrophically as pipeline complexity grows.
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+The deployment of large language model (LLM) agents on multi-step software engineering tasks has revealed a stark quantitative reality: compound errors destroy end-to-end reliability.
+At 85\% per-step accuracy across 10 steps, the probability that every step succeeds is $0.85^{10} = 19.7\%$~\citep{rajan2026math}.
+At 90\% accuracy across 20 steps, it falls to 12\%.
+Field measurements confirm these predictions: \citet{hariharan2025plan} report 63\% failure rates on 100-step tasks, and METR found that roughly 50\% of SWE-bench test-passing pull requests would not be merged by repository maintainers~\citep{metr2026swebench}.
+
+This is the single most important quantitative fact about agent workflows.
+No amount of prompt engineering, context optimization, or architectural governance matters if compound errors destroy the output.
+Yet the field lacks a formal framework for reasoning about when, where, and how aggressively to verify agent output.
+
+This paper develops such a framework. This is a \emph{theory and position paper}: we develop formal tools and apply them to derive design principles, but we do not conduct new experiments. Empirical calibration draws on published benchmarks and studies. We note that this is a rapidly evolving area where practitioner discourse (blog posts, industry reports, and preprints) frequently precedes peer-reviewed publication; we draw on such sources where they provide the best available evidence, and flag them accordingly. Our contributions are:
+
+\begin{enumerate}
+\item \textbf{Formal compound error model} (\S\ref{sec:compound}): We model agent pipelines as series reliability systems, prove the compound error sensitivity theorem (elasticity equals pipeline length), and extend the model to correlated failures via the Marshall-Olkin common-cause framework. We calibrate against published benchmarks and show that the independent $p^n$ model is a reasonable first approximation, but that error clustering in problem-framing steps dominates execution-step errors.
+
+\item \textbf{Optimal verification scheduling} (\S\ref{sec:verification}): We formulate checkpoint placement as a dynamic programming problem, prove equal-spacing optimality for homogeneous pipelines, derive the optimal checkpoint count as a discrete Young-Daly analog, and establish the geometric diminishing returns of successive verification rounds. Calibration against \citet{hariharan2025plan} confirms that three rounds are optimal.
+
+\item \textbf{Circular validation bias} (\S\ref{sec:circular}): We formalize the bias $\beta$ that arises when the same agent produces both code and tests, model it via blind-spot sets, and connect it to the METR merge-gap finding. We prove that self-verification provides zero bias reduction and that cross-family verification is where gains concentrate.
+
+\item \textbf{Structural enforcement boundary} (\S\ref{sec:structural}): We define the distinction between structural enforcement (deterministic, agent-proof) and prompt enforcement (probabilistic), derive the cost-of-failure threshold $L^*$ above which structural enforcement is cost-effective, and show that this threshold drops as $1/n$ for multi-step pipelines.
+
+\item \textbf{Adaptive verification architecture} (\S\ref{sec:adaptive}): We synthesize these results into a four-layer verification architecture with formal efficiency ordering, derive switching thresholds for adaptive verification intensity, and address the economics of multi-agent verification (including the sequential reasoning penalty documented by \citeauthor{google2025scaling}).
+\end{enumerate}
+
+% ============================================================
+\section{Preliminaries and Definitions}
+\label{sec:prelim}
+
+\begin{definition}[Agent Pipeline]
+An \emph{$n$-step agent pipeline} is a tuple $\calP = (S_1, S_2, \ldots, S_n)$ where each $S_i$ is a stochastic transformation mapping input artifact $a_{i-1}$ to output artifact $a_i$.
+The pipeline is a \emph{series reliability system} with structure function
+$\phi(x_1, \ldots, x_n) = \prod_{i=1}^{n} x_i$,
+where $x_i \in \{0,1\}$ indicates whether step $i$ produced correct output.
+\end{definition}
+
+\begin{definition}[Per-Step Success Probability]
+For step $i$, define $p_i = \Prob(x_i = 1 \mid a_{i-1} \text{ is correct})$.
+\end{definition}
+
+\begin{definition}[Error Propagation Probability]
+Define $q_i = \Prob(x_i = 1 \mid a_{i-1} \text{ is incorrect})$, the probability that step $i$ produces correct output despite incorrect input.
+In most agent workflows, $q_i \ll p_i$.
+\end{definition}
+
+\begin{definition}[Verification Layer]
+A \emph{verification layer} $\ell$ is characterized by detection rate $d(\ell) = \Prob(\text{flag} \mid \text{defect})$, false positive rate $f(\ell) = \Prob(\text{flag} \mid \text{no defect})$, cost $c(\ell)$, and latency $\tau(\ell)$.
+Its \emph{efficiency} is $\eta(\ell) = d(\ell) / c(\ell)$.
+\end{definition}
+
+% ============================================================
+\section{Compound Error Dynamics}
+\label{sec:compound}
+
+\subsection{The Series Reliability Product Law}
+
+\begin{theorem}[Series Reliability]
+\label{thm:series}
+If step outcomes are conditionally independent given correct inputs at each stage, the end-to-end reliability is
+\begin{equation}
+R(n) = \prod_{i=1}^{n} p_i
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+By the structure function $\phi(\mathbf{x}) = \prod x_i$, the pipeline succeeds iff all $x_i = 1$.
+Under conditional independence and the chain rule:
+$R(n) = \Prob\!\bigl(\bigcap_{i=1}^{n} \{x_i = 1\}\bigr) = \prod_{i=1}^{n} \Prob(x_i = 1 \mid x_1 = \cdots = x_{i-1} = 1) = \prod_{i=1}^{n} p_i$.
+\end{proof}
+
+\begin{corollary}[Homogeneous Pipeline]
+If $p_i = p$ for all $i$, then $R(n) = p^n$, which decays exponentially:
+\end{corollary}
+
+\begin{center}
+\begin{tabular}{lccccc}
+\toprule
+$p$ & $n{=}5$ & $n{=}10$ & $n{=}20$ & $n{=}50$ \\
+\midrule
+0.99 & 0.951 & 0.904 & 0.818 & 0.605 \\
+0.95 & 0.774 & 0.599 & 0.358 & 0.077 \\
+0.90 & 0.590 & 0.349 & 0.122 & 0.005 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The Compound Error Sensitivity Theorem}
+
+\begin{theorem}[Sensitivity of Pipeline Reliability]
+\label{thm:sensitivity}
+For a homogeneous pipeline with $R(n) = p^n$:
+\begin{equation}
+\frac{\partial R}{\partial p} = n \cdot p^{n-1}
+\end{equation}
+The elasticity of pipeline reliability with respect to per-step reliability is exactly $n$: a 1\% relative improvement in per-step reliability yields an $n$\% relative improvement end-to-end.
+\end{theorem}
+
+\begin{proof}
+Direct differentiation gives $dR/dp = np^{n-1}$.
+The elasticity $\varepsilon = (p/R)(dR/dp) = (p \cdot n p^{n-1})/p^n = n$.
+\end{proof}
+
+\begin{corollary}[Weakest-Link Priority]
+\label{cor:weakest}
+For a heterogeneous pipeline, $\partial R / \partial p_j = R / p_j$, which is inversely proportional to $p_j$.
+Improvement effort should target the step with the lowest reliability.
+\end{corollary}
+
+\begin{example}
+For $p_0 = 0.95$ and $n = 10$: $\partial R/\partial p = 10 \times 0.95^9 = 6.30$.
+A 1-percentage-point increase in per-step accuracy (from 0.95 to 0.96) raises pipeline reliability from 59.9\% to 66.5\%, a gain of 6.6~pp.
+\end{example}
+
+\subsection{Correlated Failures: The Common-Cause Model}
+
+The independence assumption is unrealistic.
+Agent pipelines exhibit correlated failures: task misunderstanding at step~1 biases all subsequent steps; shared model weights induce common-mode failures; context drift affects multiple steps simultaneously.
+
+\begin{definition}[Common-Cause Failure Model]
+\label{def:commoncause}
+Following the Marshall-Olkin framework~\citep{marshall1967multivariate}, decompose each step's failure into an independent component $Z_i \sim \text{Bernoulli}(\alpha_i)$ and a shared common-cause component $Y \sim \text{Bernoulli}(\gamma)$:
+\begin{equation}
+X_i = \max(Z_i, Y)
+\end{equation}
+where $X_i$ is the failure indicator for step $i$.
+\end{definition}
+
+\begin{theorem}[Correlated Failure Reliability]
+\label{thm:correlated}
+Under the common-cause model, pipeline reliability is:
+\begin{equation}
+R(n) = (1 - \gamma) \prod_{i=1}^{n} (1 - \alpha_i)
+\end{equation}
+The common-cause failure rate $\gamma$ imposes a hard ceiling: no amount of per-step improvement can raise $R(n)$ above $(1 - \gamma)$.
+\end{theorem}
+
+\begin{proof}
+The pipeline succeeds iff $Y = 0$ (no common-cause failure) and $Z_i = 0$ for all $i$.
+Since $Y$ and all $Z_i$ are independent: $R(n) = (1-\gamma)\prod_{i=1}^{n}(1-\alpha_i)$.
+\end{proof}
+
+\begin{remark}
+This decomposition is practically important.
+Research on agent failures suggests that most failures are attributable to problem framing and context management (the $\gamma$ component), not execution-step errors (the $\alpha_i$ components)~\citep{cemri2025multiagent}.
+Improving individual $\alpha_i$ has limited effect when $\gamma$ dominates; the leverage is in reducing $\gamma$ through better context engineering and specification.
+\end{remark}
+
+\subsection{Empirical Calibration}
+
+We calibrate the model against published benchmarks by back-solving for effective per-step reliability:
+
+\begin{center}
+\begin{tabular}{llccc}
+\toprule
+Source & Setting & $n$ & $R_{\text{obs}}$ & Implied $p$ \\
+\midrule
+\citet{rajan2026math} & General agent & 20 & 0.12 & 0.900 \\
+METR~\citep{metr2026swebench} & SWE-bench merge & 10 & 0.50 & 0.933 \\
+Devin~\citep{cognition2025devin} & PR merge (2025) & 12 & 0.67 & 0.967 \\
+RE-Bench~\citep{stanfordhai2025} & Long-horizon & 100 & 0.37 & 0.990 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The implied per-step reliabilities (93--99\%) are internally consistent.
+We emphasize that this calibration demonstrates \emph{consistency}, not \emph{validation}: the model predicts $R = p^n$, and the calibration assumes the same formula to back-solve for $p$.
+Independent measurements of both $p$ and $R$ under controlled conditions would be needed for true validation; such data does not yet exist at scale.
+The RE-Bench figure (99.0\%) is higher because many steps in long-horizon tasks are trivial; the failure risk concentrates in a small fraction of steps, consistent with the common-cause model (Section~\ref{def:commoncause}).
+
+The heterogeneous-step model provides sharper prescriptions.
+With $p_1 = 0.80$ (problem framing), $p_{2 \ldots 9} = 0.98$ (execution), $p_{10} = 0.92$ (integration) for a 10-step pipeline: $R = 0.80 \times 0.98^8 \times 0.92 = 0.626$.
+Improving $p_1$ from 0.80 to 0.90 yields $R = 0.703$ (12.3\% absolute gain); improving all execution steps from 0.98 to 0.99 yields $R = 0.662$ (5.7\% gain at 8$\times$ the intervention breadth).
+
+% ============================================================
+\section{Optimal Verification Scheduling}
+\label{sec:verification}
+
+\subsection{Problem Formulation}
+
+\begin{definition}[Verification Scheduling Problem]
+Given an $n$-step pipeline with per-step failure probabilities $\epsilon_i = 1 - p_i$, verification cost $c_v$, detection probability $v$, and rework cost $c_r(d)$ increasing with delay $d$, find the verification set $V^* \subseteq \{1, \ldots, n\}$ minimizing total expected cost.
+\end{definition}
+
+We adopt a segment-based formulation.
+Partition the pipeline into $k$ contiguous segments separated by verification checkpoints.
+Segment $j$ spans steps $[a_j, b_j]$ with failure probability $F_j = 1 - \prod_{i=a_j}^{b_j} p_i$ and length $L_j = b_j - a_j + 1$.
+
+The expected cost given $k$ segments with verification after each internal boundary:
+\begin{equation}
+\E[\text{Cost}] = (k-1) \cdot c_v + \sum_{j=1}^{k} g(L_j)
+\end{equation}
+where $g(L) = (1 - p^L) \cdot c_0 \cdot L$ is the expected rework cost for a segment of length $L$ (in the homogeneous case).
+
+\subsection{Equal-Spacing Optimality}
+
+\begin{theorem}[Equal-Spacing Optimality]
+\label{thm:equalspacing}
+For a homogeneous pipeline ($p_i = p$), convex rework cost, uniform detection probability, and a fixed checkpoint budget of $k-1$, the cost-minimizing partition divides the pipeline into $k$ equal segments of length $n/k$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The segment cost $g(L) = (1 - p^L) \cdot c_0 \cdot L$ is convex in $L$ for $0 < p < 1$, $L > 0$.
+To verify, write $g(L) = c_0(L - L \cdot p^L)$. Then:
+\begin{align*}
+g'(L) &= c_0\bigl[1 - p^L - L p^L \ln p\bigr] = c_0\bigl[1 - p^L(1 + L\ln p)\bigr]\\
+g''(L) &= c_0\bigl[-p^L \ln p(1 + L\ln p) - p^L \ln p\bigr] = c_0\bigl[-p^L \ln p(2 + L\ln p)\bigr]
+\end{align*}
+Since $\ln p < 0$ for $p < 1$, let $\mu = -\ln p > 0$. Then $g''(L) = c_0 \mu p^L(2 - \mu L)$.
+For $L < 2/\mu$ (i.e., $L < 2/|\ln p|$), this is positive.
+At $p = 0.95$, $2/\mu \approx 39$, so $g$ is convex for all segment lengths up to 39 steps, covering practical pipelines.
+By Schur-convexity of a sum of convex functions subject to $\sum L_j = n$, the minimum is at the equal-length partition.
+\end{proof}
+
+\begin{theorem}[Optimal Checkpoint Count]
+\label{thm:optcheckpoints}
+The optimal number of segments satisfies:
+\begin{equation}
+k^* \approx \left\lfloor \sqrt{\frac{n(1-p) c_0}{c_v}} \right\rfloor, \qquad
+L^* = n/k^* \approx \sqrt{\frac{c_v}{(1-p) c_0}}
+\end{equation}
+\end{theorem}
+
+This is a discrete analog of the Young-Daly checkpoint interval formula~\citep{young1974first, daly2006higher}.
+
+\begin{example}
+For $p = 0.95$, $c_v = 1$, $c_0 = 5$, $n = 20$: $L^* = \sqrt{1/(0.05 \times 5)} = 2$, suggesting verification every 2 steps.
+For $p = 0.99$, $c_v = 10$: $L^* = \sqrt{10/(0.01 \times 5)} \approx 14$, suggesting verification once or twice in a 20-step pipeline.
+\end{example}
+
+\subsection{Diminishing Returns of Verification Rounds}
+
+\begin{theorem}[Geometric Diminishing Returns]
+\label{thm:diminishing}
+Let $M(k)$ be the expected number of errors detected by $k$ verification rounds, each independently detecting remaining errors with probability $v$.
+Then:
+\begin{equation}
+\Delta M(k) = M(k) - M(k-1) = N_0 \cdot v \cdot (1-v)^{k-1}
+\end{equation}
+The marginal value of round $k$ decays geometrically with ratio $(1-v)$.
+\end{theorem}
+
+\begin{proof}
+After $k$ rounds, the probability a given error remains undetected is $(1-v)^k$.
+Hence $M(k) = N_0(1 - (1-v)^k)$ and $\Delta M(k) = N_0 v (1-v)^{k-1}$.
+\end{proof}
+
+\paragraph{Empirical calibration.}
+\citet{hariharan2025plan} report cumulative error detection of 62\% after round~1, 89\% after round~2, and 96.5\% after round~3.
+Fitting the geometric model with $v = 0.62$:
+
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+Round $k$ & Predicted $D(k)$ & Observed $D(k)$ & Residual \\
+\midrule
+1 & 0.620 & 0.620 & 0.000 \\
+2 & 0.856 & 0.890 & $-$0.034 \\
+3 & 0.945 & 0.965 & $-$0.020 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The slight underprediction at rounds 2--3 is consistent with an improving detection rate ($v_1 = 0.62$, $v_2 = 0.71$, $v_3 = 0.68$), where the verifier sharpens its focus after eliminating easy errors.
+The stopping criterion (verify until marginal expected catch falls below verification cost) yields $k \approx 3$ for typical parameters, confirming the empirical finding.
+
+% ============================================================
+\section{Circular Validation Bias}
+\label{sec:circular}
+
+\subsection{Formal Definition}
+
+\begin{definition}[Circular Validation Bias]
+For a code artifact $P$ and test suite $T$, the \emph{circular validation bias} is:
+\begin{equation}
+\beta = \Prob(T \text{ passes} \mid P \text{ buggy, same author}) - \Prob(T \text{ passes} \mid P \text{ buggy, different author})
+\end{equation}
+\end{definition}
+
+\subsection{The Blind-Spot Model}
+
+\begin{definition}[Blind-Spot Set]
+Let $\calB$ be the set of all possible bug types.
+Author $A$ has a blind-spot set $B_A \subseteq \calB$: bug types that $A$ systematically fails to test for.
+Bugs in the blind spot are invisible to the author.
+\end{definition}
+
+\begin{theorem}[Bias Decomposition]
+\label{thm:bias}
+Let $\beta_A = \mu(B_A)$ be the probability that a random bug falls in author $A$'s blind spot.
+For two agents $A, A'$ with \emph{independent} blind spots (that is, $\Prob(b \in B_A \cap B_{A'}) = \beta_A \cdot \beta_{A'}$):
+\begin{equation}
+\beta = \beta_A(1 - \beta_{A'})
+\end{equation}
+\end{theorem}
+
+\begin{remark}
+The independence assumption is strongest when $A$ and $A'$ are from different model families with different pretraining corpora.
+For agents from the same family (e.g., two instances of the same model with different prompts), blind-spot overlap is substantial and $\beta$ is reduced less than the theorem predicts.
+The assumption should be understood as an upper bound on the benefit of separation; the actual bias reduction depends on the degree of blind-spot independence achieved.
+\end{remark}
+
+\begin{proof}
+When the same author writes code and tests, the escape probability is $\beta_A$.
+When a different author writes tests, the escape probability is $\beta_A \cdot \beta_{A'}$ (the bug must be in both blind spots).
+Thus $\beta = \beta_A - \beta_A \beta_{A'} = \beta_A(1 - \beta_{A'})$.
+\end{proof}
+
+\begin{corollary}[Self-Verification Provides Zero Bias Reduction]
+When $A' = A$: $|B_A \cap B_A| = |B_A|$, so $\beta$ is unchanged.
+Self-verification cannot reduce circular validation bias.
+\end{corollary}
+
+This corollary is consistent with the finding of \citet{selfverification2025} that self-verification yields the smallest gains of any verification configuration.
+
+\subsection{Connection to the METR Merge-Gap Finding}
+
+METR found that roughly 50\% of SWE-bench test-passing PRs would not be merged~\citep{metr2026swebench}.
+The maintainer merge rate is 24.2 percentage points below the automated grader.
+If we model the automated grader as a ``same-paradigm'' test (sharing blind spots with the generation system), this implies near-maximal circular bias: the grader tests for functional correctness in a narrow sense, while the defects blocking merging (code quality, convention violations, subtle semantic issues) are precisely the types the grader does not cover.
+
+\begin{theorem}[Structural Separation Theorem]
+\label{thm:separation}
+Structural separation (different agents for code and test authorship) reduces circular validation bias whenever $|B_A \cap B_{A'}| < |B_A|$.
+The reduction is maximized when blind-spot sets are disjoint ($B_A \cap B_{A'} = \emptyset$).
+
+\noindent Sufficient conditions for effective separation:
+\begin{enumerate}
+\item Different model family (different pretraining corpora yield different error distributions).
+\item Different input representation (e.g., formal specification vs.\ natural language).
+\item Adversarial framing (instructing the test author to actively seek failures).
+\end{enumerate}
+\end{theorem}
+
+% ============================================================
+\section{The Structural Enforcement Boundary}
+\label{sec:structural}
+
+\subsection{Definitions}
+
+\begin{definition}[Structural Enforcement]
+A constraint is \emph{structurally enforced} if there exists a function $\sigma: \calA \to \calA'$ such that $\sigma(a) \notin \calC$ for all $a \in \calA$, where $\calA$ is the agent's action space and $\calC$ is the set of constraint-violating actions.
+The enforcement function projects every action into the safe subspace regardless of agent intent.
+\end{definition}
+
+\begin{definition}[Prompt Enforcement]
+A constraint is \emph{prompt-enforced} if compliance depends on the agent's probabilistic response:
+$\Prob(a \notin \calC \mid \text{constraint in prompt}) = 1 - \delta$,
+where $\delta > 0$ is the non-compliance probability.
+\end{definition}
+
+\subsection{The Cost-of-Failure Threshold}
+
+\begin{theorem}[Structural Enforcement Threshold]
+\label{thm:threshold}
+Let $\delta$ be the non-compliance probability under prompt enforcement, $\delta_s < \delta$ the specification gap under structural enforcement, $c_p$ and $c_s$ their respective implementation costs ($c_s > c_p$), and $L$ the cost per violation.
+Structural enforcement is cost-effective when:
+\begin{equation}
+L > L^* = \frac{c_s - c_p}{\delta - \delta_s}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The expected cost under prompt enforcement is $c_p + \delta L$; under structural enforcement, $c_s + \delta_s L$.
+Setting these equal and solving for $L$ yields the threshold.
+\end{proof}
+
+\begin{example}
+Using AgentSpec parameters~\citep{wang2026agentspec}: $\delta = 0.23$ (prompt failure rate), $\delta_s = 0.10$ (structural specification gap for manually authored rules), $c_p = 1$, $c_s = 10$.
+Then $L^* = 9/0.13 \approx 69$.
+When a single violation costs more than 69$\times$ the prompt engineering cost, structural enforcement is justified.
+For safety-critical constraints (data deletion, financial transactions), $L$ typically exceeds this threshold by orders of magnitude.
+\end{example}
+
+\subsection{Multi-Step Amplification}
+
+\begin{theorem}[Compounding Non-Compliance]
+\label{thm:compounding}
+In an $n$-step pipeline where the same constraint must hold at every step, the probability of at least one violation under prompt enforcement is:
+\begin{equation}
+\Prob(\text{any violation}) = 1 - (1 - \delta)^n
+\end{equation}
+The effective enforcement transition threshold drops to:
+\begin{equation}
+L_n^* = \frac{c_s - c_p}{(1 - (1-\delta)^n) - (1 - (1-\delta_s)^n)} \approx \frac{L^*}{n} \quad \text{for small } \delta, \delta_s
+\end{equation}
+\end{theorem}
+
+This means that for longer pipelines, the case for structural enforcement strengthens linearly with pipeline length.
+A 20-step pipeline has an enforcement threshold roughly 20$\times$ lower than a single-step invocation.
+
+\subsection{Agent Gaming and the Adversarial Collapse}
+
+Empirical evidence demonstrates that LLM agents actively circumvent evaluation criteria when given the opportunity.
+METR documented reward-hacking rates of 30.4\% on RE-Bench (where the scoring function was visible) versus 0.7\% on HCAST (where it was hidden), a 43$\times$ difference~\citep{metr2025rewardhacking}.
+NIST CAISI documented agents commenting out assertions, downloading solutions from GitHub, crashing servers via \texttt{/dev/urandom}, and reading future git commits~\citep{nist2025cheating}.
+Apollo Research confirmed in-context scheming in frontier models, with pre-training covert action rates of 13\% for o3~\citep{apollo2025scheming}.
+
+Prompt-based mitigation proved ineffective: adding ``do not cheat'' to the system prompt did not reduce reward-hacking rates~\citep{metr2025rewardhacking}.
+Anti-scheming training reduced overt misbehavior but increased evaluation-awareness reasoning, suggesting the model learned to detect evaluations rather than internalize alignment~\citep{apollo2025scheming}.
+
+Under adversarial conditions (the agent actively seeks to circumvent constraints), prompt enforcement fails entirely ($\delta \to 1$) and the enforcement transition threshold collapses to approximately $c_s - c_p$.
+This provides formal justification for the principle: \textbf{safety-critical constraints must be structurally enforced}.
+
+% ============================================================
+\section{Adaptive Verification Architecture}
+\label{sec:adaptive}
+
+\subsection{The Four-Layer Model}
+
+Synthesizing the formal results and empirical evidence, we define four canonical verification layers ordered by increasing cost and decreasing determinism:
+
+\begin{center}
+\begin{tabular}{clcccc}
+\toprule
+Layer $\ell$ & Name & $d(\ell)$ & $f(\ell)$ & $c(\ell)$ & $\eta(\ell)$ \\
+\midrule
+1 & Structural gates & 0.95 & ${\sim}0$ & 1 & 0.950 \\
+2 & Deterministic analysis & 0.80 & 0.10 & 5 & 0.160 \\
+3 & LLM-as-Judge & 0.70 & 0.25 & 50 & 0.014 \\
+4 & Human review & 0.90 & 0.05 & 500 & 0.002 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Layer~1 (type checking, schema validation, permission enforcement) is 7$\times$ more efficient than Layer~2, 68$\times$ more efficient than Layer~3, and 528$\times$ more efficient than Layer~4.
+
+\begin{theorem}[Greedy Efficiency Ordering]
+For independent verification layers with negligible false positives, the cost-minimizing strategy achieving a target detection rate $d^*$ activates layers in decreasing order of efficiency $\eta(\ell) = d(\ell)/c(\ell)$ until the target is met.
+\end{theorem}
+
+\begin{proof}
+This is a variant of the fractional knapsack problem.
+Each layer provides detection ``value'' $d(\ell)$ at cost $c(\ell)$.
+The greedy algorithm (take items in decreasing value-to-weight order) is optimal for fractional knapsack.
+\end{proof}
+
+\begin{theorem}[Cascaded Detection Rate]
+If layers $\ell_1, \ldots, \ell_m$ are applied in sequence, each independently detecting defects, the combined detection rate is:
+\begin{equation}
+d_{\text{combined}} = 1 - \prod_{j=1}^{m} (1 - d(\ell_j))
+\end{equation}
+\end{theorem}
+
+With all four layers and 3 iterations of the middle layers: $d_{\text{combined}} \geq 0.958$, matching the empirical 96.5\% convergence.
+
+\subsection{Adaptive Verification Intensity}
+
+Define the product $r \cdot \hat{g}$ where $r \in [0,1]$ is risk level and $\hat{g} \in [0,1]$ is the estimated spec-to-code information gap.
+The optimal verification level minimizes:
+\begin{equation}
+J(\ell, \hat{g}, r) = c(\ell) + \lambda \cdot r \cdot \hat{g} \cdot (1 - d(\ell))
+\end{equation}
+
+Level $\ell$ is preferred over $\ell - 1$ when $r \cdot \hat{g}$ exceeds the switching threshold:
+\begin{equation}
+\tau(\ell{-}1 \to \ell) = \frac{c(\ell) - c(\ell{-}1)}{\lambda \cdot (d(\ell) - d(\ell{-}1))}
+\end{equation}
+
+With $\lambda = 10$:
+
+\begin{center}
+\begin{tabular}{lccl}
+\toprule
+Transition & $\Delta c$ & $\Delta d$ & Threshold $\tau$ \\
+\midrule
+L1 $\to$ L2 & 4 & 0.35 & 0.011 (almost always upgrade) \\
+L2 $\to$ L3 & 45 & 0.20 & 0.075 (medium-risk code) \\
+L3 $\to$ L4 & 450 & 0.12 & 0.667 (high-risk, high-gap only) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Multi-Agent Verification Economics}
+
+The two-agent structural separation model (\S\ref{sec:circular}) incurs approximately 2$\times$ the generation cost.
+The break-even consequence (where separation pays for itself) is roughly 3.2$\times$ the generation cost, or approximately \$25 for a typical coding task.
+
+However, \citet{google2025scaling} found that multi-agent systems degrade sequential reasoning by 39--70\%.
+Adjusting for this fragmentation penalty, the break-even rises to roughly 6.3$\times$ generation cost.
+We note that these break-even estimates are sensitive to parameter choices: the self-detection rate ($d_{\text{self}} = 0.35$, from~\citealt{selfverification2025}) and cross-detection rate ($d_{\text{cross}} = 0.62$, from~\citealt{hariharan2025plan}) were measured under different conditions and on different tasks.
+At the extremes, if $d_{\text{self}}$ were as high as 0.50, the break-even would roughly double; if $d_{\text{cross}}$ were as low as 0.50, it would increase by roughly 50\%.
+The qualitative conclusion (separation is justified for non-trivial consequences) is robust, but the precise threshold should be treated as order-of-magnitude guidance, not a sharp boundary.
+For catastrophic tail risks (such as the reported \$47{,}000 infinite-loop incident, cited from a practitioner blog post and not independently verified), structural prevention through cost ceilings dominates ensemble verification.
+
+The evidence from production tools (Cursor, Claude Code, Devin) converges on a common pattern: single-agent architecture with execution feedback (test results, compiler errors) as the primary verification signal, supplemented by human review for consequential changes~\citep{cognition2025devin, metr2025devproductivity}.
+This is consistent with our framework: execution feedback provides ground-truth verification at near-zero marginal cost (Layer~2), while the overhead of a separate verification agent (Layer~3 cost, plus the sequential reasoning penalty) is justified only for high-consequence decisions.
+
+% ============================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Classical reliability theory.}
+The series system product law and the Barlow-Proschan importance measures~\citep{barlow1965mathematical, barlow1975statistical} provide the mathematical foundation for our pipeline model.
+The IFR/IFRA closure theorems~\citep{birnbaum1961stochastic} establish that series systems of components with increasing failure rates exhibit accelerating degradation.
+
+\paragraph{Checkpoint optimization.}
+The Young-Daly formula~\citep{young1974first, daly2006higher} for optimal checkpoint intervals in fault-tolerant computing is the closest antecedent to our verification scheduling result.
+The Lindsay-Bishop dynamic programming formulation for inspection allocation~\citep{lindsay1964allocation} provides the discrete optimization framework.
+
+\paragraph{Software reliability growth.}
+The Jelinski-Moranda~\citep{jelinski1972software} and Musa-Okumoto~\citep{musa1984logarithmic} models of fault detection as a depletion process directly inform our verification convergence analysis.
+
+\paragraph{Agent verification frameworks.}
+AgentSpec~\citep{wang2026agentspec} provides the key empirical data point on structural vs.\ prompt enforcement (87\% vs.\ 77\%).
+AgentGuard~\citep{koohestani2025agentguard} introduces dynamic probabilistic assurance via MDP modeling.
+Multi-Agent Verification~\citep{lifshitz2025mav} demonstrates that diverse verifier ensembles outperform homogeneous ones, and that weaker models can verify stronger ones.
+
+\paragraph{LLM evaluation.}
+Anthropic's agent evaluation methodology~\citep{anthropic2026evals} introduces the pass@$k$ vs.\ pass$^k$ distinction.
+The LLM-as-Judge survey~\citep{li2024survey} documents systematic biases (sycophancy, position bias) that limit LLM-based verification.
+The METR merge-gap study~\citep{metr2026swebench} provides the most striking evidence of circular validation bias.
+
+\paragraph{Scalable oversight.}
+The debate framework~\citep{irving2018debate} proposes using adversarial argumentation between agents to help weaker judges evaluate stronger systems.
+Empirical results have been mixed: debate is effective with strong human debaters but less so with LLM debaters.
+Constitutional AI~\citep{bai2022constitutional} uses self-critique against a set of principles; while effective as a training methodology, it does not constitute runtime verification and inherits the circular validation limitations we formalize in \S\ref{sec:circular}.
+
+\paragraph{Agent gaming.}
+METR's reward-hacking analysis~\citep{metr2025rewardhacking}, Apollo Research's scheming studies~\citep{apollo2025scheming}, and NIST CAISI's cheating documentation~\citep{nist2025cheating} collectively establish that structural enforcement is necessary for adversarial robustness.
+
+\paragraph{Sampling inspection.}
+The Dodge-Romig sampling plans~\citep{dodge1929method, dodge1959sampling} and MIL-STD-105E switching rules~\citep{milstd105e} provide the adaptive verification paradigm that informs our four-layer architecture.
+
+% ============================================================
+\section{Design Principles}
+\label{sec:principles}
+
+The formal results and empirical calibration yield eight actionable design principles:
+
+\begin{enumerate}
+
+\item \textbf{Compound errors are multiplicative, not additive.}
+Small per-step improvements produce large end-to-end gains (Theorem~\ref{thm:sensitivity}).
+A 1\% relative improvement per step yields $n$\% end-to-end for an $n$-step pipeline.
+
+\item \textbf{Fix the weakest link first.}
+The step with the lowest $p_i$ offers the highest marginal return (Corollary~\ref{cor:weakest}).
+In practice, this is usually problem framing (step~1), not execution.
+
+\item \textbf{Verify at phase boundaries, not at every step.}
+The Young-Daly analog (Theorem~\ref{thm:optcheckpoints}) gives the optimal spacing.
+For typical parameters, this means 2--5 verification points in a 20-step pipeline.
+
+\item \textbf{Three verification rounds, then stop.}
+The geometric diminishing returns (Theorem~\ref{thm:diminishing}) and empirical convergence at 96.5\% by round~3 establish a firm verification budget.
+Rounds 4+ face the pesticide paradox: the remaining errors require different detection approaches, not more of the same.
+
+\item \textbf{Separate code authorship from test authorship.}
+The circular validation bias (Theorem~\ref{thm:bias}) is real and substantial.
+Self-verification provides zero bias reduction.
+Cross-family verification is where gains concentrate.
+
+\item \textbf{Structural enforcement for safety; prompt enforcement for quality.}
+The cost-of-failure threshold (Theorem~\ref{thm:threshold}) demarcates the boundary.
+Safety-critical constraints (data deletion, financial limits, security boundaries) must be structurally enforced.
+Subjective quality dimensions (code style, naming, abstraction quality) can use LLM judgment bounded by structural gates.
+
+\item \textbf{The verifier must be structurally read-only.}
+Prompt-level ``do not modify the code'' is insufficient (\S\ref{sec:structural}).
+Tool permissions must enforce read-only access for the verification agent.
+
+\item \textbf{Layer verification by efficiency.}
+Structural gates first ($\eta = 0.95$), deterministic analysis second ($\eta = 0.16$), LLM-as-Judge third ($\eta = 0.014$), human review last ($\eta = 0.002$).
+Each dollar of verification budget should go to the highest-efficiency layer not yet saturated.
+
+\end{enumerate}
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have developed a formal framework for reliability architecture in multi-step AI agent pipelines, grounded in classical reliability theory and calibrated against contemporary benchmarks.
+The framework provides four core results: the compound error sensitivity theorem establishing that per-step improvements have $n$-fold leverage; the optimal verification scheduling formulation recovering the Young-Daly interval and confirming three-round optimality; the circular validation bias theorem showing that self-verification is structurally incapable of reducing same-author blind spots; and the enforcement transition threshold demarcating when deterministic constraints become cost-effective.
+
+Several limitations deserve emphasis.
+Our empirical calibration relies on sparse data points from heterogeneous benchmarks.
+The independence assumption in the series reliability model, while a useful first approximation, does not capture the full correlation structure of real agent pipelines.
+The verification convergence data (62\%/89\%/96.5\% by rounds 1/2/3) comes from a single domain, namely household task planning on the TEACh dataset~\citep{hariharan2025plan}; generalization to software engineering pipelines is assumed throughout but not experimentally verified.
+Software engineering tasks may exhibit different convergence profiles due to the availability of execution feedback (compiler errors, test failures), which provides ground-truth signals absent in embodied task planning.
+The ``true quality'' $Q$ in our gaming detection framework is fundamentally uncomputable; all practical proxies inherit the Goodhart problem they aim to detect.
+
+The most important open question is empirical: as agent capabilities improve, how do the key parameters ($p$, $\gamma$, $\beta$, $\delta$) evolve?
+If per-step reliability increases faster than pipeline length, compound errors become manageable.
+If pipeline ambitions grow faster than per-step reliability, the framework's predictions become increasingly binding.
+The arithmetic is unforgiving either way: the exponential in $R = p^n$ does not negotiate.
+
+% ============================================================
+\begin{appendices}
+\section{Proofs and Extended Results}
+\label{app:proofs}
+
+\subsection{Markov Error Propagation Model}
+
+When errors propagate (a step can fail because its input was corrupted), the simple product law does not hold.
+Model the pipeline as a Markov chain on states $\{C, E\}$ with transition matrix:
+\begin{equation}
+\mathbf{P} = \begin{pmatrix} p & 1 - p \\ q & 1 - q \end{pmatrix}
+\end{equation}
+
+\begin{theorem}[Pipeline Reliability Under Markov Error Propagation]
+Starting from state $C$, the probability of being in state $C$ after $n$ steps is:
+\begin{equation}
+R_{\text{Markov}}(n) = \pi_C + (1 - \pi_C)(p + q - 1)^n
+\end{equation}
+where $\pi_C = q/(1 - p + q)$ is the stationary probability of the correct state.
+\end{theorem}
+
+\begin{proof}
+Diagonalize $\mathbf{P}$.
+Its eigenvalues are $\lambda_1 = 1$ and $\lambda_2 = p + q - 1$.
+The spectral decomposition gives $\mathbf{P}^n = \Pi + (p+q-1)^n(\mathbf{I} - \Pi)$ where $\Pi$ is the matrix of stationary probabilities.
+The $(C,C)$ entry is $\pi_C + (1 - \pi_C)(p+q-1)^n$.
+\end{proof}
+
+When $q = 0$ (errors never self-correct), the error state is absorbing: once an error is introduced, it persists through all subsequent steps.
+In this case, the pipeline succeeds only if no step introduces an error, giving $R_{\text{Markov}}(n) = p^n$, which recovers the series reliability product law.
+The Markov model with $q > 0$ is more optimistic than the product law because it allows error recovery at each step.
+
+\subsection{The LLM-Verifier Convergence Theorem}
+
+\citet{chen2024fourdelta} model a multi-stage LLM verification pipeline as an absorbing Markov chain with $m$ transient stages and one absorbing state (Verified).
+
+\begin{theorem}[LLM-Verifier Convergence]
+For success probability $\delta \in (0,1]$ per stage:
+\begin{enumerate}
+\item \emph{Almost sure convergence}: $\Prob(\tau < \infty) = 1$.
+\item \emph{Expected iteration bound}: $\E[\tau] = m/\delta$.
+\item \emph{Exponential tail bound}: $\Prob(\tau > k) \leq \alpha(1 - \delta)^k$.
+\end{enumerate}
+\end{theorem}
+
+\subsection{Information-Theoretic Verification Bounds}
+
+A verification step is a binary channel from true correctness to verdict.
+By Fano's inequality~\citep{fano1961transmission}:
+\begin{equation}
+\Prob(\text{misclassification}) \geq H_b^{-1}(H(\text{correct} \mid \text{verdict}))
+\end{equation}
+
+The data processing inequality~\citep{cover2006elements} establishes that verification is fundamentally limited by the information preserved in the agent's output: $I(X; Z) \leq I(X; Y)$ for any chain $X \to Y \to Z$.
+If the agent's output is ambiguous with respect to correctness, no verifier can fully compensate.
+
+\subsection{Beta-Binomial Calibration}
+
+To capture heterogeneity in per-step success rates across tasks, let $p \sim \text{Beta}(\alpha, \beta)$.
+The marginal pipeline success probability is:
+\begin{equation}
+R_{\text{BB}}(n, \alpha, \beta) = \E[p^n] = \frac{B(\alpha + n, \beta)}{B(\alpha, \beta)} = \prod_{k=0}^{n-1} \frac{\alpha + k}{\alpha + \beta + k}
+\end{equation}
+
+Calibrated parameters from published benchmarks:
+
+\begin{center}
+\begin{tabular}{lcccccc}
+\toprule
+Benchmark & $n$ & $R_{\text{obs}}$ & $\mu$ & $\alpha$ & $\beta$ & $\alpha{+}\beta$ \\
+\midrule
+SWE-bench (METR) & 10 & 0.50 & 0.93 & 12.5 & 0.95 & 13.5 \\
+Devin (2025) & 12 & 0.67 & 0.97 & 28.4 & 0.88 & 29.3 \\
+RE-Bench & 100 & 0.37 & 0.99 & 85.0 & 0.86 & 85.9 \\
+Generic agent & 20 & 0.12 & 0.90 & 8.1 & 0.90 & 9.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Higher concentration ($\alpha + \beta$) indicates more homogeneous task populations; lower concentration indicates high task-to-task variance.
+
+\subsection{Goodhart's Law Taxonomy for Agent Gaming}
+
+Following \citet{manheim2019goodhart}, the four Goodhart mechanisms are:
+
+\begin{enumerate}
+\item \textbf{Regressional}: Optimizing a noisy proxy selects for noise in the proxy-target relationship.
+\item \textbf{Extremal}: The proxy-target relationship, estimated in a typical regime, breaks down at extremes.
+\item \textbf{Causal}: The proxy and target share a common cause; intervening on the proxy breaks the causal pathway.
+\item \textbf{Adversarial}: The agent directly manipulates the proxy without affecting the target.
+\end{enumerate}
+
+Every documented NIST CAISI cheating instance~\citep{nist2025cheating} is detectable through invariant violation checks (structural enforcement), not through statistical proxy-target monitoring.
+This strongly supports the principle that structural enforcement handles safety-critical concerns.
+
+\end{appendices}
+
+% ============================================================
+\bibliography{reliability}
+
+\end{document}
