@@ -1,0 +1,349 @@
+% ====================================================================
+% 8. THE HUMAN INTERACTION PILLAR
+% ====================================================================
+\section{The Human Interaction Pillar}
+\label{sec:human}
+
+The Human Interaction pillar addresses the scarce resource that every other pillar assumes exists but none model: human attention. AI coding agents now generate 40--60\% of committed code, yet only 26\% of developers always verify AI output before committing \citep{sonar2026}, and review time has increased 91\% \citep{dora2025}. The human is not a perfect oracle at the end of a verification pipeline; they are an adaptive, degradable, finite-capacity component whose interaction with the agent must be \emph{designed}.
+
+Current harnesses treat human interaction as static gate-based systems (review at fixed points regardless of risk or trust). None implement adaptive triage based on learned trust or risk estimation, and none account for the vigilance decay that \citet{bainbridge1983ironies} identified over four decades ago. This pillar bridges the gap between the automation supervision literature and harness engineering practice.
+
+\subsection{Human Code Review as Signal Detection}
+
+\begin{definition}[Code Review as Signal Detection]
+\label{def:sdt}
+\emph{[Mathematical Fact: standard SDT formulation.]}
+For each code unit, the reviewer observes an internal evidence variable $X$ drawn from $\mathcal{N}(\mu_0, \sigma^2)$ under $H_0$ (correct code) or $\mathcal{N}(\mu_1, \sigma^2)$ under $H_1$ (defective code), with $\mu_1 > \mu_0$. The reviewer reports ``defect'' iff $X > \lambda$ for criterion $\lambda$.
+\end{definition}
+
+The sensitivity $d' = (\mu_1 - \mu_0)/\sigma$ measures discrimination independent of response bias. Published estimates place $d'$ for code review at 0.84 (informal review) to 2.12 (optimal Fagan inspection conditions) \citep{fagan1976design, cohen2006best}. The criterion $c = (\lambda - (\mu_0 + \mu_1)/2)/\sigma$ captures the reviewer's bias.
+
+\paragraph{The prevalence effect.} When defect prevalence is low (most agent output is correct), reviewers shift their criterion toward conservative values ($c \uparrow$), increasing miss rates. \citet{wolfe2005low} demonstrated that miss rates rise from 7\% at 50\% prevalence to 30\% at $<1\%$ prevalence. For AI agents with 95\%+ correctness, the effective prevalence may be below 5\%, placing reviewers in the high-miss-rate regime. This is the signal-detection-theoretic explanation for why vigilance probes (\S\ref{sec:human}.7) are necessary: they restore prevalence to maintain criterion placement.
+
+\paragraph{Automation levels.} \citet{parasuraman2000model} propose that automation operates across four stages of human information processing (acquisition, analysis, decision, action). For code review, high automation of information acquisition (auto-gathering diffs, test results, CI status) is generally safe, while high automation of decision selection (auto-approve/reject) is dangerous because it removes the operator from the comprehension loop. \citet{endsley1995outofloop} showed that full automation degrades comprehension (Level~2 situation awareness) while preserving perception (Level~1): developers can \emph{see} the code but lose understanding of what it means.
+
+\subsection{Definitions: Capacity, Risk, and Cost}
+
+\begin{definition}[Human Review Capacity]
+\label{def:capacity}
+The human reviewer can inspect at most $H$ outputs per review cycle, where $H \ll N$ ($N$ is the total agent output count). Effective code review requires 150--200 LOC/hour \citep{fagan1976design, cohen2006best}. For a harness producing dozens to hundreds of outputs per cycle, $H/N$ is typically in $[0.05, 0.30]$.
+\end{definition}
+
+\begin{definition}[Risk Weight]
+\label{def:risk-weight}
+The risk weight of output $i$ is $w_i = p_i \cdot c_i$, where $p_i$ is the prior defect probability and $c_i > 0$ is the defect cost. The review decision carries asymmetric costs: $c_{FG}$ for a missed defect (false negative) and $c_{GF}$ for an unnecessary review (false positive), with $c_{FG} \gg c_{GF}$ in practice.
+\end{definition}
+
+\subsection{Optimal Attention Allocation}
+
+Given $N$ agent outputs and human capacity $H \ll N$, which outputs should the human review? We connect this to Dodge-Romig sampling inspection theory \citep{dodge1929method, dodge1959sampling}. The mapping is direct: manufacturing lots become batches of agent outputs, items within lots become individual diff hunks or files, and the inspection station becomes the human reviewer. Under review policy $S$ with rectifying inspection, the Average Outgoing Quality is:
+\begin{equation}
+\text{AOQ}(S) = \frac{(1 - d_{\text{auto}})}{N} \sum_{i=1}^{N} p_i \left[1 - S(i) \cdot d_{\text{human}}\right]
+\end{equation}
+where $S(i) \in \{0,1\}$ indicates whether output $i$ is reviewed.
+
+\begin{theorem}[Optimal Triage is Risk-Ranked Selection]
+\emph{[Mathematical Fact: follows from the knapsack optimality of greedy selection under unit weights.]}
+\label{thm:optimal-triage}
+The review set $S^*$ minimizing expected defect escape cost consists of the $H$ outputs with the largest risk weights $w_i = p_i \cdot c_i$. Formally, let $\sigma$ be a permutation with $w_{\sigma(1)} \geq \cdots \geq w_{\sigma(N)}$. Then $S^*(i) = 1$ iff $i \in \{\sigma(1), \ldots, \sigma(H)\}$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The objective $\sum_i S(i) w_i$ subject to $\sum_i S(i) \leq H$ and $S(i) \in \{0,1\}$ is a 0-1 knapsack with unit weights. The KKT conditions yield $S(i) = 1$ when $w_i > \lambda$, where $\lambda$ is the risk weight of the $H$-th most risky output.
+\end{proof}
+
+\begin{theorem}[Stratification Improvement Bound]
+\emph{[Mathematical Fact: follows from the rearrangement inequality.]}
+\label{thm:stratification}
+Let $E_{\textup{uniform}}$ and $E_{\textup{stratified}}$ be the expected defect escape costs under uniform and optimal risk-stratified sampling of $H$ outputs. Then:
+\begin{equation}
+E_{\textup{uniform}} - E_{\textup{stratified}} \geq (1 - d_{\textup{auto}}) \cdot d_{\textup{human}} \cdot \frac{H}{N} \cdot \textup{Var}_N(w)
+\end{equation}
+where $\textup{Var}_N(w)$ is the population variance of risk weights. The improvement factor is approximately $1 + \textup{CV}(w)^2$ when $H/N$ is small.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Under uniform sampling, each output is reviewed with probability $H/N$. Under optimal stratification, the top-$H$ outputs are reviewed. The improvement equals $(1 - d_{\text{auto}}) d_{\text{human}}$ times $\sum_{i \in S^*} w_i - (H/N)\sum_i w_i$. By the rearrangement inequality, this gap is bounded below by $(H/N) \cdot \text{Var}_N(w)$.
+\end{proof}
+
+With risk concentrated (60\% of defects in the riskiest 20\% of code, consistent with the Pareto distribution commonly observed in software defects \citep{jones1996software}), the stratification bound predicts a $3\times$ improvement in defects caught per review under optimal triage vs.\ uniform sampling. For an organization reviewing 20\% of agent output ($H/N = 0.20$), stratified triage achieves an escape rate comparable to reviewing 50\% uniformly.
+
+\paragraph{Adaptive inspection via switching rules.} We formalize the MIL-STD-105E switching rules \citep{milstd105e} as a finite state machine on three states $\mathcal{Q} = \{R, N, T\}$ (Reduced, Normal, Tightened), with transitions governed by lot acceptance history.
+
+\begin{proposition}[Steady-State Distribution]
+\emph{[Engineering Hypothesis: the conjectured 40--60\% cost reduction is extrapolated from manufacturing data.]}
+\label{prop:steady-state}
+For constant defect rate $p$, the steady-state probability of each inspection state satisfies a balance equation depending on the lot acceptance probabilities under each plan. When quality is good ($p \ll \textup{AQL}$), $\pi_R \to 1$ and review workload drops to the reduced level. When quality deteriorates ($p > \textup{AQL}$), $\pi_T \to 1$ and scrutiny increases automatically.
+\end{proposition}
+
+This is precisely the trust calibration mechanism that \citet{lee2004trust} prescribe: review intensity should track demonstrated reliability. The switching rules reduce inspection cost by 40--60\% at equivalent quality levels in manufacturing; we conjecture comparable savings for software review.
+
+\subsection{The Autonomy Boundary}
+
+For each output with feature vector $\mathbf{x}_i$, the harness chooses between trust ($a = F$, autonomous passage) and review ($a = G$, human inspection).
+
+\begin{theorem}[Optimal Autonomy Threshold]
+\emph{[Mathematical Fact: standard Bayesian decision theory.]}
+\label{thm:threshold}
+The Bayes-optimal rule routes output $i$ to review iff $P(\theta_i = 1 \mid \mathbf{x}_i) > \tau^*$, where:
+\begin{equation}
+\tau^* = \frac{c_{GF}}{c_{FG} + c_{GF}} = \frac{1}{1 + \rho}, \quad \rho = c_{FG}/c_{GF}
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The posterior expected loss for trusting is $c_{FG} \cdot P(\theta = 1 \mid \mathbf{x})$; for reviewing, $c_{GF} \cdot P(\theta = 0 \mid \mathbf{x})$. Review is preferred when the latter is smaller, yielding $P(\theta = 1 \mid \mathbf{x}) > c_{GF}/(c_{FG} + c_{GF})$.
+\end{proof}
+
+\begin{theorem}[Monotonicity]
+\label{thm:monotonicity}
+The threshold $\tau^*(\rho) = 1/(1+\rho)$ is strictly decreasing in $\rho$, with $d\tau^*/d\rho = -1/(1+\rho)^2 < 0$.
+\end{theorem}
+
+The cost ratio $\rho$ serves as a single governance dial:
+
+\begin{center}
+\small
+\begin{tabular}{llrl}
+\toprule
+\textbf{Context} & $\rho$ & $\tau^*$ & \textbf{Interpretation} \\
+\midrule
+Documentation/comments & 2 & 0.333 & Review only when $P(\text{defect}) > 33\%$ \\
+Test files in dev branch & 5 & 0.167 & Moderate autonomy \\
+Production source code & 50 & 0.020 & Review when $P(\text{defect}) > 2\%$ \\
+Security-critical code & 200 & 0.005 & Review almost everything \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{theorem}[Capacity-Constrained Threshold]
+\emph{[Mathematical Fact: connects the Bayesian threshold to the knapsack triage.]}
+\label{thm:capacity-threshold}
+When review capacity is binding, the effective threshold is $\tau_H = \max(\tau^*, \tau_{\textup{cap}})$, where $\tau_{\textup{cap}}$ is the smallest threshold such that $|\{i : P(\theta_i = 1 \mid \mathbf{x}_i) > \tau_{\textup{cap}}\}| \leq H$. Under capacity constraints, the top-$H$ selection from Theorem~\ref{thm:optimal-triage} and the threshold classifier from Theorem~\ref{thm:threshold} coincide.
+\end{theorem}
+
+The Expected Value of Perfect Information for each output is $\text{EVPI}(\mathbf{x}) = \min(c_{FG} P(\theta=1 \mid \mathbf{x}), c_{GF} P(\theta=0 \mid \mathbf{x}))$, maximized at the decision boundary $P(\theta=1 \mid \mathbf{x}) = \tau^*$. This provides an information-theoretic justification for prioritizing borderline cases: the outputs where the harness is most uncertain about the review decision are exactly the outputs where human input has the highest expected value.
+
+\subsection{Trust Calibration via Thompson Sampling}
+
+The harness should learn which (agent, task-type) pairs require oversight and which can be trusted. We model this as a multi-armed bandit \citep{thompson1933likelihood}.
+
+\begin{definition}[Trust Calibration Bandit]
+\label{def:trust-bandit}
+A trust calibration bandit is a tuple $(\mathcal{K}, \Theta, \mathcal{F})$ where $\mathcal{K} = \{1, \ldots, K\}$ indexes (agent, task-type) pairs, $\Theta = (\theta_1, \ldots, \theta_K) \in [0,1]^K$ is the vector of unknown success probabilities, and $\mathcal{F} = \{\text{Bernoulli}(\theta_k)\}_{k=1}^K$ is the reward family. The trust score for arm $k$ with posterior $\text{Beta}(\alpha_k, \beta_k)$ is the posterior mean $\tau_k = \alpha_k / (\alpha_k + \beta_k)$.
+\end{definition}
+
+Thompson sampling maintains Beta posteriors for each arm, sampling from each posterior at decision time and selecting the arm with the highest sample. The Agrawal-Goyal regret bounds \citep{agrawal2012analysis} guarantee:
+
+\begin{theorem}[Regret Bound, \citealt{agrawal2012analysis}]
+\emph{[Mathematical Fact: cited result.]}
+\label{thm:regret}
+Thompson sampling achieves expected regret $\mathbb{E}[\textup{Regret}(T)] \leq (1+\epsilon) \sum_{k: \Delta_k > 0} \ln T / \Delta_k + O(K/\epsilon^2)$, where $\Delta_k = \theta^* - \theta_k$ is the suboptimality gap.
+\end{theorem}
+
+\begin{proposition}[Posterior Concentration]
+\emph{[Mathematical Fact: follows from Hoeffding's inequality and Bayesian consistency.]}
+\label{prop:concentration}
+The trust score concentrates around the true success probability at rate $|\tau_k - \theta_k| = O_p(1/\sqrt{n_k})$, where $n_k$ is the number of observations for arm $k$.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+The posterior mean is a weighted average of the sample mean $\hat{p}_k$ and the prior mean: $\tau_k = (n_k \hat{p}_k + c_0 \tau_k^{(0)}) / (n_k + c_0)$, where $c_0 = \alpha_k^{(0)} + \beta_k^{(0)}$. By Hoeffding's inequality, $|\hat{p}_k - \theta_k| = O_p(1/\sqrt{n_k})$, and the prior weight $c_0/(n_k + c_0) = O(1/n_k)$.
+\end{proof}
+
+\paragraph{Contextual extension.} When the trust decision depends on context features $\mathbf{x}_t$ (file type, complexity, novelty), we extend to linear contextual bandits \citep{li2010contextual, agrawal2013thompson}. The trust surface becomes $\tau(\text{agent}, \text{task\_type}, \mathbf{x}) = \mathbf{x}^\top \hat{\boldsymbol{\theta}}_k$, with contextual regret bound $O(d\sqrt{T} \ln^{3/2} T)$, where $d$ is the context dimension.
+
+\paragraph{Trust information bound.} \emph{[Engineering Hypothesis: the bound connects to the Governance pillar's capacity results.]} The trust information rate (the rate at which the harness learns about agent reliability) is bounded by $H \ln 2$ bits per review cycle. When $K$ is the number of (agent, task-type) arms, calibrated trust (trust calibration error $< \epsilon$) requires:
+\begin{equation}
+H \geq \frac{K}{\epsilon^2} \cdot C_{\textup{min}}
+\end{equation}
+where $C_{\textup{min}}$ depends on the minimum suboptimality gap. When $H < K/\epsilon^2$, trust calibration error remains above $\epsilon$ regardless of the algorithm. This is the trust-edition analogue of the governance capacity bound from the Governance pillar (Section~\ref{sec:governance}): when agent reliability changes faster than the review channel can observe, no bandit algorithm can maintain calibrated trust.
+
+\subsection{The Automation Supervision Paradox}
+
+Bainbridge's \citeyearpar{bainbridge1983ironies} ironies of automation identify a fundamental tension: if automation is reliable enough that the human rarely intervenes, the human's intervention skills degrade. When automation fails, the human is least prepared to take over. We formalize this for coding harnesses.
+
+\begin{definition}[Vigilance Decay Function]
+\emph{[Engineering Hypothesis: functional form proposed, not validated for software review.]}
+\label{def:vigilance}
+When automation handles a fraction $p_{\textup{auto}}$ of decisions correctly, the human's detection probability decays according to $d_{\textup{human}}(t) = d_0 \cdot \Phi(p_{\textup{auto}}, t)$, where:
+\begin{equation}
+\Phi(p_{\textup{auto}}, t) = \phi_\infty(p_{\textup{auto}}) + (1 - \phi_\infty(p_{\textup{auto}})) \exp\!\left(-t / \xi(p_{\textup{auto}})\right)
+\end{equation}
+with $\phi_\infty(p_{\textup{auto}}) = (1 - p_{\textup{auto}})^\eta$ and $\xi(p_{\textup{auto}}) = \xi_0 (1 - p_{\textup{auto}})^\gamma$.
+\end{definition}
+
+Calibration from the vigilance literature: $\eta = 1.5$, $\gamma = 1.0$, $\xi_0 = 30$ minutes \citep{mackworth1948breakdown, see1995meta}, $d_0 = 0.80$ \citep{cohen2006best}. Under these parameters with $p_{\text{auto}} = 0.95$: the asymptotic residual vigilance drops to $\phi_\infty \approx 0.011$, the decay timescale shrinks to 1.5 minutes, and effective detection collapses to under 4\% within five minutes.
+
+\begin{theorem}[Automation Supervision Paradox]
+\emph{[Mathematical Fact: follows from IVT under the stated model.]}
+\label{thm:paradox}
+Under the vigilance decay model (Definition~\ref{def:vigilance}), when $d_0(1+\eta) > 1$, there exists a threshold $p^* \in (0,1)$ such that for all $p_{\textup{auto}} \in (0, p^*)$, the steady-state combined detection $D_\infty(p_{\textup{auto}}) < d_0$: the human-automation system detects fewer defects than the human alone.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The steady-state combined detection is $D_\infty(p) = p + d_0(1-p)^{1+\eta}$. Let $g(p) = D_\infty(p) - d_0$. Then $g(0) = 0$ and $g'(0) = 1 - d_0(1+\eta) < 0$ when $d_0(1+\eta) > 1$. Since $g(1) = 1 - d_0 > 0$, the intermediate value theorem gives a unique $p^* \in (0,1)$ with $g(p^*) = 0$. For $p \in (0, p^*)$, $g(p) < 0$.
+\end{proof}
+
+For $d_0 = 0.80$ and $\eta = 1.5$: $p^* \approx 0.59$. The paradox region is substantial.
+
+\paragraph{Concrete example.} Consider an AI coding agent with 70\% automation reliability ($p_{\text{auto}} = 0.70$). The human alone detects 80\% of defects ($d_0 = 0.80$). With automation, steady-state human vigilance drops to $d_0 \cdot (1-0.70)^{1.5} = 0.80 \times 0.164 = 0.131$. The combined system detects $0.70 + 0.131 \times 0.30 = 0.739$, which is \emph{less} than the 0.80 the human achieved alone. The automation reliably catches easy defects but degrades the human's ability to catch the hard ones that automation misses.
+
+The irony is asymmetric: $D_\infty(p) \geq p$ always holds (the combined system never performs worse than automation alone), but adding the machine harms overall performance by degrading the human, not by failing itself.
+
+\subsection{Vigilance Probes}
+
+\begin{definition}[Vigilance Probe]
+A vigilance probe is a synthetic, known-defective output injected into the review stream at rate $\lambda$, indistinguishable from genuine output at review time, with feedback provided after the reviewer's judgment. This is analogous to Threat Image Projection (TIP) in aviation security screening \citep{wolfe2005low}.
+\end{definition}
+
+\begin{theorem}[Optimal Probe Rate]
+\emph{[Engineering Hypothesis: the precise optimum depends on the vigilance model parameters, which are uncalibrated for software review.]}
+\label{thm:probe-rate}
+Under the vigilance model with probes augmenting the effective signal rate, there exists an optimal probe rate $\lambda^*$ that maximizes combined system detection, balancing maintained vigilance against probe-consumed review capacity.
+\end{theorem}
+
+The probe-augmented model replaces $p_{\text{auto}}$ with an effective $p_{\text{eff}} = p_{\text{auto}} / (1 + \lambda/(1-p_{\text{auto}}))$, shifting $p^*$ upward (expanding the safe region). Numerical analysis with $d_0 = 0.80$, $\eta = 1.5$, and probe rate $\lambda = 0.05$ increases $p^*$ from 0.59 to approximately 0.74. Probes convert a passive monitoring task into an active detection task, counteracting the vigilance decrement \citep{warm2008vigilance}.
+
+\subsection{The Human Interaction Budget}
+
+The preceding components (triage, autonomy, trust calibration, vigilance) compete for a single scarce resource: human attention. We unify them through a budget decomposition.
+
+\begin{definition}[Budget Decomposition]
+\label{def:budget}
+The total interaction budget $B = H \cdot T$ (capacity $\times$ session time) is decomposed as:
+\begin{equation}
+B = B_{\textup{review}} + B_{\textup{cal}} + B_{\textup{vig}}
+\end{equation}
+where $B_{\textup{review}}$ is risk-based triage review, $B_{\textup{cal}}$ is calibration (exploration of trusted arms), and $B_{\textup{vig}}$ is vigilance probes.
+\end{definition}
+
+Let $\phi_r, \phi_c, \phi_v \geq 0$ with $\phi_r + \phi_c + \phi_v = 1$ be the allocation fractions. The defect escape rate depends on all three:
+\begin{equation}
+\mathcal{E}(\phi_r, \phi_c, \phi_v) = p(1 - d_{\text{auto}}) \left[(1 - \phi_r B/N) + \phi_r B/N \cdot (1 - d_0 \Phi(\phi_v)) \cdot (1 + g(\phi_c))\right]
+\end{equation}
+where $\Phi(\phi_v) = 1 - (1 - \Phi_{\min}) e^{-\kappa \phi_v}$ captures vigilance maintenance and $g(\phi_c) = g_0 e^{-\lambda \phi_c}$ captures triage inefficiency from miscalibration.
+
+\begin{theorem}[Optimal Budget Allocation]
+\emph{[Mathematical Fact: follows from optimization on a compact set with strict concavity/convexity.]}
+\label{thm:budget-optimal}
+Under strict concavity of $\Phi$ and strict convexity of $g$, with $B/N < 1$ and $d_0, p > 0$, $d_{\textup{auto}} < 1$, there exists a unique optimal allocation $(\phi_r^*, \phi_c^*, \phi_v^*)$ in the interior of the simplex.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The feasible set (2-simplex) is compact; $\mathcal{E}$ is continuous, so a minimum exists. For interiority: at $\phi_v = 0$, the marginal benefit of vigilance is large ($\Phi'(0) = \kappa(1 - \Phi_{\min})$); at $\phi_v \to 1$, review coverage vanishes. By IVT, an interior optimum exists. The bordered Hessian is negative definite on the constraint surface by strict concavity/convexity, giving uniqueness.
+\end{proof}
+
+\begin{corollary}[Vigilance-Review Tradeoff]
+\label{cor:tradeoff}
+At the optimum, the marginal defect escape reduction from one additional unit of vigilance equals the marginal increase from one fewer unit of review:
+\begin{equation}
+d_0 \Phi'(\phi_v^*) \cdot \phi_r^* B/N = (1 - d_0 \Phi(\phi_v^*)(1 + g(\phi_c^*))) \cdot B/N
+\end{equation}
+\end{corollary}
+
+\paragraph{Comparative statics.} \emph{[Philosophical Observation: this is the budget-theoretic formalization of Bainbridge's irony.]} As agent quality improves ($p \to 0$): $\phi_v^*$ and $\phi_c^*$ increase (the dominant failure modes shift from defect volume to detection degradation and trust miscalibration), while $\phi_r^*$ decreases. The better the automation, the more human attention must be allocated to \emph{maintaining} oversight capability rather than exercising it.
+
+\subsection{Complementarity Conditions}
+
+\begin{definition}[Complementarity Index]
+$C = P(\text{team correct}) - \max(P(\text{human correct}), P(\text{AI correct}))$.
+\end{definition}
+
+\begin{theorem}[Conditions for Positive Complementarity]
+\emph{[Mathematical Fact: algebraic consequence of the OR combination rule.]}
+\label{thm:complementarity}
+Under an OR combination rule, the human-AI team has $C > 0$ iff:
+\begin{equation}
+\rho_{HA} < \sqrt{\frac{(1 - d_A) \cdot d_H}{(1 - d_H) \cdot d_A}}
+\end{equation}
+where $\rho_{HA}$ is the error correlation and $d_H, d_A$ are detection rates. Independent errors ($\rho_{HA} = 0$) always produce positive complementarity; perfectly correlated errors ($\rho_{HA} = 1$) produce none.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Under the OR rule, $P(\text{team detects}) = 1 - P(E_H)P(E_A) - \rho_{HA}\sqrt{P(E_H)(1-P(E_H))P(E_A)(1-P(E_A))}$. The condition $C > 0$ reduces to the stated bound on $\rho_{HA}$ by algebra.
+\end{proof}
+
+Complementarity is robust to variation in individual detection rates but fragile to error correlation. \citet{vaccaro2024combinations} meta-analyzed human-AI collaboration, finding a mean effect of $g = -0.23$ (teams often underperform the better component alone). Theorem~\ref{thm:complementarity} provides a formal explanation: high error correlation destroys complementarity. The design implication: harness verification layers should be chosen for error diversity, not just individual accuracy.
+
+\subsection{Connection to Learning-to-Defer}
+
+\citet{mozannar2020consistent} formalize the joint optimization of a classifier $h$ and rejector $r$, minimizing the system 0-1 loss. We establish the connection between this framework and the Bayesian autonomy threshold.
+
+\begin{theorem}[Deferral-Threshold Equivalence]
+\emph{[Mathematical Fact: algebraic equivalence under stated conditions.]}
+\label{thm:deferral-equivalence}
+Under asymmetric binary loss, well-calibrated defect probability estimates, and constant human detection rate, the Mozannar-Sontag optimal rejector is equivalent to the Bayesian threshold:
+\begin{equation}
+r^*(x) = \mathbb{I}\!\left[\hat{p}(x) > \frac{c_{GF}}{c_{FG} \cdot d_{\textup{human}} + c_{GF}}\right]
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Deferral is optimal when the review cost plus residual miss cost is less than the autonomous miss cost: $c_{GF} + c_{FG}\hat{p}(x)(1-d_{\text{human}}) < c_{FG}\hat{p}(x)$. Solving for $\hat{p}(x)$ yields the threshold.
+\end{proof}
+
+This equivalence shows that the learning-to-defer framework and the Bayesian triage framework converge to the same decision rule under standard conditions. The deferral threshold adjusts Theorem~\ref{thm:threshold} by incorporating the human's imperfect detection ($d_{\text{human}} < 1$), yielding a slightly higher threshold (review is less valuable when the human is imperfect).
+
+\subsection{Empirical Calibration}
+
+\emph{[Engineering Hypothesis: all parameter ranges are calibrated from analogue domains, not software review studies.]}
+
+\begin{center}
+\small
+\begin{tabular}{llll}
+\toprule
+\textbf{Parameter} & \textbf{Range} & \textbf{Source} & \textbf{Conf.} \\
+\midrule
+$d_{\text{human}}$ (formal inspection) & 0.60--0.82 & \citet{fagan1976design, jones1996software} & H \\
+$d_{\text{human}}$ (optimal conditions) & 0.70--0.90 & \citet{cohen2006best} & H \\
+$d_{\text{human}}$ (high review rate) & 0.25--0.40 & \citet{cohen2006best} & M \\
+$d_{\text{auto}}$ (hallucinated imports) & 0.92--0.99 & AST/lockfile validation & H \\
+$d_{\text{auto}}$ (security vulns) & 0.15--0.35 & SAST tools & M \\
+Vigilance $\Phi(30\text{ min})$ & 0.85--0.90 & \citet{mackworth1948breakdown} & H \\
+Vigilance $\Phi(120\text{ min})$ & 0.50--0.70 & \citet{mackworth1948breakdown} & M \\
+Verification rate & 26\% always verify & \citet{sonar2026} & H \\
+Review time growth with AI & +91\% & \citet{dora2025} & H \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Confidence levels: \textbf{H} (directly measurable from published studies), \textbf{M} (estimable with moderate study design effort), \textbf{L} (requires dedicated experimental infrastructure).
+
+\paragraph{The review capacity gap.} The DORA 2025 data implies $\text{RCG} = N_{\text{outputs}} / B > 1$ in many settings: PR size has grown 154\% while review capacity has not scaled proportionally \citep{dora2025}. The Sonar 2026 survey found that 96\% of developers do not fully trust AI output, yet only 26\% always verify AI code before committing \citep{sonar2026}, confirming that the capacity-constrained regime ($B/N < 1$) is the default, not an edge case. Meanwhile, METR reports that experienced developers were 19\% \emph{slower} with AI tools in a controlled RCT \citep{metr2026}, suggesting the interaction between expertise and AI assistance is non-monotonic.
+
+\subsection{Design Principles}
+
+From the formal framework, seven principles for harness builders:
+
+\begin{enumerate}[leftmargin=*,nosep]
+\item \textbf{Risk-stratified triage, not uniform review.} Review the $H$ highest-risk outputs (\ref{thm:optimal-triage}). The improvement factor is approximately $1 + \text{CV}(w)^2$.
+
+\item \textbf{Asymmetric cost thresholds per context.} Set the autonomy boundary using $\rho = c_{FG}/c_{GF}$ as a governance dial (\ref{thm:threshold}). Security-critical code ($\rho = 200$) is reviewed at $\tau^* = 0.005$; documentation ($\rho = 2$) at $\tau^* = 0.333$.
+
+\item \textbf{Adaptive inspection regimes.} Implement MIL-STD-105E switching: reduced review for reliable agents, tightened review when quality degrades (\ref{prop:steady-state}).
+
+\item \textbf{Maintain a vigilance budget.} Allocate a fraction of review capacity to vigilance probes (\ref{thm:probe-rate}). This is the engineering response to Bainbridge's irony.
+
+\item \textbf{Invest in trust calibration.} Maintain Beta posteriors per (agent, task-type) pair and allocate a calibration budget for exploration (\ref{thm:budget-optimal}).
+
+\item \textbf{Optimize for error diversity.} Complementarity requires low error correlation (\ref{thm:complementarity}). Choose verification layers for diverse failure modes.
+
+\item \textbf{Distinguish tactical from strategic interaction.} Per-output triage is amenable to formal optimization; per-milestone deliberation requires conversational grounding. Design both, but do not conflate them.
+\end{enumerate}
+
+\subsection{Contrarian Positions}
+
+\paragraph{``Humans should review everything.''} The throughput mismatch makes this impossible: AI generates 40--60\% of code; PR size has grown 154\% \citep{dora2025}. The generalized Deming $kp$ rule shows 100\% inspection is economically justified only when $\bar{p} > k_1/(c \cdot d_{\text{human}})$; at typical parameters, the crossover is around $\bar{p} = 6.25\%$. Below this rate, triage is more efficient. \emph{Counter}: triage, not abdication.
+
+\paragraph{``Fully autonomous agents are the goal.''} Current agents are insufficiently reliable: METR reports approximately 50\% of test-passing PRs would not be merged \citep{metr2026}. More importantly, Naur's theory preservation problem means human understanding degrades without review interaction \citep{naur1985programming}. \emph{Counter}: full autonomy is a legitimate asymptotic goal, but the transition requires adaptive oversight.
+
+\paragraph{``Trust calibration creates auto-pilot complacency.''} Bainbridge's irony is real, and Theorem~\ref{thm:paradox} quantifies it. But the solution is not to avoid trust calibration; it is to include vigilance probes that maintain detection skill (\ref{thm:probe-rate}), analogous to TIP in aviation security. \emph{Counter}: vigilance probes are the engineering response.
+
+\paragraph{``Interaction should be conversational, not gate-based.''} Suchman's critique \citep{suchman1987plans} is well-founded: real interaction is dynamic, not a series of approve/reject gates. \emph{Counter}: gate-based interaction is the only model currently amenable to formal optimization. This is explicitly a limitation; tactical interaction (formalized here) and strategic interaction (conversational, requiring different formalisms) serve different purposes.
+
+\paragraph{``Developer experience cannot be formalized.''} The METR finding that experienced developers are 19\% \emph{slower} with AI tools \citep{metr2026} suggests the moderation is non-monotonic. \emph{Counter}: the trust calibration mechanism implicitly captures expertise through observed defect rates, sidestepping the need for explicit experience modeling.
+
+\paragraph{Developer experience moderation.} The expertise parameter $e \in [0,1]$ modulates three quantities: baseline detection $d_0(e)$ is increasing in $e$ (experts detect more); vigilance decay rate is decreasing in $e$ (experts resist decay longer); trust prior strength $c_0(e)$ is increasing in $e$ (experts have more informative priors). For novices ($e \to 0$), the optimal policy is conservative: more review, lower autonomy threshold, more probes. Juniors exhibit 3--4$\times$ higher accretion rates; the context budget optimum shifts from approximately $0.08W$ for experts to approximately $0.50W$ for novices. However, the scalar parameter $e$ is an oversimplification: the METR finding that AI slows experienced developers defies monotonic modeling.
+
+\paragraph{Limitations.} The formal framework captures tactical interaction (per-output triage, trust calibration, vigilance maintenance) but not strategic interaction (requirements evolution, architectural deliberation, theory building \citep{naur1985programming}). Suchman's critique \citep{suchman1987plans} applies: gate-based models cannot capture the full richness of situated human-agent collaboration. Key parameters (vigilance decay rate, error correlation structure, optimal probe rate) are calibrated from analogue domains (radiology, aviation, manufacturing), not from software review studies. The functional form of $\Phi(p_{\text{auto}}, t)$ is proposed, not validated. Empirical validation in coding harness settings is the most important next step.
