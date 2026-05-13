@@ -104,51 +104,51 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | TBD | Pending |
-| FOUND-02 | TBD | Pending |
-| FOUND-03 | TBD | Pending |
-| FOUND-04 | TBD | Pending |
-| FOUND-05 | TBD | Pending |
-| FOUND-06 | TBD | Pending |
-| FOUND-07 | TBD | Pending |
-| BOOK-01 | TBD | Pending |
-| BOOK-02 | TBD | Pending |
-| BOOK-03 | TBD | Pending |
-| BOOK-04 | TBD | Pending |
-| BOOK-05 | TBD | Pending |
-| BOOK-06 | TBD | Pending |
-| FORM-01 | TBD | Pending |
-| FORM-02 | TBD | Pending |
-| FORM-03 | TBD | Pending |
-| FORM-04 | TBD | Pending |
-| FORM-05 | TBD | Pending |
-| FORM-06 | TBD | Pending |
-| FORM-07 | TBD | Pending |
-| FORM-08 | TBD | Pending |
-| FORM-09 | TBD | Pending |
-| FORM-10 | TBD | Pending |
-| DISC-01 | TBD | Pending |
-| DISC-02 | TBD | Pending |
-| DISC-03 | TBD | Pending |
-| DISC-04 | TBD | Pending |
-| DISC-05 | TBD | Pending |
-| DISC-06 | TBD | Pending |
-| DESIGN-01 | TBD | Pending |
-| DESIGN-02 | TBD | Pending |
-| DESIGN-03 | TBD | Pending |
-| DESIGN-04 | TBD | Pending |
-| DESIGN-05 | TBD | Pending |
-| QUAL-01 | TBD | Pending |
-| QUAL-02 | TBD | Pending |
-| QUAL-03 | TBD | Pending |
-| QUAL-04 | TBD | Pending |
-| QUAL-05 | TBD | Pending |
+| FOUND-01 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Pending |
+| FOUND-03 | Phase 1 | Pending |
+| FOUND-04 | Phase 1 | Pending |
+| FOUND-05 | Phase 1 | Pending |
+| FOUND-06 | Phase 1 | Pending |
+| FOUND-07 | Phase 1 | Pending |
+| BOOK-01 | Phase 2 | Pending |
+| BOOK-02 | Phase 2 | Pending |
+| BOOK-03 | Phase 2 | Pending |
+| BOOK-04 | Phase 4 | Pending |
+| BOOK-05 | Phase 2 | Pending |
+| BOOK-06 | Phase 2 | Pending |
+| FORM-01 | Phase 3 | Pending |
+| FORM-02 | Phase 3 | Pending |
+| FORM-03 | Phase 3 | Pending |
+| FORM-04 | Phase 3 | Pending |
+| FORM-05 | Phase 3 | Pending |
+| FORM-06 | Phase 3 | Pending |
+| FORM-07 | Phase 3 | Pending |
+| FORM-08 | Phase 3 | Pending |
+| FORM-09 | Phase 3 | Pending |
+| FORM-10 | Phase 3 | Pending |
+| DISC-01 | Phase 4 | Pending |
+| DISC-02 | Phase 4 | Pending |
+| DISC-03 | Phase 4 | Pending |
+| DISC-04 | Phase 4 | Pending |
+| DISC-05 | Phase 4 | Pending |
+| DISC-06 | Phase 4 | Pending |
+| DESIGN-01 | Phase 2 | Pending |
+| DESIGN-02 | Phase 2 | Pending |
+| DESIGN-03 | Phase 2 | Pending |
+| DESIGN-04 | Phase 2 | Pending |
+| DESIGN-05 | Phase 5 | Pending |
+| QUAL-01 | Phase 5 | Pending |
+| QUAL-02 | Phase 5 | Pending |
+| QUAL-03 | Phase 4 | Pending |
+| QUAL-04 | Phase 5 | Pending |
+| QUAL-05 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 39 total
-- Mapped to phases: 0
-- Unmapped: 39
+- Mapped to phases: 39
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-13*
-*Last updated: 2026-05-13 after initial definition*
+*Last updated: 2026-05-13 after roadmap creation*
