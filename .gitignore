@@ -40,3 +40,10 @@ __pycache__/
 
 # Scratch canvas
 /test.canvas
+
+# Local paper assets
+logo.pdf
+**/logo.pdf
+
+# Local brainstorming companion output
+.superpowers/
