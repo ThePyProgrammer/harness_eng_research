@@ -409,3 +409,8 @@ This manifest records the physical file migration that reorganizes the repositor
 | sdd-research/workflow-research/state.json | archive/unsorted/sdd-research/workflow-research/state.json | unsorted research | moved | Preserved research project artifact |
 | googledeepmind.cls | assets/latex/googledeepmind.cls | LaTeX class | moved | Shared class file |
 | google.cls | assets/latex/google.cls | LaTeX class | moved | Shared class file |
+| final_papers/googledeepmind.cls | archive/obsolete-builds/final_papers/googledeepmind.cls | LaTeX class duplicate | archived | Preserved final_papers-era class copy outside old content root |
+| generate_pdf.py | archive/obsolete-builds/generate_pdf.py | obsolete build helper | archived | Root PDF helper referenced old outputs/papers paths |
+| science/paper/googledeepmind.cls | science/paper/googledeepmind.cls | LaTeX class symlink | added | Symlink to shared assets/latex/googledeepmind.cls for local science compile |
+| pillars/*/paper/*.cls | pillars/*/paper/*.cls | LaTeX class symlink | normalized | Paper-local class entries point to shared assets/latex classes for local compile |
+| science/paper/science.pdf and pillars/*/paper/*.pdf | same paths | canonical PDFs | recompiled | Recompiled after removing the logo class option from canonical sources |

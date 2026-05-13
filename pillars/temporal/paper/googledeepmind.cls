@@ -1,1 +1,1 @@
-../../googledeepmind.cls
+../../../assets/latex/googledeepmind.cls

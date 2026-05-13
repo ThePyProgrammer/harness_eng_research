@@ -214,4 +214,4 @@ Rapid iteration: 13 releases in ~6 weeks, 739 commits, 99.5% Python.
 - [[what-is-slop|What Is Code Slop?]] — Full 18-type taxonomy
 - [[gsd-desloppification|GSD Improvement Proposal]] — How to integrate Desloppify into GSD's pipeline
 - [[de-sloppification-report|De-Sloppification Research Report]] — Three-stage defense model
-- [Desloppify Canvas](canvases/desloppify.canvas) — Visual architecture diagram
+- [Desloppify Canvas](../canvases/desloppify.canvas) — Visual architecture diagram

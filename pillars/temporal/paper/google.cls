@@ -1,1 +1,1 @@
-../../google.cls
+../../../assets/latex/google.cls

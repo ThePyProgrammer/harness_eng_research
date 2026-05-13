@@ -14,13 +14,13 @@ A research wiki on AI coding agent harnesses — how they work, how to prevent c
 
 ## Framework Analyses
 
-- **[[gsd]]** — Execution-first (23K stars) · [Canvas](canvases/frameworks/gsd.canvas)
-- **[[openspec]]** — Spec-first, YC-backed · [Canvas](canvases/frameworks/openspec.canvas)
-- **[[speckit]]** — Agent-agnostic SDD, GitHub · [Canvas](canvases/frameworks/speckit.canvas)
-- **[[kiro]]** — Purpose-built IDE, Amazon · [Canvas](canvases/frameworks/kiro.canvas)
-- **[[bmad]]** — Role-first multi-agent · [Canvas](canvases/frameworks/bmad.canvas)
-- **[[taskmaster]]** — Task-first decomposition · [Canvas](canvases/frameworks/taskmaster.canvas)
-- **[[desloppify]]** — Post-hoc cleanup harness · [Canvas](canvases/desloppify.canvas)
+- **[[gsd]]** — Execution-first (23K stars) · [Canvas](../../science/synthesis/canvases/frameworks/gsd.canvas)
+- **[[openspec]]** — Spec-first, YC-backed · [Canvas](../../science/synthesis/canvases/frameworks/openspec.canvas)
+- **[[speckit]]** — Agent-agnostic SDD, GitHub · [Canvas](../../science/synthesis/canvases/frameworks/speckit.canvas)
+- **[[kiro]]** — Purpose-built IDE, Amazon · [Canvas](../../science/synthesis/canvases/frameworks/kiro.canvas)
+- **[[bmad]]** — Role-first multi-agent · [Canvas](../../science/synthesis/canvases/frameworks/bmad.canvas)
+- **[[taskmaster]]** — Task-first decomposition · [Canvas](../../science/synthesis/canvases/frameworks/taskmaster.canvas)
+- **[[desloppify]]** — Post-hoc cleanup harness · [Canvas](../../pillars/quality/notes/canvases/desloppify.canvas)
 
 ## De-Sloppification
 
@@ -48,7 +48,7 @@ A research wiki on AI coding agent harnesses — how they work, how to prevent c
 
 ## Canvases
 
-- [Harness Landscape](canvases/harness_landscape.canvas) — Master canvas: patterns, ontology, ecosystem, slop, improvements
-- [SDD Ontology](canvases/sdd-ontology.canvas) — 10 stages, 12 capabilities, 6 frameworks scored
-- [Desloppify](canvases/desloppify.canvas) — Architecture, loop, scoring, anti-gaming
-- Framework canvases: [GSD](canvases/frameworks/gsd.canvas) · [OpenSpec](canvases/frameworks/openspec.canvas) · [Spec Kit](canvases/frameworks/speckit.canvas) · [Kiro](canvases/frameworks/kiro.canvas) · [BMAD](canvases/frameworks/bmad.canvas) · [Taskmaster](canvases/frameworks/taskmaster.canvas)
+- [Harness Landscape](../../science/synthesis/canvases/harness_landscape.canvas) — Master canvas: patterns, ontology, ecosystem, slop, improvements
+- [SDD Ontology](../../science/synthesis/canvases/sdd-ontology.canvas) — 10 stages, 12 capabilities, 6 frameworks scored
+- [Desloppify](../../pillars/quality/notes/canvases/desloppify.canvas) — Architecture, loop, scoring, anti-gaming
+- Framework canvases: [GSD](../../science/synthesis/canvases/frameworks/gsd.canvas) · [OpenSpec](../../science/synthesis/canvases/frameworks/openspec.canvas) · [Spec Kit](../../science/synthesis/canvases/frameworks/speckit.canvas) · [Kiro](../../science/synthesis/canvases/frameworks/kiro.canvas) · [BMAD](../../science/synthesis/canvases/frameworks/bmad.canvas) · [Taskmaster](../../science/synthesis/canvases/frameworks/taskmaster.canvas)

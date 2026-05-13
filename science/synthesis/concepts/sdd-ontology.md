@@ -57,5 +57,5 @@ A universal taxonomy for evaluating coding agent harnesses. Encompasses 10 pipel
 
 - [[harness-engineering|What Is Harness Engineering?]]
 - [[what-is-slop|What Is Code Slop?]]
-- [SDD Ontology Canvas](canvases/sdd-ontology.canvas) — Visual version with full coverage matrix
+- [SDD Ontology Canvas](../canvases/sdd-ontology.canvas) — Visual version with full coverage matrix
 - [[gsd-desloppification|GSD Improvement Proposal]] — Anti-slop improvements mapped to this ontology

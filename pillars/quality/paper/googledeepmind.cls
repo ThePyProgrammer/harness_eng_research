@@ -1,1 +1,1 @@
-/home/prannayag/pragnition/htx/harness_eng/googledeepmind.cls
+../../../assets/latex/googledeepmind.cls
