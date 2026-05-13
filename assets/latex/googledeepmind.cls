@@ -180,7 +180,7 @@ a4paper]{geometry}%
 \renewcommand\Authands{ and }
 
 \newcommand{\internalonly}{Confidential -- Google, do not share or forward externally.}
-\newcommand{\copyrightext}{\footerfont \textcopyright\, \the\year{} Pragnition Labs. All rights
+\newcommand{\copyrightext}{\footerfont \textcopyright\, \the\year{} Authors. All rights
 reserved}
 
 
