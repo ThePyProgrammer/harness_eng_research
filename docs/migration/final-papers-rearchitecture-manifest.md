@@ -407,3 +407,5 @@ This manifest records the physical file migration that reorganizes the repositor
 | sdd-research/workflow-research/sdd-research/.research/report.md | archive/unsorted/sdd-research/workflow-research/sdd-research/.research/report.md | unsorted research | moved | Preserved research project artifact |
 | sdd-research/workflow-research/sdd-research/.research/state.json | archive/unsorted/sdd-research/workflow-research/sdd-research/.research/state.json | unsorted research | moved | Preserved research project artifact |
 | sdd-research/workflow-research/state.json | archive/unsorted/sdd-research/workflow-research/state.json | unsorted research | moved | Preserved research project artifact |
+| googledeepmind.cls | assets/latex/googledeepmind.cls | LaTeX class | moved | Shared class file |
+| google.cls | assets/latex/google.cls | LaTeX class | moved | Shared class file |
