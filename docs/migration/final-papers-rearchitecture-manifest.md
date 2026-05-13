@@ -25,3 +25,25 @@ This manifest records the physical file migration that reorganizes the repositor
 | final_papers/security_architecture/ | pillars/security/paper/ | canonical paper directory | moved | Non-logo tracked files moved; logo.pdf untracked locally |
 | final_papers/accretion_category/ | pillars/accretion/paper/ | canonical paper directory | moved | Non-logo tracked files moved; logo.pdf untracked locally |
 | **/logo.pdf | local filesystem only | local asset | untracked | Removed from Git tracking, preserved on disk |
+| pillars/1-information-architecture.md | pillars/information/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/2-reliability-architecture.md | pillars/reliability/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/3-coordination-architecture.md | pillars/coordination/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/4-temporal-architecture.md | pillars/temporal/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/5-quality-architecture.md | pillars/quality/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/6-governance-architecture.md | pillars/governance/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/7-economics-architecture.md | pillars/economics/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/8-human-interaction-architecture.md | pillars/human-interaction/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/9-model-routing-architecture.md | pillars/model-routing/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| pillars/10-security-architecture.md | pillars/security/notes/concepts/original-pillar-note.md | pillar note | moved | Preserved as original pillar note |
+| generated | pillars/abstraction/README.md | navigation | created | Pillar landing page |
+| generated | pillars/information/README.md | navigation | created | Pillar landing page |
+| generated | pillars/reliability/README.md | navigation | created | Pillar landing page |
+| generated | pillars/coordination/README.md | navigation | created | Pillar landing page |
+| generated | pillars/temporal/README.md | navigation | created | Pillar landing page |
+| generated | pillars/quality/README.md | navigation | created | Pillar landing page |
+| generated | pillars/governance/README.md | navigation | created | Pillar landing page |
+| generated | pillars/economics/README.md | navigation | created | Pillar landing page |
+| generated | pillars/human-interaction/README.md | navigation | created | Pillar landing page |
+| generated | pillars/model-routing/README.md | navigation | created | Pillar landing page |
+| generated | pillars/security/README.md | navigation | created | Pillar landing page |
+| generated | pillars/accretion/README.md | navigation | created | Pillar landing page |
