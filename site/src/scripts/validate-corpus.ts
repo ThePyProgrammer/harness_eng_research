@@ -48,10 +48,26 @@ function addError(
 
 function archiveNextStep(entry: CorpusEntry): string {
   if (entry.id === 'security') {
-    return 'Move the reference to pillars/security/paper/ or mark the entry as provenance-only';
+    return 'Move the reference to pillars/security/paper/';
   }
 
-  return 'Move the reference to the owning paper/ directory or mark the entry as provenance-only';
+  return 'Move the reference to the owning paper/ directory';
+}
+
+function canonicalPaperNextStep(entry: CorpusEntry): string {
+  if (entry.kind === 'umbrella') {
+    return 'Use science/paper/ for umbrella canonical paths';
+  }
+
+  return `Use pillars/${entry.id}/paper/ for ${entry.id} canonical paths`;
+}
+
+function isCanonicalPaperPath(entry: CorpusEntry, pathValue: string): boolean {
+  if (entry.kind === 'umbrella') {
+    return pathValue.startsWith('science/paper/');
+  }
+
+  return pathValue.startsWith(`pillars/${entry.id}/paper/`);
 }
 
 function validateExpectedIds(entries: CorpusEntry[], errors: ValidationError[]): void {
@@ -124,7 +140,18 @@ function validatePathField(
     return;
   }
 
-  if (archivePathPattern.test(pathValue) && entry.sourceStatus !== 'provenance-only') {
+  if (!isCanonicalPaperPath(entry, pathValue)) {
+    addError(
+      errors,
+      entry.id,
+      field,
+      pathValue,
+      'Path must point into the canonical paper directory',
+      canonicalPaperNextStep(entry),
+    );
+  }
+
+  if (archivePathPattern.test(pathValue)) {
     addError(
       errors,
       entry.id,

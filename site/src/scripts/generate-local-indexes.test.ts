@@ -25,6 +25,15 @@ describe('generate-local-indexes', () => {
     expect(index.entries.map((entry) => entry.id)).toContain('accretion');
   });
 
+  it('accepts normalized absolute output paths inside the site directory', () => {
+    const outputDir = `${process.cwd()}/dist/../dist/normalized-index`;
+
+    const outputPath = writeCorpusIndex({ outputDir });
+    const payload = JSON.parse(readFileSync(outputPath, 'utf-8'));
+
+    expect(payload.entryCount).toBe(13);
+  });
+
   it('refuses output paths outside the provided site output directory', () => {
     expect(() => writeCorpusIndex({ outputDir: '../dist' })).toThrow(
       'Output directory must stay inside site/',

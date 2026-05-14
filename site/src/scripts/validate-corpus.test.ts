@@ -47,7 +47,7 @@ describe('validateCorpus', () => {
 
     expect(result.ok).toBe(false);
     expect(result.errors.map(formatValidationError)).toContain(
-      'Entry security: canonicalTex points to pillars/security/archive/security_architecture.tex. Archive paths cannot be canonical sources. Move the reference to pillars/security/paper/ or mark the entry as provenance-only.',
+      'Entry security: canonicalTex points to pillars/security/archive/security_architecture.tex. Archive paths cannot be canonical sources. Move the reference to pillars/security/paper/.',
     );
   });
 
@@ -74,6 +74,63 @@ describe('validateCorpus', () => {
           entryId: 'umbrella',
           field: 'canonicalTex',
           path: 'science/paper/does-not-exist.tex',
+        }),
+      ]),
+    );
+  });
+
+  it('fails when canonical fields point outside the owning paper directory', () => {
+    const entries = cloneEntries().map((entry) => {
+      if (entry.id === 'umbrella') {
+        return { ...entry, canonicalTex: 'README.md' };
+      }
+
+      if (entry.id === 'security') {
+        return { ...entry, canonicalTex: 'pillars/security/notes/security_architecture.tex' };
+      }
+
+      return entry;
+    });
+
+    const result = validateCorpus(entries);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entryId: 'umbrella',
+          field: 'canonicalTex',
+          reason: 'Path must point into the canonical paper directory',
+        }),
+        expect.objectContaining({
+          entryId: 'security',
+          field: 'canonicalTex',
+          reason: 'Path must point into the canonical paper directory',
+        }),
+      ]),
+    );
+  });
+
+  it('fails when provenance-only entries use archive paths in canonical fields', () => {
+    const entries = cloneEntries().map((entry) =>
+      entry.id === 'security'
+        ? {
+            ...entry,
+            canonicalTex: 'pillars/security/archive/security_architecture.tex',
+            sourceStatus: 'provenance-only' as const,
+          }
+        : entry,
+    );
+
+    const result = validateCorpus(entries);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entryId: 'security',
+          field: 'canonicalTex',
+          reason: 'Archive paths cannot be canonical sources',
         }),
       ]),
     );

@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { corpusEntries } from '../data/corpus';
 import type { CorpusEntry } from '../data/corpus.schema';
@@ -22,14 +22,10 @@ function siteRoot(): string {
 }
 
 function assertInsideSite(outputDir: string, root: string): string {
-  if (outputDir.includes('..')) {
-    throw new Error('Output directory must stay inside site/');
-  }
-
   const resolvedOutputDir = isAbsolute(outputDir) ? resolve(outputDir) : resolve(root, outputDir);
   const relativePath = relative(root, resolvedOutputDir);
 
-  if (relativePath === '..' || relativePath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(relativePath)) {
+  if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
     throw new Error('Output directory must stay inside site/');
   }
 
