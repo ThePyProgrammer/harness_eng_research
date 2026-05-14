@@ -1,0 +1,31 @@
+---
+title: Site Foundation
+---
+
+# Site Foundation
+
+This foundation establishes the static site boundary for the Harness Architecture Book Wiki. The implementation lives under `site/`, while the canonical research corpus remains a read-only input owned by the repository’s existing paper structure.
+
+The site may link to and validate canonical corpus inputs, but builds must not move, replace, or take ownership of files in `science/paper/` or `pillars/*/paper/`. Archive material remains provenance material unless an explicit future page discusses it as provenance.
+
+## Build contract
+
+Run validation before trusting a generated site:
+
+```bash
+bun run validate
+```
+
+Build the static HTML and local index artifacts from the same workspace:
+
+```bash
+bun run build
+```
+
+Deployment-specific wiring is deferred. This phase proves local static output only: no server runtime, database, CMS, account system, hosted search service, or corpus-mutating build step belongs in the foundation.
+
+## Corpus boundary
+
+The umbrella framework source starts at `science/paper/`. Pillar chapters start at `pillars/*/paper/`. Later inventory and provenance pages must trace each reader-facing page back to those canonical paths instead of becoming untraceable forks.
+
+[Inspect Corpus Inventory](/inventory/)
