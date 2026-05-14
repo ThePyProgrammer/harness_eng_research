@@ -140,7 +140,9 @@ function validatePathField(
     return;
   }
 
-  if (!isCanonicalPaperPath(entry, pathValue)) {
+  const isProvenanceArchive = entry.sourceStatus === 'provenance-only' && archivePathPattern.test(pathValue);
+
+  if (!isProvenanceArchive && !isCanonicalPaperPath(entry, pathValue)) {
     addError(
       errors,
       entry.id,
@@ -151,7 +153,7 @@ function validatePathField(
     );
   }
 
-  if (archivePathPattern.test(pathValue)) {
+  if (!isProvenanceArchive && archivePathPattern.test(pathValue)) {
     addError(
       errors,
       entry.id,

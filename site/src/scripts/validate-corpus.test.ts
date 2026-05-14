@@ -111,12 +111,12 @@ describe('validateCorpus', () => {
     );
   });
 
-  it('fails when provenance-only entries use archive paths in canonical fields', () => {
+  it('allows provenance-only entries to reference existing archive paths', () => {
     const entries = cloneEntries().map((entry) =>
-      entry.id === 'security'
+      entry.id === 'umbrella'
         ? {
             ...entry,
-            canonicalTex: 'pillars/security/archive/security_architecture.tex',
+            canonicalTex: 'science/archive/drafts/science-assembled.tex',
             sourceStatus: 'provenance-only' as const,
           }
         : entry,
@@ -124,13 +124,12 @@ describe('validateCorpus', () => {
 
     const result = validateCorpus(entries);
 
-    expect(result.ok).toBe(false);
-    expect(result.errors).toEqual(
+    expect(result.errors).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          entryId: 'security',
+          entryId: 'umbrella',
           field: 'canonicalTex',
-          reason: 'Archive paths cannot be canonical sources',
+          path: 'science/archive/drafts/science-assembled.tex',
         }),
       ]),
     );
