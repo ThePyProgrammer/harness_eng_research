@@ -1,0 +1,69 @@
+---
+title: Provenance Contract
+---
+
+# Provenance Contract
+
+The book wiki treats `science/paper/` and `pillars/*/paper/` as the executable source-of-truth boundary for canonical corpus material. The website may explain, quote, and cross-link the corpus, but every inventory entry must keep a traceable path back to the canonical paper files.
+
+`bun run validate` is the provenance gate. It validates the typed inventory before static publication, and `bun run build` runs validation before Astro emits static HTML and before local indexes are generated. A build that cannot prove corpus provenance should fail loudly rather than publish a page with a vague or archived source trail.
+
+## Required inventory fields
+
+Every entry in `site/src/data/corpus.ts` must provide these fields:
+
+| Field | Contract |
+|---|---|
+| `id` | Stable corpus id. The inventory must include the umbrella framework and all twelve expected pillar ids exactly once. |
+| `kind` | `umbrella` or `pillar`. |
+| `title` | Reader-facing title for the corpus entry. |
+| `slug` | Static site slug for the entry. |
+| `summary` | Short corpus summary used by inventory and later index generation. |
+| `canonicalTex` | Project-root-relative path to the canonical `.tex` source. |
+| `canonicalPdf` | Project-root-relative path to the rendered canonical `.pdf`. |
+| `bibliography` | Project-root-relative path to the canonical `.bib` file when the entry has one. |
+| `sourceStatus` | Provenance status label source: canonical, missing source, archive blocked, or provenance-only. |
+
+## Canonical path rules
+
+Canonical source paths must point into `science/paper/` for the umbrella framework or `pillars/*/paper/` for pillar papers. They must be project-root-relative, must not be absolute filesystem paths, and must not contain `..` parent traversal segments.
+
+Archive directories are preservation areas, not active canonical sources. Paths containing `archive/` cannot be used for `canonicalTex`, `canonicalPdf`, or `bibliography` unless the entry is explicitly `provenance-only` per D-16. That exception is for pages that discuss provenance or history; it is not a shortcut for replacing canonical source paths.
+
+Local-only build assets follow the same narrow exception style as the LaTeX asset contract: ignored files such as local `logo.pdf` copies may exist beside papers for compilation, but they are not inventory provenance fields.
+
+## Passing validation
+
+Run the gate from the site workspace:
+
+```bash
+bun run validate
+```
+
+A valid thirteen-entry inventory prints:
+
+```text
+OK: 13 corpus entries validated, 0 errors found.
+```
+
+## Failure diagnostics
+
+Every validation error follows this diagnostic pattern:
+
+```text
+Entry {id}: {field} points to {path}. {reason}. {next step}.
+```
+
+Missing canonical source paths identify the entry, field, bad path, and the repair step:
+
+```text
+Entry umbrella: canonicalTex points to science/paper/does-not-exist.tex. Required canonical source path does not exist. Restore the file or update the inventory to the canonical paper path.
+```
+
+Archive-backed canonical paths are rejected unless the entry is provenance-only:
+
+```text
+Entry security: canonicalTex points to pillars/security/archive/security_architecture.tex. Archive paths cannot be canonical sources. Move the reference to pillars/security/paper/ or mark the entry as provenance-only.
+```
+
+The fix is deliberately boring: restore the missing canonical file, update the inventory to the owning `paper/` directory, or mark the entry as provenance-only when the page is explicitly about preserved history.
