@@ -1,0 +1,187 @@
+:root {
+  --phase-color-dominant: #F7F3EA;
+  --phase-color-secondary: #E8DDC8;
+  --phase-color-accent: #7A3E1D;
+  --phase-color-destructive: #B42318;
+  --phase-color-text: #1f2933;
+  --phase-color-muted: #475569;
+  --phase-color-success: #166534;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --font-size-body: 16px;
+  --font-size-label: 14px;
+  --font-size-heading: 20px;
+  --font-size-display: 28px;
+  --font-family-prose: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-family-label: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.phase-inventory {
+  min-height: 100vh;
+  background: var(--phase-color-dominant);
+  color: var(--phase-color-text);
+  font-family: var(--font-family-label);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  padding: var(--space-3xl) var(--space-lg);
+}
+
+.phase-inventory__shell {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.phase-inventory__header {
+  display: grid;
+  gap: var(--space-md);
+  margin-bottom: var(--space-2xl);
+}
+
+.phase-inventory__eyebrow,
+.phase-inventory__label,
+.phase-inventory__meta-label,
+.phase-inventory__status {
+  font-family: var(--font-family-label);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.phase-inventory__eyebrow {
+  color: var(--phase-color-accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.phase-inventory h1 {
+  margin: 0;
+  font-family: var(--font-family-prose);
+  font-size: var(--font-size-display);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.phase-inventory__summary {
+  max-width: 760px;
+  margin: 0;
+}
+
+.phase-inventory__empty {
+  background: var(--phase-color-secondary);
+  border: 1px solid color-mix(in srgb, var(--phase-color-accent), transparent 70%);
+  padding: var(--space-lg);
+}
+
+.phase-inventory__grid {
+  display: grid;
+  gap: var(--space-lg);
+  margin: 0;
+}
+
+.phase-inventory__card {
+  background: var(--phase-color-secondary);
+  border: 1px solid color-mix(in srgb, var(--phase-color-accent), transparent 70%);
+  border-radius: 14px;
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.phase-inventory__card-header {
+  align-items: start;
+  display: flex;
+  gap: var(--space-md);
+  justify-content: space-between;
+}
+
+.phase-inventory__title {
+  margin: 0;
+  font-family: var(--font-family-prose);
+  font-size: var(--font-size-heading);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.phase-inventory__description {
+  margin: var(--space-sm) 0 0;
+}
+
+.phase-inventory__status {
+  align-items: center;
+  background: var(--phase-color-dominant);
+  border: 1px solid var(--phase-color-accent);
+  border-radius: 999px;
+  color: var(--phase-color-accent);
+  display: inline-flex;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  white-space: nowrap;
+}
+
+.phase-inventory__status--missing-source,
+.phase-inventory__status--archive-blocked {
+  border-color: var(--phase-color-destructive);
+  color: var(--phase-color-destructive);
+}
+
+.phase-inventory__status--provenance-only {
+  border-color: var(--phase-color-muted);
+  color: var(--phase-color-muted);
+}
+
+.phase-inventory__metadata {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.phase-inventory__meta-row {
+  align-items: baseline;
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: 150px minmax(0, 1fr);
+  margin: 0;
+}
+
+.phase-inventory__meta-label {
+  color: var(--phase-color-muted);
+}
+
+.phase-inventory__path {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-body);
+  overflow-wrap: anywhere;
+}
+
+.phase-inventory a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.phase-inventory a:focus-visible {
+  outline: 2px solid var(--phase-color-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .phase-inventory {
+    padding: var(--space-xl) var(--space-md);
+  }
+
+  .phase-inventory__card-header,
+  .phase-inventory__meta-row {
+    display: grid;
+    gap: var(--space-sm);
+    grid-template-columns: 1fr;
+  }
+
+  .phase-inventory__status {
+    justify-self: start;
+  }
+}
