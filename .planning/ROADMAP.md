@@ -30,8 +30,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Builder can run one documented command that produces static HTML assets and local indexes without a database, CMS, accounts, server runtime, or hosted search dependency.
   3. Builder can inspect a structured inventory covering the umbrella framework and all twelve pillars with required canonical source metadata.
   4. Validation fails when required canonical source paths are missing or when archive paths are used as canonical sources without explicit provenance marking.
-**Plans**: TBD
+**Plans**: 4 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 01-01-PLAN.md — Establish isolated Astro/Starlight site boundary, Bun scripts, static math pipeline, and foundation docs.
+- [ ] 01-02-PLAN.md — Define typed corpus schema and explicit umbrella-plus-twelve-pillar inventory.
+- [ ] 01-03-PLAN.md — Implement executable provenance validator and documented failure contract.
+- [ ] 01-04-PLAN.md — Render inventory page and generate local static index artifacts through the one-command build.
 
 ### Phase 2: Book Shell and Formal Reading Interface
 **Goal**: Readers can use a polished, accessible, book-like interface with stable navigation and consistent visual treatment for formal academic content.
@@ -95,7 +101,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Site Foundation and Provenance Contract | 0/TBD | Not started | - |
+| 1. Site Foundation and Provenance Contract | 0/4 | Planned | - |
 | 2. Book Shell and Formal Reading Interface | 0/TBD | Not started | - |
 | 3. Curated Corpus Chapters and Formal Registry | 0/TBD | Not started | - |
 | 4. Local Discovery and Cross-Corpus Exploration | 0/TBD | Not started | - |
