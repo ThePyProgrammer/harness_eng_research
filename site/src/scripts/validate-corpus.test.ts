@@ -7,7 +7,13 @@ function cloneEntries(): CorpusEntry[] {
   return structuredClone(corpusEntries);
 }
 
-describe('validateCorpus negative provenance cases', () => {
+describe('validateCorpus', () => {
+  it('validates the real corpus inventory', () => {
+    const result = validateCorpus();
+
+    expect(result).toEqual({ ok: true, errors: [] });
+  });
+
   it('fails when a required corpus entry is missing', () => {
     const entries = cloneEntries().filter((entry) => entry.id !== 'security');
 
@@ -100,6 +106,41 @@ describe('validateCorpus negative provenance cases', () => {
           entryId: 'security',
           field: 'canonicalTex',
           reason: 'Path cannot contain parent traversal',
+        }),
+      ]),
+    );
+  });
+
+  it('collects all validation errors for invalid fixtures', () => {
+    const entries = cloneEntries().map((entry) => {
+      if (entry.id === 'umbrella') {
+        return { ...entry, canonicalTex: 'science/paper/does-not-exist.tex' };
+      }
+
+      if (entry.id === 'security') {
+        return {
+          ...entry,
+          canonicalTex: 'pillars/security/archive/security_architecture.tex',
+          sourceStatus: 'canonical' as const,
+        };
+      }
+
+      return entry;
+    });
+
+    const result = validateCorpus(entries);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.length).toBeGreaterThanOrEqual(2);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entryId: 'umbrella',
+          reason: 'Required canonical source path does not exist',
+        }),
+        expect.objectContaining({
+          entryId: 'security',
+          reason: 'Archive paths cannot be canonical sources',
         }),
       ]),
     );
