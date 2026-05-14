@@ -1,13 +1,16 @@
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { corpusEntries } from '../data/corpus';
 import { buildCorpusIndex, writeCorpusIndex } from './generate-local-indexes';
 
+const testSiteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
 describe('generate-local-indexes', () => {
   it('writes corpus-index.json under the provided output directory with entryCount 13', () => {
-    mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
-    const outputDir = mkdtempSync(join(process.cwd(), 'dist', 'corpus-index-'));
+    mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
+    const outputDir = mkdtempSync(join(testSiteRoot, 'dist', 'corpus-index-'));
 
     const outputPath = writeCorpusIndex({ outputDir });
     const payload = JSON.parse(readFileSync(outputPath, 'utf-8'));
@@ -26,7 +29,7 @@ describe('generate-local-indexes', () => {
   });
 
   it('accepts normalized absolute output paths inside the site directory', () => {
-    const outputDir = `${process.cwd()}/dist/../dist/normalized-index`;
+    const outputDir = `${testSiteRoot}/dist/../dist/normalized-index`;
 
     const outputPath = writeCorpusIndex({ outputDir });
     const payload = JSON.parse(readFileSync(outputPath, 'utf-8'));
