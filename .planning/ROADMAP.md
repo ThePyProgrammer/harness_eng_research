@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Establish isolated Astro/Starlight site boundary, Bun scripts, static math pipeline, and foundation docs.
 - [x] 01-02-PLAN.md — Define typed corpus schema and explicit umbrella-plus-twelve-pillar inventory.
-- [ ] 01-03-PLAN.md — Implement executable provenance validator and documented failure contract.
+- [x] 01-03-PLAN.md — Implement executable provenance validator and documented failure contract.
 - [ ] 01-04-PLAN.md — Render inventory page and generate local static index artifacts through the one-command build.
 
 ### Phase 2: Book Shell and Formal Reading Interface
