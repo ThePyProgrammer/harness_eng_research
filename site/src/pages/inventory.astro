@@ -1,0 +1,75 @@
+---
+import '../styles/phase-1.css';
+import { corpusEntries } from '../data/corpus';
+import { sourceStatusLabels } from '../data/corpus.schema';
+
+const entryCount = corpusEntries.length;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Corpus Inventory | Harness Architecture Book Wiki</title>
+  </head>
+  <body class="phase-inventory">
+    <main class="phase-inventory__shell" data-pagefind-body>
+      <header class="phase-inventory__header">
+        <p class="phase-inventory__eyebrow">Phase 1 provenance contract</p>
+        <h1>Corpus Inventory</h1>
+        <p class="phase-inventory__summary">
+          13 corpus entries render from the typed inventory: the umbrella framework and all twelve pillar papers.
+          Each entry keeps a source trail to repository-relative canonical artifacts only.
+        </p>
+      </header>
+
+      {entryCount === 0 ? (
+        <section class="phase-inventory__empty" aria-labelledby="empty-heading">
+          <h2 id="empty-heading" class="phase-inventory__title">No corpus entries found</h2>
+          <p>Add the umbrella framework and all twelve pillar entries to the typed inventory before running the static build.</p>
+        </section>
+      ) : (
+        <section class="phase-inventory__grid" aria-label={`${entryCount} corpus entries`}>
+          {corpusEntries.map((entry) => (
+            <article class="phase-inventory__card">
+              <div class="phase-inventory__card-header">
+                <div>
+                  <h2 class="phase-inventory__title">{entry.title}</h2>
+                  <p class="phase-inventory__description">{entry.summary}</p>
+                </div>
+                <span class={`phase-inventory__status phase-inventory__status--${entry.sourceStatus}`}>
+                  {sourceStatusLabels[entry.sourceStatus]}
+                </span>
+              </div>
+
+              <dl class="phase-inventory__metadata">
+                <div class="phase-inventory__meta-row">
+                  <dt class="phase-inventory__meta-label">Kind</dt>
+                  <dd>{entry.kind}</dd>
+                </div>
+                <div class="phase-inventory__meta-row">
+                  <dt class="phase-inventory__meta-label">Slug</dt>
+                  <dd>{entry.slug}</dd>
+                </div>
+                <div class="phase-inventory__meta-row">
+                  <dt class="phase-inventory__meta-label">Canonical .tex</dt>
+                  <dd><code class="phase-inventory__path">{entry.canonicalTex}</code></dd>
+                </div>
+                <div class="phase-inventory__meta-row">
+                  <dt class="phase-inventory__meta-label">PDF</dt>
+                  <dd><code class="phase-inventory__path">{entry.canonicalPdf}</code></dd>
+                </div>
+                {entry.bibliography && (
+                  <div class="phase-inventory__meta-row">
+                    <dt class="phase-inventory__meta-label">Bibliography</dt>
+                    <dd><code class="phase-inventory__path">{entry.bibliography}</code></dd>
+                  </div>
+                )}
+              </dl>
+            </article>
+          ))}
+        </section>
+      )}
+    </main>
+  </body>
+</html>

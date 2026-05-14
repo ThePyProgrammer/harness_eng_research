@@ -22,6 +22,8 @@ Build the static HTML and local index artifacts from the same workspace:
 bun run build
 ```
 
+`bun run build` validates provenance, produces static HTML assets, emits `dist/corpus-index.json`, and builds Pagefind local index files from the generated static site.
+
 Deployment-specific wiring is deferred. This phase proves local static output only: no server runtime, database, CMS, account system, hosted search service, or corpus-mutating build step belongs in the foundation.
 
 ## Corpus boundary
