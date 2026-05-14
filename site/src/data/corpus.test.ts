@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { corpusEntries } from './corpus';
 import {
   corpusEntrySchema,
   expectedCorpusIds,
+  parseCorpusEntries,
   sourceStatusSchema,
 } from './corpus.schema';
 
@@ -46,5 +48,23 @@ describe('corpus schema contract', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('corpus inventory contract', () => {
+  it('parses explicit corpus entries through the schema', () => {
+    expect(parseCorpusEntries(corpusEntries)).toHaveLength(13);
+    expect(corpusEntries).toHaveLength(13);
+  });
+
+  it('contains every expected corpus id exactly once', () => {
+    const ids = corpusEntries.map((entry) => entry.id);
+
+    expect(ids).toEqual([...expectedCorpusIds]);
+    expect(new Set(ids).size).toBe(expectedCorpusIds.length);
+  });
+
+  it('starts every inventory entry as canonical', () => {
+    expect(corpusEntries.every((entry) => entry.sourceStatus === 'canonical')).toBe(true);
   });
 });
