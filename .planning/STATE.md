@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 UI-SPEC approved
-last_updated: "2026-05-14T08:17:27.456Z"
-last_activity: 2026-05-14 -- Phase 01 planning complete
+last_updated: "2026-05-14T08:30:05.709Z"
+last_activity: 2026-05-14 -- Phase 01 execution started
 progress:
   total_phases: 5
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-13)
 
 **Core value:** Researchers can understand, navigate, and cross-reference the corpus's formal pillar definitions, theorems, and derivations without losing the rigor of the canonical papers.
-**Current focus:** Phase 1: Site Foundation and Provenance Contract
+**Current focus:** Phase 01 — site-foundation-and-provenance-contract
 
 ## Current Position
 
-Phase: 1 of 5 (Site Foundation and Provenance Contract)
-Plan: 0 of TBD in current phase
-Status: Ready to execute
-Last activity: 2026-05-14 -- Phase 01 planning complete
+Phase: 01 (site-foundation-and-provenance-contract) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 01
+Last activity: 2026-05-14 -- Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
