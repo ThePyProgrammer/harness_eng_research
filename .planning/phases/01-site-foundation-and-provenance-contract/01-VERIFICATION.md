@@ -1,9 +1,13 @@
 ---
 phase: 01-site-foundation-and-provenance-contract
 verified: 2026-05-14T09:57:41Z
-status: human_needed
-score: 21/21 must-haves verified
+status: passed
+score: 21/21 must-haves verified + 2/2 human checks approved
 overrides_applied: 0
+human_uat:
+  status: passed
+  approved: 2026-05-15T06:29:44Z
+  source: 01-HUMAN-UAT.md
 re_verification:
   previous_status: gaps_found
   previous_score: 20/21
@@ -24,8 +28,9 @@ human_verification:
 
 **Phase Goal:** The project has a separate, reproducible static site foundation that knows the corpus boundaries and rejects untraceable or archive-backed canonical content.
 **Verified:** 2026-05-14T09:57:41Z
-**Status:** human_needed
+**Status:** passed
 **Re-verification:** Yes — after FOUND-06 gap closure
+**Human UAT:** Approved 2026-05-15T06:29:44Z in `01-HUMAN-UAT.md`.
 
 ## MVP Mode Guard
 
@@ -65,7 +70,7 @@ Because the phase goal is not a valid MVP user story, these steps are derived fr
 | 9 | Generated local indexes live under `site/dist` and do not write into `science/` or `pillars/`. | VERIFIED | `generate-local-indexes.ts` resolves output inside site root and rejects paths outside `site/`; build wrote `/home/prannayag/harness_eng/site/dist/corpus-index.json`. |
 | 10 | D-07 Phase 1 UI uses approved early foundation tokens and responsive path wrapping. | VERIFIED | `phase-1.css` defines required colors, spacing, typography, focus outline, `overflow-wrap: anywhere`, and `@media (max-width: 720px)` rules. |
 
-**Score:** 21/21 must-haves verified. Automated gap closure is complete; status is `human_needed` only because human verification items remain.
+**Score:** 21/21 must-haves verified and 2/2 human checks approved. Automated gap closure is complete, and the human verification items are recorded as passed in `01-HUMAN-UAT.md`.
 
 ## Required Artifacts
 
@@ -142,7 +147,7 @@ No orphaned Phase 1 requirements were found: FOUND-01 through FOUND-07 are decla
 |------|------|---------|----------|--------|
 | None | - | - | - | No blocker or warning anti-patterns found in the re-verified gap files. |
 
-## Human Verification Required
+## Human Verification Completed
 
 ### 1. MVP user-story correction
 
@@ -150,7 +155,7 @@ No orphaned Phase 1 requirements were found: FOUND-01 through FOUND-07 are decla
 
 **Expected:** The phase has a canonical user-story goal or the team explicitly accepts standard technical goal-backward verification for this foundation phase.
 
-**Why human:** The roadmap mode and goal format disagree, and the local user-story validator command is unavailable.
+**Result:** PASS — human approval accepts standard technical goal-backward verification for this foundation phase.
 
 ### 2. Visual inventory page review
 
@@ -158,13 +163,13 @@ No orphaned Phase 1 requirements were found: FOUND-01 through FOUND-07 are decla
 
 **Expected:** Inventory rows are readable, status is communicated by text rather than color alone, and long paths wrap without horizontal overflow.
 
-**Why human:** Automated verification confirms CSS and generated HTML exist; actual visual quality still needs browser inspection.
+**Result:** PASS — human approval accepts the built inventory page visual review.
 
 ## Gaps Summary
 
 The previous FOUND-06 gap is closed. The validator now implements the provenance-only archive exception described by the requirement and docs, the focused test suite covers it, and runtime spot-checks confirm the behavior.
 
-Automated tests and build pass. The phase is not marked `passed` only because the verification process requires human follow-up for the MVP-mode goal-format mismatch and browser-level visual review.
+Automated tests and build pass. Human follow-up for the MVP-mode goal-format mismatch and browser-level visual review is complete, so the phase is marked `passed`.
 
 ---
 

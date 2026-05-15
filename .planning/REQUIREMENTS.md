@@ -9,13 +9,13 @@ Requirements for the first release. Each maps to roadmap phases.
 
 ### Foundation and Provenance
 
-- [ ] **FOUND-01**: Site implementation lives under a clear project boundary that does not move or replace canonical `science/` or `pillars/` corpus files
-- [ ] **FOUND-02**: Site build uses a static-site architecture with no server-side database, CMS, accounts, or hosted search dependency
-- [ ] **FOUND-03**: Site has a structured corpus inventory covering the umbrella framework and all twelve pillars
-- [ ] **FOUND-04**: Site content schema requires canonical source metadata for pillar chapters and formal objects
-- [ ] **FOUND-05**: Site validation fails when required canonical source paths are missing
-- [ ] **FOUND-06**: Site validation prevents archive paths from being treated as canonical sources unless explicitly marked as provenance content
-- [ ] **FOUND-07**: Site has a documented build command that produces static HTML assets and local indexes reproducibly
+- [x] **FOUND-01**: Site implementation lives under a clear project boundary that does not move or replace canonical `science/` or `pillars/` corpus files
+- [x] **FOUND-02**: Site build uses a static-site architecture with no server-side database, CMS, accounts, or hosted search dependency
+- [x] **FOUND-03**: Site has a structured corpus inventory covering the umbrella framework and all twelve pillars
+- [x] **FOUND-04**: Site content schema requires canonical source metadata for pillar chapters and formal objects
+- [x] **FOUND-05**: Site validation fails when required canonical source paths are missing
+- [x] **FOUND-06**: Site validation prevents archive paths from being treated as canonical sources unless explicitly marked as provenance content
+- [x] **FOUND-07**: Site has a documented build command that produces static HTML assets and local indexes reproducibly
 
 ### Book Site Experience
 
@@ -104,13 +104,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
-| FOUND-03 | Phase 1 | Pending |
-| FOUND-04 | Phase 1 | Pending |
-| FOUND-05 | Phase 1 | Pending |
-| FOUND-06 | Phase 1 | Pending |
-| FOUND-07 | Phase 1 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
+| FOUND-03 | Phase 1 | Complete |
+| FOUND-04 | Phase 1 | Complete |
+| FOUND-05 | Phase 1 | Complete |
+| FOUND-06 | Phase 1 | Complete |
+| FOUND-07 | Phase 1 | Complete |
 | BOOK-01 | Phase 2 | Pending |
 | BOOK-02 | Phase 2 | Pending |
 | BOOK-03 | Phase 2 | Pending |

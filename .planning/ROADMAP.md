@@ -12,7 +12,7 @@ Build a static, source-grounded academic book/wiki layer over the existing harne
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Site Foundation and Provenance Contract** - Create the isolated static site workspace, corpus inventory, source metadata model, and reproducible validation baseline.
+- [x] **Phase 1: Site Foundation and Provenance Contract** - Create the isolated static site workspace, corpus inventory, source metadata model, and reproducible validation baseline.
 - [ ] **Phase 2: Book Shell and Formal Reading Interface** - Deliver the homepage, book navigation, original visual system, and reusable formal reading components.
 - [ ] **Phase 3: Curated Corpus Chapters and Formal Registry** - Publish the umbrella page, all twelve pillar chapters, glossary/concept index, citations, and formal object registry.
 - [ ] **Phase 4: Local Discovery and Cross-Corpus Exploration** - Add local static search, reading paths, typed related links, and generated graph-style relationship data.
@@ -101,7 +101,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Site Foundation and Provenance Contract | 0/4 | Planned | - |
+| 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 0/TBD | Not started | - |
 | 3. Curated Corpus Chapters and Formal Registry | 0/TBD | Not started | - |
 | 4. Local Discovery and Cross-Corpus Exploration | 0/TBD | Not started | - |
