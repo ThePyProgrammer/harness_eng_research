@@ -26,5 +26,10 @@
     "@types/bun": "^1.3.14",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
+  },
+  "overrides": {
+    "devalue": "^5.8.1",
+    "volar-service-yaml": "0.0.71",
+    "yaml-language-server": "1.23.0"
   }
 }
