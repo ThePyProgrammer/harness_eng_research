@@ -1,0 +1,86 @@
+---
+title: Formal Reading Fixture
+---
+
+import DefinitionBlock from '../../components/formal/DefinitionBlock.astro'
+import TheoremBlock from '../../components/formal/TheoremBlock.astro'
+import DerivationWalkthrough from '../../components/formal/DerivationWalkthrough.astro'
+import CitationRef from '../../components/formal/CitationRef.astro'
+import SourceTrail from '../../components/formal/SourceTrail.astro'
+
+# Formal Reading Fixture
+
+This page is a fixture/source-detail interface proof for Phase 2 formal reading components. It demonstrates reusable treatment for definitions, theorem-like claims, derivation walkthroughs, citations, footnotes, bibliography entries, math, and visible source trails; it is not curated Phase 3 chapter substance.
+
+<DefinitionBlock id="def-harness-architecture-fixture" label="Harness architecture interface boundary" owner="Umbrella framework source detail" sourceHref="/science/paper/science.tex">
+  A harness architecture is the explicit interface layer that coordinates model calls, verification, tool access, memory, human supervision, and policy constraints around an AI coding agent. The definition fixture preserves a stable anchor while pointing back to the canonical umbrella source.
+  <SourceTrail slot="source-trail" owner="Umbrella framework source detail" materialKind="canonical" canonicalTex="science/paper/science.tex" canonicalPdf="science/paper/science.pdf" bibliography="science/paper/science.bib" sourceStatus="canonical" locator="Fixture anchor def-harness-architecture-fixture" note="Canonical example uses the umbrella paper path from corpusEntries." />
+</DefinitionBlock>
+
+<TheoremBlock id="claim-temporal-throughput-fixture" label="Verified-iteration throughput claim" owner="Temporal pillar source detail" sourceHref="/pillars/temporal/paper/temporal_architecture.tex">
+  When verification latency and stale context both rise, the useful throughput of a coding-agent workflow is bounded by verified iterations rather than raw model-call speed. This claim fixture is source-grounded to the temporal pillar and remains visibly labelled as a fixture.
+  <SourceTrail slot="source-trail" owner="Temporal pillar source detail" materialKind="canonical" canonicalTex="pillars/temporal/paper/temporal_architecture.tex" canonicalPdf="pillars/temporal/paper/temporal_architecture.pdf" bibliography="pillars/temporal/paper/temporal_architecture.bib" sourceStatus="canonical" locator="Fixture anchor claim-temporal-throughput-fixture" note="Claim wording is illustrative fixture text, not final Phase 3 chapter curation." />
+</TheoremBlock>
+
+<DerivationWalkthrough id="derivation-vih-fixture" label="Verified iteration rate decomposition" owner="Temporal pillar source detail" sourceHref="/pillars/temporal/paper/temporal_architecture.tex">
+  <div className="formal-derivation__cell formal-derivation__cell--prose">
+    Start with a throughput proxy that divides accepted verification events by elapsed wall-clock time. The fixture alternates explanatory prose with math and code-like cells so future chapter authors have a concrete notebook pattern.
+  </div>
+
+  <div className="formal-derivation__cell formal-derivation__cell--math">
+
+$$
+\operatorname{VIH} = \frac{\sum_{i=1}^{n} \mathbf{1}[\operatorname{verified}(i)]}{T_{wall}/3600}
+$$
+
+  </div>
+
+  <div className="formal-derivation__cell formal-derivation__cell--prose">
+    The next cell deliberately uses a wider aligned equation so responsive behavior is contained inside the formal math cell rather than causing page-level horizontal scrolling.
+  </div>
+
+  <div className="formal-derivation__cell formal-derivation__cell--math formal-math-cell">
+
+$$
+\begin{aligned}
+\operatorname{VIH}_{effective}
+  &= \frac{\sum_{i=1}^{n} \mathbf{1}[\operatorname{verified}(i)] \cdot (1 - \operatorname{staleness}(c_i)) \cdot \operatorname{quality}(i)}{\operatorname{planningLatency} + \operatorname{modelLatency} + \operatorname{verificationLatency} + \operatorname{mergeLatency}} \\
+  &\leq \frac{n}{\operatorname{planningLatency} + \operatorname{modelLatency} + \operatorname{verificationLatency} + \operatorname{mergeLatency}}
+\end{aligned}
+$$
+
+  </div>
+
+  <div className="formal-derivation__cell formal-derivation__cell--code">
+    <pre><code>{`verified_iterations_per_hour = accepted_verifications / (wall_clock_seconds / 3600)
+effective_rate = verified_iterations_per_hour * (1 - context_staleness)`}</code></pre>
+  </div>
+
+  <SourceTrail slot="source-trail" owner="Temporal pillar source detail" materialKind="supporting" canonicalTex="pillars/temporal/paper/temporal_architecture.tex" canonicalPdf="pillars/temporal/paper/temporal_architecture.pdf" bibliography="pillars/temporal/paper/temporal_architecture.bib" sourceStatus="canonical" locator="Notebook derivation fixture" note="Supporting treatment shows how a derivation cell can point back to the canonical paper while remaining fixture-only." />
+</DerivationWalkthrough>
+
+<CitationRef label="A Formal Framework for AI Coding Agent Harness Architecture" citationKey="harness-architecture-framework" sourceHref="/science/paper/science.bib">
+  Bibliography-backed reference for the umbrella framework fixture.
+</CitationRef>
+
+<section className="formal-footnote" aria-labelledby="fixture-footnote-heading">
+  <p className="formal-footnote__label" id="fixture-footnote-heading">Footnote</p>
+  <p>This styled footnote fixture demonstrates dense academic aside treatment without hiding source context or shrinking below the Phase 2 body type scale.</p>
+</section>
+
+<section className="formal-bibliography-entry" aria-labelledby="fixture-bibliography-heading">
+  <p className="formal-bibliography-entry__label" id="fixture-bibliography-heading">Bibliography entry</p>
+  <p><strong>Harness Architecture Framework.</strong> Source-backed bibliography fixture linked to <code>science/paper/science.bib</code> and rendered as readable academic prose.</p>
+</section>
+
+## Material-kind source trail fixtures
+
+The following standalone source trails prove all required material-kind labels are visible by default in formal source trails.
+
+<SourceTrail owner="Umbrella framework source detail" materialKind="canonical" canonicalTex="science/paper/science.tex" canonicalPdf="science/paper/science.pdf" bibliography="science/paper/science.bib" sourceStatus="canonical" note="canonical material-kind fixture." />
+
+<SourceTrail owner="Temporal notes support fixture" materialKind="supporting" canonicalTex="pillars/temporal/paper/temporal_architecture.tex" canonicalPdf="pillars/temporal/paper/temporal_architecture.pdf" bibliography="pillars/temporal/paper/temporal_architecture.bib" sourceStatus="canonical" note="supporting material-kind fixture using temporal canonical paths for traceability." />
+
+<SourceTrail owner="Science synthesis review fixture" materialKind="synthesis/review" canonicalTex="science/paper/science.tex" canonicalPdf="science/paper/science.pdf" bibliography="science/paper/science.bib" sourceStatus="canonical" note="synthesis/review material-kind fixture demonstrating cross-pillar review treatment." />
+
+<SourceTrail owner="Archive provenance fixture" materialKind="archived/provenance" canonicalTex="science/paper/science.tex" canonicalPdf="science/paper/science.pdf" bibliography="science/paper/science.bib" sourceStatus="provenance-only" locator="Provenance interface example" note="archived/provenance treatment is explicitly provenance-only and does not replace canonical source paths." />

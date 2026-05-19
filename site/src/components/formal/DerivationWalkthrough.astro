@@ -1,0 +1,37 @@
+---
+interface Props {
+  id: string;
+  label: string;
+  owner: string;
+  sourceHref: string;
+}
+
+const { id, label, owner, sourceHref } = Astro.props;
+---
+
+<section id={id} class="formal-derivation formal-block" aria-labelledby={`${id}-heading`}>
+  <header class="formal-block__header formal-derivation__header">
+    <div>
+      <p class="formal-block__type">Derivation walkthrough</p>
+      <h2 id={`${id}-heading`} class="formal-block__title">{label}</h2>
+    </div>
+    <a class="formal-block__source-link" href={sourceHref}>Canonical .tex source</a>
+  </header>
+
+  <dl class="formal-block__metadata" aria-label="Derivation walkthrough metadata">
+    <div class="formal-block__meta-row">
+      <dt>Stable ID</dt>
+      <dd><code>{id}</code></dd>
+    </div>
+    <div class="formal-block__meta-row">
+      <dt>Owner</dt>
+      <dd>{owner}</dd>
+    </div>
+  </dl>
+
+  <div class="formal-derivation__notebook" aria-label="Notebook-style derivation cells" data-cell-classes="formal-derivation__cell--prose formal-derivation__cell--math formal-derivation__cell--code">
+    <slot />
+  </div>
+
+  <slot name="source-trail" />
+</section>
