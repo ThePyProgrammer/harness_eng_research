@@ -1,24 +1,58 @@
 ---
+import type { SourceTier } from '../../data/formal-registry.schema';
+
+type TheoremKind = 'definition' | 'assumption' | 'theorem' | 'proposition' | 'lemma' | 'corollary' | 'claim';
+
 interface Props {
   id: string;
   label: string;
   owner: string;
   sourceHref: string;
+  kind: TheoremKind;
+  sourceTier?: SourceTier;
+  relatedConcepts?: string[];
 }
 
-const { id, label, owner, sourceHref } = Astro.props;
+const {
+  id,
+  label,
+  owner,
+  sourceHref,
+  kind,
+  sourceTier = 'canonical',
+  relatedConcepts = [],
+} = Astro.props;
+
+const kindLabels: Record<TheoremKind, string> = {
+  definition: 'Definition',
+  assumption: 'Assumption',
+  theorem: 'Theorem',
+  proposition: 'Proposition',
+  lemma: 'Lemma',
+  corollary: 'Corollary',
+  claim: 'Claim',
+};
+
+const sourceTierLabels: Record<SourceTier, string> = {
+  canonical: 'Canonical',
+  'supporting-research': 'Supporting research',
+  'synthesis-review': 'Synthesis/review',
+  'archived-provenance': 'Archived provenance',
+};
+
+const visibleKind = kindLabels[kind];
 ---
 
-<article id={id} class="formal-block formal-block--claim" aria-labelledby={`${id}-heading`}>
+<article id={id} class={`formal-block formal-block--${kind}`} aria-labelledby={`${id}-heading`}>
   <header class="formal-block__header">
     <div>
-      <p class="formal-block__type">Claim</p>
+      <p class="formal-block__type">{visibleKind}</p>
       <h2 id={`${id}-heading`} class="formal-block__title">{label}</h2>
     </div>
     <a class="formal-block__source-link" href={sourceHref}>Canonical .tex source</a>
   </header>
 
-  <dl class="formal-block__metadata" aria-label="Claim metadata">
+  <dl class="formal-block__metadata" aria-label={`${visibleKind} metadata`}>
     <div class="formal-block__meta-row">
       <dt>Stable ID</dt>
       <dd><code>{id}</code></dd>
@@ -27,6 +61,16 @@ const { id, label, owner, sourceHref } = Astro.props;
       <dt>Owner</dt>
       <dd>{owner}</dd>
     </div>
+    <div class="formal-block__meta-row">
+      <dt>Source tier</dt>
+      <dd><span class={`source-tier source-tier--${sourceTier}`}>{sourceTierLabels[sourceTier]}</span></dd>
+    </div>
+    {relatedConcepts.length > 0 && (
+      <div class="formal-block__meta-row">
+        <dt>Related concepts</dt>
+        <dd>{relatedConcepts.map((concept) => <span>{concept}</span>)}</dd>
+      </div>
+    )}
   </dl>
 
   <div class="formal-block__body">

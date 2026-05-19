@@ -53,7 +53,7 @@ describe('book spine conceptual arc', () => {
 
   it('derives every corpus-backed href from corpus entry slugs', () => {
     const entriesById = new Map(corpusEntries.map((entry) => [entry.id, entry]));
-    const corpusBackedItems = bookSpine.filter((item) => item.id !== 'overview');
+    const corpusBackedItems = bookSpine.filter((item): item is typeof item & { id: Exclude<typeof item.id, 'overview'> } => item.id !== 'overview');
 
     for (const item of corpusBackedItems) {
       const entry = entriesById.get(item.id);

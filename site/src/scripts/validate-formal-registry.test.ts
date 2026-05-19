@@ -36,7 +36,7 @@ describe('validateFormalRegistry', () => {
 
   it('fails invalid owner ids and invalid curation statuses', () => {
     const fixture = cloneFixture();
-    fixture.formalObjects[0] = { ...fixture.formalObjects[0], ownerId: 'not-a-pillar' };
+    fixture.formalObjects[0] = { ...fixture.formalObjects[0], ownerId: 'not-a-pillar' as FormalObject['ownerId'] };
     fixture.chapters[0] = { ...fixture.chapters[0], curationStatus: 'draft' as ChapterRecord['curationStatus'] };
 
     const result = validateFormalRegistry(fixture);

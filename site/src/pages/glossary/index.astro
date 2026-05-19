@@ -1,0 +1,43 @@
+---
+import ConceptCard from '../../components/formal/ConceptCard.astro';
+import { corpusEntries } from '../../data/corpus';
+import { conceptRegistry } from '../../data/concepts';
+import { formalRegistry } from '../../data/formal-registry';
+import '../../styles/atlas.css';
+
+const ownerLookup = Object.fromEntries(corpusEntries.map((item) => [item.id, item]));
+const formalObjectLookup = Object.fromEntries(formalRegistry.map((item) => [item.id, item]));
+const conceptLookup = Object.fromEntries(conceptRegistry.map((item) => [item.id, item]));
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossary | Harness Architecture Book Wiki</title>
+  </head>
+  <body class="atlas-page">
+    <main class="registry-page glossary-page" data-pagefind-body>
+      <header class="registry-page__header">
+        <p class="source-detail__eyebrow">Concept index</p>
+        <h1>Glossary</h1>
+        <p>Concept cards expose canonical terms, alias links, notation, owning pillars, source tier links, related formal objects, and reciprocal related concepts from the typed registry.</p>
+      </header>
+
+      <section class="glossary-page__aliases" aria-labelledby="glossary-alias-heading">
+        <h2 id="glossary-alias-heading">Alias links</h2>
+        <ul>
+          {conceptRegistry.flatMap((concept) => concept.aliases.map((alias) => (
+            <li><a href={`#${concept.id}`}>{alias}</a> points to {concept.term}</li>
+          )))}
+        </ul>
+      </section>
+
+      <section class="concept-card-grid" aria-label="Concept cards">
+        {conceptRegistry.map((concept) => (
+          <ConceptCard concept={concept} ownerLookup={ownerLookup} formalObjectLookup={formalObjectLookup} conceptLookup={conceptLookup} />
+        ))}
+      </section>
+    </main>
+  </body>
+</html>

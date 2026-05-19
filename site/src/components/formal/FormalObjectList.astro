@@ -1,0 +1,89 @@
+---
+import type { FormalObject, OwnerId, SourceTier } from '../../data/formal-registry.schema';
+import type { SourceStatus } from '../../data/corpus.schema';
+
+type OwnerLookup = Partial<Record<OwnerId, { title: string; slug: string; sourceStatus: SourceStatus }>>;
+
+interface Props {
+  objects: FormalObject[];
+  ownerLookup: OwnerLookup;
+  heading?: string;
+}
+
+const { objects, ownerLookup, heading = 'Formal objects' } = Astro.props;
+
+const sourceTierLabels: Record<SourceTier, string> = {
+  canonical: 'Canonical',
+  'supporting-research': 'Supporting research',
+  'synthesis-review': 'Synthesis/review',
+  'archived-provenance': 'Archived provenance',
+};
+
+const kindLabels: Record<FormalObject['kind'], string> = {
+  definition: 'Definition',
+  assumption: 'Assumption',
+  theorem: 'Theorem',
+  proposition: 'Proposition',
+  lemma: 'Lemma',
+  corollary: 'Corollary',
+  equation: 'Equation',
+  derivation: 'Derivation',
+  citation: 'Citation',
+};
+
+function primarySourceTier(object: FormalObject): SourceTier {
+  return object.sourceTrail[0]?.tier ?? 'canonical';
+}
+---
+
+<section class="formal-registry-list" aria-labelledby="formal-registry-list-heading">
+  <header class="formal-registry-list__header">
+    <p class="formal-registry-list__eyebrow">Formal registry</p>
+    <h2 id="formal-registry-list-heading">{heading}</h2>
+  </header>
+
+  {objects.length === 0 ? (
+    <div class="formal-registry-empty" role="status">
+      <h3>No formal objects registered yet</h3>
+      <p>This chapter has a source trail, but its definitions, claims, citations, and concepts have not been curated into the registry yet. Add registry entries before marking the chapter complete.</p>
+    </div>
+  ) : (
+    <ol class="formal-registry-list__items">
+      {objects.map((object) => {
+        const owner = ownerLookup[object.ownerId];
+        const tier = primarySourceTier(object);
+        const href = owner ? `/corpus/${owner.slug}/#${object.id}` : `#${object.id}`;
+
+        return (
+          <li class="formal-registry-row">
+            <a class="formal-registry-row__anchor" href={href}>Anchor link</a>
+            <div class="formal-registry-row__content">
+              <p class="formal-registry-row__kind">{kindLabels[object.kind]}</p>
+              <h3 class="formal-registry-row__title">{object.title}</h3>
+              <dl class="formal-registry-row__metadata">
+                <div>
+                  <dt>Stable ID</dt>
+                  <dd><code>{object.id}</code></dd>
+                </div>
+                <div>
+                  <dt>Owner</dt>
+                  <dd>{owner?.title ?? object.ownerId}</dd>
+                </div>
+                <div>
+                  <dt>Source tier</dt>
+                  <dd><span class={`source-tier source-tier--${tier}`}>{sourceTierLabels[tier]}</span></dd>
+                </div>
+                {owner && (
+                  <div>
+                    <dt>Source status</dt>
+                    <dd><span class={`source-status source-status--${owner.sourceStatus}`}>{owner.sourceStatus}</span></dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  )}
+</section>

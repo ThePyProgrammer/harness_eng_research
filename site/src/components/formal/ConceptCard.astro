@@ -1,0 +1,91 @@
+---
+import type { ConceptRecord, FormalObject, OwnerId, SourceTier } from '../../data/formal-registry.schema';
+
+type OwnerLookup = Partial<Record<OwnerId, { title: string; slug: string }>>;
+type FormalObjectLookup = Partial<Record<string, FormalObject>>;
+type ConceptLookup = Partial<Record<string, ConceptRecord>>;
+
+interface Props {
+  concept: ConceptRecord;
+  ownerLookup: OwnerLookup;
+  formalObjectLookup: FormalObjectLookup;
+  conceptLookup: ConceptLookup;
+}
+
+const { concept, ownerLookup, formalObjectLookup, conceptLookup } = Astro.props;
+
+const sourceTierLabels: Record<SourceTier, string> = {
+  canonical: 'Canonical',
+  'supporting-research': 'Supporting research',
+  'synthesis-review': 'Synthesis/review',
+  'archived-provenance': 'Archived provenance',
+};
+
+const sourceTiers = Array.from(new Set(concept.sourceTrail.map((source) => source.tier)));
+---
+
+<article id={concept.id} class="concept-card" aria-labelledby={`${concept.id}-heading`}>
+  <header class="concept-card__header">
+    <p class="concept-card__eyebrow">Concept</p>
+    <h2 id={`${concept.id}-heading`} class="concept-card__title">{concept.term}</h2>
+  </header>
+
+  <p class="concept-card__definition">{concept.definition}</p>
+
+  <dl class="concept-card__metadata">
+    <div>
+      <dt>Aliases</dt>
+      <dd>
+        {concept.aliases.length > 0 ? concept.aliases.map((alias) => <a href={`#${concept.id}`}>{alias}</a>) : 'None registered'}
+      </dd>
+    </div>
+    <div>
+      <dt>Notation</dt>
+      <dd>{concept.notation.length > 0 ? concept.notation.map((item) => <code>{item}</code>) : 'None registered'}</dd>
+    </div>
+    <div>
+      <dt>Owning pillars</dt>
+      <dd>
+        {concept.ownerIds.map((ownerId) => {
+          const owner = ownerLookup[ownerId];
+          return owner ? <a href={`/corpus/${owner.slug}/`}>{owner.title}</a> : <span>{ownerId}</span>;
+        })}
+      </dd>
+    </div>
+    <div>
+      <dt>Source tiers</dt>
+      <dd>{sourceTiers.map((tier) => <span class={`source-tier source-tier--${tier}`}>{sourceTierLabels[tier]}</span>)}</dd>
+    </div>
+    <div>
+      <dt>Related formal objects</dt>
+      <dd>
+        {concept.formalObjectIds.length > 0
+          ? concept.formalObjectIds.map((objectId) => {
+            const object = formalObjectLookup[objectId];
+            const owner = object ? ownerLookup[object.ownerId] : undefined;
+            return <a href={owner ? `/corpus/${owner.slug}/#${objectId}` : `#${objectId}`}><code>{objectId}</code></a>;
+          })
+          : 'None registered'}
+      </dd>
+    </div>
+    <div>
+      <dt>Related concepts</dt>
+      <dd>
+        {concept.relatedConceptIds.length > 0
+          ? concept.relatedConceptIds.map((conceptId) => {
+            const related = conceptLookup[conceptId];
+            return <a href={`#${conceptId}`}>{related?.term ?? conceptId}</a>;
+          })
+          : 'None registered'}
+      </dd>
+    </div>
+  </dl>
+
+  <div class="concept-card__sources" aria-label={`Source tier links for ${concept.term}`}>
+    {concept.sourceTrail.map((source) => (
+      <a href={`https://github.com/ThePyProgrammer/harness_eng_research/blob/main/${source.path}`}>
+        {sourceTierLabels[source.tier]}: {source.label}
+      </a>
+    ))}
+  </div>
+</article>

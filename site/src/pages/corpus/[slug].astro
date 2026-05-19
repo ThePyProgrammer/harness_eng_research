@@ -1,19 +1,112 @@
 ---
 import BookFooterNav from '../../components/BookFooterNav.astro';
 import SourceLinkPanel from '../../components/SourceLinkPanel.astro';
+import DefinitionBlock from '../../components/formal/DefinitionBlock.astro';
+import TheoremBlock from '../../components/formal/TheoremBlock.astro';
+import DerivationWalkthrough from '../../components/formal/DerivationWalkthrough.astro';
+import CitationRef from '../../components/formal/CitationRef.astro';
+import SourceTrail from '../../components/formal/SourceTrail.astro';
+import FormalObjectList from '../../components/formal/FormalObjectList.astro';
+import ConceptCard from '../../components/formal/ConceptCard.astro';
 import { bookSpine } from '../../data/book-spine';
 import { corpusEntries } from '../../data/corpus';
+import { sourceStatusLabels } from '../../data/corpus.schema';
+import { chapterRegistry } from '../../data/chapters';
+import { conceptRegistry } from '../../data/concepts';
+import { citations, formalRegistry } from '../../data/formal-registry';
+import type { FormalObject, OwnerId, SourceTier } from '../../data/formal-registry.schema';
 import '../../styles/atlas.css';
 
-export function getStaticPaths() {
-  return corpusEntries.map((entry) => ({
-    params: { slug: entry.slug },
-    props: { entry },
-  }));
+export const repositoryBaseUrl = 'https://github.com/ThePyProgrammer/harness_eng_research/blob/main/';
+
+const sectionOrder = [
+  ['problem', 'Problem'],
+  ['coreModel', 'Core model'],
+  ['keyNotation', 'Key notation'],
+  ['definitions', 'Definitions'],
+  ['formalClaims', 'Formal claims'],
+  ['derivationContext', 'Derivation/proof context'],
+  ['interpretation', 'Interpretation'],
+  ['relatedPillars', 'Related pillars'],
+  ['citations', 'Citations'],
+  ['sourceTrail', 'Source trail'],
+] as const;
+
+export const sourceTierLabels: Record<SourceTier, string> = {
+  canonical: 'Canonical',
+  'supporting-research': 'Supporting research',
+  'synthesis-review': 'Synthesis/review',
+  'archived-provenance': 'Archived provenance',
+};
+
+const theoremKinds = new Set<FormalObject['kind']>(['definition', 'assumption', 'theorem', 'proposition', 'lemma', 'corollary']);
+export const ownerLookup = Object.fromEntries(corpusEntries.map((item) => [item.id, item]));
+export const conceptLookup = Object.fromEntries(conceptRegistry.map((item) => [item.id, item]));
+export const formalObjectLookup = Object.fromEntries(formalRegistry.map((item) => [item.id, item]));
+export const citationLookup = Object.fromEntries(citations.map((item) => [item.id, item]));
+
+export function repositoryHref(path: string): string {
+  return new URL(path, repositoryBaseUrl).toString();
 }
 
-const { entry } = Astro.props;
-const pageTitle = `${entry.title} | Harness Architecture Book Wiki`;
+export function getChapterByOwner(ownerId: OwnerId) {
+  const chapter = chapterRegistry.find((item) => item.ownerId === ownerId);
+  if (!chapter) {
+    throw new Error(`Missing chapter registry record for owner: ${ownerId}`);
+  }
+  return chapter;
+}
+
+export function getPrimarySource(object: FormalObject) {
+  return object.sourceTrail[0];
+}
+
+export function getSourceTrailProps(object: FormalObject) {
+  const entry = ownerLookup[object.ownerId];
+  if (!entry) {
+    throw new Error(`Missing owner entry for formal object: ${object.id}`);
+  }
+  const source = getPrimarySource(object);
+
+  return {
+    owner: entry.title,
+    canonicalTex: entry.canonicalTex,
+    canonicalPdf: entry.canonicalPdf,
+    bibliography: entry.bibliography,
+    sourceStatus: entry.sourceStatus,
+    locator: source?.locator,
+    note: source ? `${sourceTierLabels[source.tier]}: ${source.label}` : undefined,
+    materialKind: 'canonical' as const,
+  };
+}
+
+export function getStaticPaths() {
+  return corpusEntries.map((entry) => {
+    const chapter = getChapterByOwner(entry.id);
+    const formalObjects = chapter.formalObjectIds.map((objectId) => {
+      const object = formalObjectLookup[objectId];
+      if (!object) {
+        throw new Error(`Missing formal registry object ${objectId} for ${entry.id}`);
+      }
+      return object;
+    });
+    const concepts = chapter.conceptIds.map((conceptId) => {
+      const concept = conceptLookup[conceptId];
+      if (!concept) {
+        throw new Error(`Missing concept registry object ${conceptId} for ${entry.id}`);
+      }
+      return concept;
+    });
+
+    return {
+      params: { slug: entry.slug },
+      props: { entry, chapter, formalObjects, concepts },
+    };
+  });
+}
+
+const { entry, chapter, formalObjects, concepts } = Astro.props;
+const pageTitle = `${chapter.title} | Harness Architecture Book Wiki`;
 ---
 
 <html lang="en">
@@ -44,18 +137,108 @@ const pageTitle = `${entry.title} | Harness Architecture Book Wiki`;
         </nav>
       </aside>
 
-      <main class="source-detail" data-pagefind-body>
-        <header class="source-detail__header">
-          <p class="source-detail__eyebrow">Source-detail page</p>
-          <h1>{entry.title}</h1>
-          <p class="source-detail__summary">{entry.summary}</p>
+      <main class="source-detail chapter-page" data-pagefind-body>
+        <header class="source-detail__header chapter-page__header">
+          <p class="source-detail__eyebrow">{entry.kind === 'umbrella' ? 'Umbrella formal chapter' : 'Pillar formal chapter'}</p>
+          <h1>{chapter.title}</h1>
+          <p class="source-detail__summary">{chapter.summary}</p>
+          <dl class="chapter-page__metadata">
+            <div>
+              <dt>Owner</dt>
+              <dd>{entry.title}</dd>
+            </div>
+            <div>
+              <dt>Curation status</dt>
+              <dd><span class={`curation-status curation-status--${chapter.curationStatus}`}>{chapter.curationStatus === 'curated' ? 'Curated' : 'Incomplete/minimal curation'}</span></dd>
+            </div>
+            <div>
+              <dt>Source status</dt>
+              <dd><span class={`source-status source-status--${entry.sourceStatus}`}>{sourceStatusLabels[entry.sourceStatus]}</span></dd>
+            </div>
+          </dl>
         </header>
 
-        <section class="source-detail__overview" aria-labelledby="source-detail-overview-heading">
-          <h2 id="source-detail-overview-heading">Phase 2 source detail</h2>
-          <p>
-            This lightweight page preserves source traceability for the canonical corpus entry. Phase 3 can expand it into a curated chapter without changing the shared book spine or provenance links.
-          </p>
+        {chapter.curationStatus === 'minimal' && (
+          <section class="chapter-page__notice" aria-labelledby={`${entry.id}-minimal-status`}>
+            <h2 id={`${entry.id}-minimal-status`}>Incomplete/minimal curation status</h2>
+            <p>This owner has schema-valid chapter sections, formal anchors, and source trails, but the prose is a minimal build-safe seed awaiting later Phase 3 curation.</p>
+          </section>
+        )}
+
+        {sectionOrder.map(([key, label]) => (
+          <section class="chapter-section" aria-labelledby={`${entry.id}-${key}`}>
+            <h2 id={`${entry.id}-${key}`}>{label}</h2>
+            <p>{chapter.sections[key]}</p>
+            <ul class="chapter-section__sources" aria-label={`${label} source trail`}>
+              {chapter.sourceTrail.map((source) => (
+                <li>
+                  <span class={`source-tier source-tier--${source.tier}`}>{sourceTierLabels[source.tier]}</span>
+                  <a href={repositoryHref(source.path)}>{source.label}</a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+
+        <section class="chapter-section" aria-labelledby={`${entry.id}-formal-objects`}>
+          <h2 id={`${entry.id}-formal-objects`}>Formal registry objects</h2>
+          <FormalObjectList objects={formalObjects} ownerLookup={ownerLookup} heading="Chapter formal objects" />
+          {formalObjects.map((object) => {
+            const source = getPrimarySource(object);
+            const sourceHref = repositoryHref(source?.path ?? entry.canonicalTex);
+            const ownerTitle = ownerLookup[object.ownerId]?.title ?? object.ownerId;
+
+            if (object.kind === 'definition') {
+              return (
+                <DefinitionBlock id={object.id} label={object.title} owner={ownerTitle} sourceHref={sourceHref}>
+                  <p>{object.statement}</p>
+                  <SourceTrail slot="source-trail" {...getSourceTrailProps(object)} />
+                </DefinitionBlock>
+              );
+            }
+
+            if (theoremKinds.has(object.kind)) {
+              const theoremKind = object.kind as 'definition' | 'assumption' | 'theorem' | 'proposition' | 'lemma' | 'corollary';
+              return (
+                <TheoremBlock id={object.id} label={object.title} owner={ownerTitle} sourceHref={sourceHref} kind={theoremKind} sourceTier={source?.tier ?? 'canonical'} relatedConcepts={object.conceptIds}>
+                  <p>{object.statement}</p>
+                  <SourceTrail slot="source-trail" {...getSourceTrailProps(object)} />
+                </TheoremBlock>
+              );
+            }
+
+            if (object.kind === 'derivation' || object.kind === 'equation') {
+              return (
+                <DerivationWalkthrough id={object.id} label={object.title} owner={ownerTitle} sourceHref={sourceHref}>
+                  <div class="formal-derivation__cell formal-derivation__cell--prose"><p>{object.statement}</p></div>
+                  <SourceTrail slot="source-trail" {...getSourceTrailProps(object)} />
+                </DerivationWalkthrough>
+              );
+            }
+
+            return (
+              <CitationRef label={object.title} citationKey={object.citationIds[0] ?? object.id} sourceHref={sourceHref}>
+                <p>{object.statement}</p>
+              </CitationRef>
+            );
+          })}
+        </section>
+
+        <section class="chapter-section" aria-labelledby={`${entry.id}-concepts`}>
+          <h2 id={`${entry.id}-concepts`}>Concepts</h2>
+          <div class="concept-card-grid">
+            {concepts.map((concept) => (
+              <ConceptCard concept={concept} ownerLookup={ownerLookup} formalObjectLookup={formalObjectLookup} conceptLookup={conceptLookup} />
+            ))}
+          </div>
+        </section>
+
+        <section class="chapter-section" aria-labelledby={`${entry.id}-citations`}>
+          <h2 id={`${entry.id}-citations`}>Citation records</h2>
+          {chapter.citationIds.map((citationId) => {
+            const citation = citationLookup[citationId];
+            return citation ? <CitationRef label={citation.label} citationKey={citation.id} sourceHref={repositoryHref(citation.sourceTrail[0].path)} /> : null;
+          })}
         </section>
 
         <SourceLinkPanel entry={entry} />
