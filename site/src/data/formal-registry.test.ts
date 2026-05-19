@@ -11,7 +11,7 @@ import {
 } from './formal-registry.schema';
 import { derivationCoverageByOwner, formalRegistry } from './formal-registry';
 
-const d01SectionKeys = [
+export const requiredChapterSections = [
   'problem',
   'coreModel',
   'keyNotation',
@@ -23,6 +23,9 @@ const d01SectionKeys = [
   'citations',
   'sourceTrail',
 ] as const;
+
+const forbiddenCurationMarkers = /\b(minimal|placeholder|incomplete|todo|fixme|coming soon|not available)\b/iu;
+const theoremLikeKinds = ['theorem', 'proposition', 'lemma', 'corollary'] as const;
 
 const firstBatchOwners = [
   'abstraction',
@@ -98,28 +101,40 @@ describe('formal registry data contract', () => {
     );
   });
 
-  it('provides chapter, formal object, citation, source trail, concept, and matrix coverage for every expected owner', () => {
+  it('FORM-01 through FORM-10 and D-05 through D-16: provides all-owner chapter, registry, citation, source, concept, and derivation coverage', () => {
+    expect(expectedCorpusIds).toHaveLength(13);
+    expect(chapterRegistry.filter((entry) => entry.ownerId === 'umbrella')).toHaveLength(1); // FORM-01 / D-02 umbrella chapter.
+    expect(chapterRegistry.filter((entry) => entry.ownerId !== 'umbrella')).toHaveLength(12); // FORM-02 all twelve pillars.
+
     for (const ownerId of expectedCorpusIds) {
       const chapter = chapterRegistry.find((entry) => entry.ownerId === ownerId);
       const objects = ownerObjects(ownerId);
       const ownerConcepts = conceptRegistry.filter((entry) => entry.ownerIds.includes(ownerId));
       const matrixEntries = derivationCoverageByOwner[ownerId];
 
-      expect(chapter, `${ownerId} chapter`).toBeDefined();
-      expect(chapter?.curationStatus, `${ownerId} curation`).toBe('curated');
-      expect(chapter?.sourceTrail.some((source) => source.tier === 'canonical'), `${ownerId} canonical source trail`).toBe(true);
-      expect(chapter?.formalObjectIds.length, `${ownerId} chapter objects`).toBeGreaterThan(0);
-      expect(chapter?.conceptIds.length, `${ownerId} chapter concepts`).toBeGreaterThan(0);
-      expect(chapter?.citationIds.length, `${ownerId} chapter citations`).toBeGreaterThan(0);
+      expect(chapter, `${ownerId} chapter`).toBeDefined(); // FORM-01 / FORM-02
+      expect(chapter?.curationStatus, `${ownerId} curation`).toBe('curated'); // FORM-03 / D-04 final prose gate.
+      expect(chapter?.summary).not.toMatch(forbiddenCurationMarkers);
+      expect(chapter?.sourceTrail.some((source) => source.tier === 'canonical'), `${ownerId} canonical source trail`).toBe(true); // FORM-09 / D-09.
+      expect(chapter?.sourceTrail.every((source) => ['canonical', 'supporting-research', 'synthesis-review', 'archived-provenance'].includes(source.tier)), `${ownerId} labeled tiers`).toBe(true); // D-12.
+      expect(chapter?.sourceTrail.every((source) => /\.(tex|pdf|bib|md)$/u.test(source.path)), `${ownerId} source path type`).toBe(true);
+      expect(chapter?.formalObjectIds.length, `${ownerId} chapter objects`).toBeGreaterThan(0); // FORM-04 / FORM-05.
+      expect(chapter?.conceptIds.length, `${ownerId} chapter concepts`).toBeGreaterThan(0); // FORM-08.
+      expect(chapter?.citationIds.length, `${ownerId} chapter citations`).toBeGreaterThan(0); // FORM-07.
       expect(objects.length, `${ownerId} formal objects`).toBeGreaterThan(0);
-      expect(objects.some((entry) => entry.sourceTrail.length > 0), `${ownerId} object source trail`).toBe(true);
-      expect(objects.some((entry) => entry.citationIds.length > 0), `${ownerId} object citations`).toBe(true);
-      expect(ownerConcepts.length, `${ownerId} concepts`).toBeGreaterThan(0);
-      expect(ownerConcepts.some((entry) => entry.relatedConceptIds.length > 0), `${ownerId} concept relations`).toBe(true);
-      expect(matrixEntries?.length, `${ownerId} derivation matrix`).toBeGreaterThan(0);
+      expect(objects.some((entry) => entry.kind === 'definition'), `${ownerId} definitions`).toBe(true);
+      expect(objects.some((entry) => theoremLikeKinds.includes(entry.kind as (typeof theoremLikeKinds)[number])), `${ownerId} theorem-like anchors`).toBe(ownerId === 'umbrella' ? false : true);
+      expect(objects.every((entry) => entry.sourceTrail.length > 0), `${ownerId} object source trail`).toBe(true); // D-10.
+      expect(objects.every((entry) => entry.sourceTrail.every((source) => source.tier === 'canonical' || source.tier === 'supporting-research' || source.tier === 'synthesis-review' || source.tier === 'archived-provenance')), `${ownerId} object source tiers`).toBe(true); // D-11 / D-12.
+      expect(objects.some((entry) => entry.citationIds.length > 0), `${ownerId} object citations`).toBe(true); // FORM-07.
+      expect(ownerConcepts.length, `${ownerId} concepts`).toBeGreaterThan(0); // FORM-08 / D-13.
+      expect(ownerConcepts.some((entry) => entry.relatedConceptIds.length > 0), `${ownerId} concept relations`).toBe(true); // D-14 / D-15 / D-16.
+      expect(matrixEntries?.length, `${ownerId} derivation matrix`).toBeGreaterThan(0); // FORM-06.
 
-      for (const sectionKey of d01SectionKeys) {
-        expect(chapter?.sections[sectionKey]?.trim(), `${ownerId}.${sectionKey}`).toBeTruthy();
+      for (const sectionKey of requiredChapterSections) {
+        expect(chapter?.sections[sectionKey]?.trim(), `${ownerId}.${sectionKey}`).toBeTruthy(); // FORM-03 section contract.
+        expect(chapter?.sections[sectionKey], `${ownerId}.${sectionKey} no placeholder`).not.toMatch(forbiddenCurationMarkers);
+        expect(chapter?.sourceTrail.length, `${ownerId}.${sectionKey} source trail ids`).toBeGreaterThan(0); // D-10 source trail per major section.
       }
     }
   });
@@ -157,7 +172,7 @@ describe('first-batch pillar chapter coverage', () => {
         ]),
       );
 
-      for (const sectionKey of d01SectionKeys) {
+      for (const sectionKey of requiredChapterSections) {
         expect(chapter?.sections[sectionKey], `${ownerId}.${sectionKey}`).toEqual(expect.any(String));
         expect(chapter?.sections[sectionKey].length, `${ownerId}.${sectionKey}`).toBeGreaterThan(80);
       }
@@ -172,8 +187,6 @@ describe('first-batch pillar chapter coverage', () => {
   });
 
   it('gives every first-batch owner definitions, theorem-like claims, citations, source trails, and concept relations', () => {
-    const theoremLikeKinds = ['theorem', 'proposition', 'lemma', 'corollary'] as const;
-
     for (const ownerId of firstBatchOwners) {
       const objects = ownerObjects(ownerId);
       const chapter = chapterRegistry.find((entry) => entry.ownerId === ownerId);
@@ -251,7 +264,7 @@ describe('complete corpus coverage for remaining pillars', () => {
         ]),
       );
 
-      for (const sectionKey of d01SectionKeys) {
+      for (const sectionKey of requiredChapterSections) {
         expect(chapter?.sections[sectionKey], `${ownerId}.${sectionKey}`).toEqual(expect.any(String));
         expect(chapter?.sections[sectionKey].length, `${ownerId}.${sectionKey}`).toBeGreaterThan(80);
       }
@@ -264,7 +277,7 @@ describe('complete corpus coverage for remaining pillars', () => {
     expect(ids).toEqual(expect.arrayContaining([...remainingStableIds]));
   });
 
-  it('publishes an all-owner derivation coverage matrix without curated-only semantics', () => {
+  it('FORM-06 and D-03: publishes an all-owner derivation coverage matrix keyed to source-supported derivation coverage, not where-curated semantics', () => {
     expect(Object.keys(derivationCoverageByOwner)).toEqual([...expectedCorpusIds]);
 
     for (const ownerId of expectedCorpusIds) {
@@ -294,7 +307,7 @@ describe('complete corpus coverage for remaining pillars', () => {
     }
   });
 
-  it('uses reciprocal static concept links for concepts that reference each other', () => {
+  it('FORM-08 and D-08: uses valid reciprocal static concept links for concepts that reference each other', () => {
     for (const concept of conceptRegistry) {
       for (const relatedId of concept.relatedConceptIds) {
         const related = conceptRegistry.find((entry) => entry.id === relatedId);

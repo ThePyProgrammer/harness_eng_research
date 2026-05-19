@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { chapterRegistry } from '../data/chapters';
 import { conceptRegistry } from '../data/concepts';
 import { expectedCorpusIds } from '../data/corpus.schema';
-import { citations, derivationCoverageByOwner, formalRegistry } from '../data/formal-registry';
+import { citations, derivationCoverageByOwner as defaultDerivationCoverageByOwner, formalRegistry, type DerivationCoverageEntry } from '../data/formal-registry';
 import {
   chapterRecordSchema,
   conceptRecordSchema,
@@ -36,6 +36,7 @@ interface RegistryFixture {
   chapters?: ChapterRecord[];
   concepts?: ConceptRecord[];
   citations?: CitationRecord[];
+  derivationCoverage?: Record<string, DerivationCoverageEntry[]>;
 }
 
 const archivePathPattern = /(^|\/)archive(\/|$)/;
@@ -202,12 +203,13 @@ function validateChapterSections(chapters: ChapterRecord[], errors: FormalRegist
 function validateDerivationCoverage(
   formalObjects: FormalObject[],
   chapters: ChapterRecord[],
+  coverageByOwner: Record<string, DerivationCoverageEntry[]>,
   errors: FormalRegistryValidationError[],
 ): void {
   const formalObjectById = new Map(formalObjects.map((object) => [object.id, object]));
 
   for (const ownerId of expectedCorpusIds) {
-    const entries = derivationCoverageByOwner[ownerId];
+    const entries = coverageByOwner[ownerId];
     const chapter = chapters.find((entry) => entry.ownerId === ownerId);
     if (!entries?.length) {
       addError(errors, ownerId, 'derivationCoverageByOwner', ownerId, 'Missing owner in derivation coverage matrix', 'Add a supported derivation/equation entry or source-grounded not-supported rationale.');
@@ -302,6 +304,7 @@ export function validateFormalRegistry(
   const chapters = fixture.chapters ?? chapterRegistry;
   const concepts = fixture.concepts ?? conceptRegistry;
   const citationInput = fixture.citations ?? citations;
+  const coverageByOwner = fixture.derivationCoverage ?? defaultDerivationCoverageByOwner;
   const repoRoot = options.repoRoot ?? defaultRepoRoot();
 
   validateSchemaShapes(formalObjects, chapters, concepts, errors);
@@ -319,7 +322,7 @@ export function validateFormalRegistry(
     validateSourceTrail(concept.id, concept.ownerIds[0], concept.sourceTrail, repoRoot, errors);
   }
 
-  validateDerivationCoverage(formalObjects, chapters, errors);
+  validateDerivationCoverage(formalObjects, chapters, coverageByOwner, errors);
   validateTargets(formalObjects, chapters, concepts, citationInput, errors);
 
   return { ok: errors.length === 0, errors };
