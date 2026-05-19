@@ -89,7 +89,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-03-PLAN.md — Curate first-batch pillar chapters across the conceptual arc.
+- [x] 03-03-PLAN.md — Curate first-batch pillar chapters across the conceptual arc.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -141,6 +141,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
-| 3. Curated Corpus Chapters and Formal Registry | 2/5 | In Progress|  |
+| 3. Curated Corpus Chapters and Formal Registry | 3/5 | In Progress|  |
 | 4. Local Discovery and Cross-Corpus Exploration | 0/TBD | Not started | - |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
