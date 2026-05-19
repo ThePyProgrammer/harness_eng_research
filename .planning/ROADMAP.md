@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
-| 2. Book Shell and Formal Reading Interface | 0/TBD | Not started | - |
+| 2. Book Shell and Formal Reading Interface | 1/3 | In Progress|  |
 | 3. Curated Corpus Chapters and Formal Registry | 0/TBD | Not started | - |
 | 4. Local Discovery and Cross-Corpus Exploration | 0/TBD | Not started | - |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
