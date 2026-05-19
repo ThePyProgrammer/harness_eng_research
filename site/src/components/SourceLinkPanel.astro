@@ -31,8 +31,10 @@ const materialKinds = [
   },
 ] as const;
 
+const repositoryBaseUrl = 'https://github.com/ThePyProgrammer/harness_eng_research/blob/main/';
+
 function repositoryHref(path: string): string {
-  return `/${path}`;
+  return new URL(path, repositoryBaseUrl).toString();
 }
 ---
 

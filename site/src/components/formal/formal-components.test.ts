@@ -73,4 +73,16 @@ describe('formal reading component contract', () => {
     expect(fixtureSource).toContain('science/paper/science.tex');
     expect(fixtureSource).toContain('pillars/temporal/paper/temporal_architecture.tex');
   });
+
+  it('routes formal provenance links to browsable repository sources', () => {
+    expect(sourceTrailSource).toContain('https://github.com/ThePyProgrammer/harness_eng_research/blob/main/');
+    expect(fixtureSource).toContain('https://github.com/ThePyProgrammer/harness_eng_research/blob/main/science/paper/science.tex');
+    expect(fixtureSource).not.toContain('sourceHref="/science/');
+    expect(fixtureSource).not.toContain('sourceHref="/pillars/');
+  });
+
+  it('keeps the fixture out of public search indexing', () => {
+    expect(fixtureSource).toContain('pagefind: false');
+    expect(fixtureSource).toContain('robots: noindex');
+  });
 });

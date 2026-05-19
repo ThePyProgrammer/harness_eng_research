@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { bookSidebar, bookSpine, getPreviousNext, pillarArc } from './book-spine';
 import { corpusEntries } from './corpus';
+
+const sourceLinkPanelSource = readFileSync(
+  fileURLToPath(new URL('../components/SourceLinkPanel.astro', import.meta.url)),
+  'utf8',
+);
 
 const conceptualArcIds = [
   'overview',
@@ -72,5 +79,15 @@ describe('book spine conceptual arc', () => {
         items: bookSpine.map((item) => ({ label: item.title, link: item.href })),
       },
     ]);
+  });
+
+  it('routes source-detail provenance links to browsable repository sources', () => {
+    expect(sourceLinkPanelSource).toContain('https://github.com/ThePyProgrammer/harness_eng_research/blob/main/');
+  });
+
+  it('does not publish the formal reading fixture as sidebar chapter content', () => {
+    const sidebarLinks = bookSidebar.flatMap((group) => group.items.map((item) => item.link));
+
+    expect(sidebarLinks).not.toContain('/formal-reading-fixture/');
   });
 });

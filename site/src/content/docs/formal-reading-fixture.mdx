@@ -1,5 +1,7 @@
 ---
 title: Formal Reading Fixture
+pagefind: false
+robots: noindex
 ---
 
 import DefinitionBlock from '../../components/formal/DefinitionBlock.astro'
@@ -12,17 +14,17 @@ import SourceTrail from '../../components/formal/SourceTrail.astro'
 
 This page is a fixture/source-detail interface proof for Phase 2 formal reading components. It demonstrates reusable treatment for definitions, theorem-like claims, derivation walkthroughs, citations, footnotes, bibliography entries, math, and visible source trails; it is not curated Phase 3 chapter substance.
 
-<DefinitionBlock id="def-harness-architecture-fixture" label="Harness architecture interface boundary" owner="Umbrella framework source detail" sourceHref="/science/paper/science.tex">
+<DefinitionBlock id="def-harness-architecture-fixture" label="Harness architecture interface boundary" owner="Umbrella framework source detail" sourceHref="https://github.com/ThePyProgrammer/harness_eng_research/blob/main/science/paper/science.tex">
   A harness architecture is the explicit interface layer that coordinates model calls, verification, tool access, memory, human supervision, and policy constraints around an AI coding agent. The definition fixture preserves a stable anchor while pointing back to the canonical umbrella source.
   <SourceTrail slot="source-trail" owner="Umbrella framework source detail" materialKind="canonical" canonicalTex="science/paper/science.tex" canonicalPdf="science/paper/science.pdf" bibliography="science/paper/science.bib" sourceStatus="canonical" locator="Fixture anchor def-harness-architecture-fixture" note="Canonical example uses the umbrella paper path from corpusEntries." />
 </DefinitionBlock>
 
-<TheoremBlock id="claim-temporal-throughput-fixture" label="Verified-iteration throughput claim" owner="Temporal pillar source detail" sourceHref="/pillars/temporal/paper/temporal_architecture.tex">
+<TheoremBlock id="claim-temporal-throughput-fixture" label="Verified-iteration throughput claim" owner="Temporal pillar source detail" sourceHref="https://github.com/ThePyProgrammer/harness_eng_research/blob/main/pillars/temporal/paper/temporal_architecture.tex">
   When verification latency and stale context both rise, the useful throughput of a coding-agent workflow is bounded by verified iterations rather than raw model-call speed. This claim fixture is source-grounded to the temporal pillar and remains visibly labelled as a fixture.
   <SourceTrail slot="source-trail" owner="Temporal pillar source detail" materialKind="canonical" canonicalTex="pillars/temporal/paper/temporal_architecture.tex" canonicalPdf="pillars/temporal/paper/temporal_architecture.pdf" bibliography="pillars/temporal/paper/temporal_architecture.bib" sourceStatus="canonical" locator="Fixture anchor claim-temporal-throughput-fixture" note="Claim wording is illustrative fixture text, not final Phase 3 chapter curation." />
 </TheoremBlock>
 
-<DerivationWalkthrough id="derivation-vih-fixture" label="Verified iteration rate decomposition" owner="Temporal pillar source detail" sourceHref="/pillars/temporal/paper/temporal_architecture.tex">
+<DerivationWalkthrough id="derivation-vih-fixture" label="Verified iteration rate decomposition" owner="Temporal pillar source detail" sourceHref="https://github.com/ThePyProgrammer/harness_eng_research/blob/main/pillars/temporal/paper/temporal_architecture.tex">
   <div className="formal-derivation__cell formal-derivation__cell--prose">
     Start with a throughput proxy that divides accepted verification events by elapsed wall-clock time. The fixture alternates explanatory prose with math and code-like cells so future chapter authors have a concrete notebook pattern.
   </div>
@@ -59,7 +61,7 @@ effective_rate = verified_iterations_per_hour * (1 - context_staleness)`}</code>
   <SourceTrail slot="source-trail" owner="Temporal pillar source detail" materialKind="supporting" canonicalTex="pillars/temporal/paper/temporal_architecture.tex" canonicalPdf="pillars/temporal/paper/temporal_architecture.pdf" bibliography="pillars/temporal/paper/temporal_architecture.bib" sourceStatus="canonical" locator="Notebook derivation fixture" note="Supporting treatment shows how a derivation cell can point back to the canonical paper while remaining fixture-only." />
 </DerivationWalkthrough>
 
-<CitationRef label="A Formal Framework for AI Coding Agent Harness Architecture" citationKey="harness-architecture-framework" sourceHref="/science/paper/science.bib">
+<CitationRef label="A Formal Framework for AI Coding Agent Harness Architecture" citationKey="harness-architecture-framework" sourceHref="https://github.com/ThePyProgrammer/harness_eng_research/blob/main/science/paper/science.bib">
   Bibliography-backed reference for the umbrella framework fixture.
 </CitationRef>
 
