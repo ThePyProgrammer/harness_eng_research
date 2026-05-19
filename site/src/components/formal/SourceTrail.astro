@@ -1,0 +1,90 @@
+---
+import { sourceStatusLabels, type SourceStatus } from '../../data/corpus.schema';
+
+type MaterialKind = 'canonical' | 'supporting' | 'synthesis/review' | 'archived/provenance';
+
+interface Props {
+  owner: string;
+  canonicalTex: string;
+  canonicalPdf: string;
+  bibliography?: string;
+  sourceStatus: SourceStatus;
+  locator?: string;
+  note?: string;
+  materialKind?: MaterialKind;
+}
+
+const {
+  owner,
+  canonicalTex,
+  canonicalPdf,
+  bibliography,
+  sourceStatus,
+  locator,
+  note,
+  materialKind = 'canonical',
+} = Astro.props;
+
+const materialKindClass = materialKind.replace('/', '-');
+
+function repositoryHref(path: string): string {
+  return `/${path}`;
+}
+---
+
+<section class="formal-source-trail" aria-label={`Source trail for ${owner}`}>
+  <div class="formal-source-trail__header">
+    <p class="formal-source-trail__eyebrow">Source trail</p>
+    <h3 class="formal-source-trail__title">Source trail</h3>
+  </div>
+
+  <dl class="formal-source-trail__metadata">
+    <div class="formal-source-trail__row">
+      <dt>Owner</dt>
+      <dd>{owner}</dd>
+    </div>
+    <div class="formal-source-trail__row">
+      <dt>Material kind</dt>
+      <dd><span class={`material-kind material-kind--${materialKindClass}`}>{materialKind}</span></dd>
+    </div>
+    <div class="formal-source-trail__row">
+      <dt>Canonical .tex source</dt>
+      <dd>
+        <a href={repositoryHref(canonicalTex)}>Canonical .tex source</a>
+        <code>{canonicalTex}</code>
+      </dd>
+    </div>
+    <div class="formal-source-trail__row">
+      <dt>Canonical PDF</dt>
+      <dd>
+        <a href={repositoryHref(canonicalPdf)}>Canonical PDF</a>
+        <code>{canonicalPdf}</code>
+      </dd>
+    </div>
+    {bibliography && (
+      <div class="formal-source-trail__row">
+        <dt>Bibliography source</dt>
+        <dd>
+          <a href={repositoryHref(bibliography)}>Bibliography source</a>
+          <code>{bibliography}</code>
+        </dd>
+      </div>
+    )}
+    <div class="formal-source-trail__row">
+      <dt>Source status</dt>
+      <dd><span class={`source-status source-status--${sourceStatus}`}>{sourceStatusLabels[sourceStatus]}</span></dd>
+    </div>
+    {locator && (
+      <div class="formal-source-trail__row">
+        <dt>Locator</dt>
+        <dd>{locator}</dd>
+      </div>
+    )}
+    {note && (
+      <div class="formal-source-trail__row">
+        <dt>Note</dt>
+        <dd>{note}</dd>
+      </div>
+    )}
+  </dl>
+</section>

@@ -1,0 +1,19 @@
+---
+interface Props {
+  label: string;
+  citationKey: string;
+  sourceHref?: string;
+}
+
+const { label, citationKey, sourceHref } = Astro.props;
+---
+
+<aside class="formal-citation" aria-label={`Citation ${citationKey}`}>
+  <p class="formal-citation__label">Citation</p>
+  <p class="formal-citation__body">
+    <span class="formal-citation__title">{label}</span>
+    <code class="formal-citation__key">{citationKey}</code>
+    {sourceHref && <a href={sourceHref}>Bibliography source</a>}
+  </p>
+  <slot />
+</aside>
