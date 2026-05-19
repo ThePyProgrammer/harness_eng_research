@@ -11,6 +11,8 @@ const theoremSource = readFixture('./TheoremBlock.astro');
 const derivationSource = readFixture('./DerivationWalkthrough.astro');
 const citationSource = readFixture('./CitationRef.astro');
 const sourceTrailSource = readFixture('./SourceTrail.astro');
+const formalObjectListSource = readFixture('./FormalObjectList.astro');
+const conceptCardSource = readFixture('./ConceptCard.astro');
 const fixtureSource = readFixture('../../content/docs/formal-reading-fixture.mdx');
 
 describe('formal reading component contract', () => {
@@ -36,9 +38,17 @@ describe('formal reading component contract', () => {
     expect(definitionSource).toContain('<slot name="source-trail"');
 
     expect(theoremSource).toContain('<article id={id}');
+    expect(theoremSource).toContain('kind: TheoremKind');
+    expect(theoremSource).toContain('Definition');
+    expect(theoremSource).toContain('Assumption');
+    expect(theoremSource).toContain('Theorem');
+    expect(theoremSource).toContain('Proposition');
+    expect(theoremSource).toContain('Lemma');
+    expect(theoremSource).toContain('Corollary');
     expect(theoremSource).toContain('Claim');
     expect(theoremSource).toContain('Stable ID');
     expect(theoremSource).toContain('Owner');
+    expect(theoremSource).toContain('Source tier');
     expect(theoremSource).toContain('Canonical .tex source');
     expect(theoremSource).toContain('<slot name="source-trail"');
 
@@ -47,6 +57,27 @@ describe('formal reading component contract', () => {
     expect(derivationSource).toContain('formal-derivation__cell--prose');
     expect(derivationSource).toContain('formal-derivation__cell--math');
     expect(derivationSource).toContain('formal-derivation__cell--code');
+  });
+
+  it('formal registry and concept components expose typed registry metadata', () => {
+    expect(formalObjectListSource).toContain("type FormalObject");
+    expect(formalObjectListSource).toContain('Stable ID');
+    expect(formalObjectListSource).toContain('Source tier');
+    expect(formalObjectListSource).toContain('Source status');
+    expect(formalObjectListSource).toContain('Anchor link');
+    expect(formalObjectListSource).toContain('#${object.id}');
+    expect(formalObjectListSource).toContain('Canonical');
+    expect(formalObjectListSource).toContain('Supporting research');
+    expect(formalObjectListSource).toContain('Synthesis/review');
+    expect(formalObjectListSource).toContain('Archived provenance');
+
+    expect(conceptCardSource).toContain("type ConceptRecord");
+    expect(conceptCardSource).toContain('Aliases');
+    expect(conceptCardSource).toContain('Notation');
+    expect(conceptCardSource).toContain('Owning pillars');
+    expect(conceptCardSource).toContain('Related formal objects');
+    expect(conceptCardSource).toContain('Related concepts');
+    expect(conceptCardSource).toContain('Source tiers');
   });
 
   it('source trail supports exactly the required material-kind labels and visible rows', () => {
