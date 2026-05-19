@@ -44,6 +44,22 @@ const firstBatchStableIds = [
   'model-routing.stage-specific-routing',
 ] as const;
 
+const remainingPillarOwners = [
+  'human-interaction',
+  'quality',
+  'security',
+  'governance',
+  'accretion',
+] as const;
+
+const remainingStableIds = [
+  'human-interaction.attention-allocation',
+  'quality.ai-code-slop',
+  'security.prompt-injection-boundary',
+  'governance.governance-ratchet',
+  'accretion.plausible-local-change',
+] as const;
+
 function ownerObjects(ownerId: string) {
   return formalRegistry.filter((entry) => entry.ownerId === ownerId);
 }
@@ -82,19 +98,25 @@ describe('formal registry data contract', () => {
     );
   });
 
-  it('provides a build-safe minimal chapter, formal object, concept, source trail, and curation status for every owner', () => {
+  it('provides chapter, formal object, citation, source trail, concept, and matrix coverage for every expected owner', () => {
     for (const ownerId of expectedCorpusIds) {
       const chapter = chapterRegistry.find((entry) => entry.ownerId === ownerId);
       const objects = ownerObjects(ownerId);
       const ownerConcepts = conceptRegistry.filter((entry) => entry.ownerIds.includes(ownerId));
+      const matrixEntries = derivationCoverageByOwner[ownerId];
 
       expect(chapter, `${ownerId} chapter`).toBeDefined();
-      expect(chapter?.sourceTrail.some((source) => source.tier === 'canonical')).toBe(true);
-      expect(['minimal', 'curated']).toContain(chapter?.curationStatus);
-      expect(chapter?.formalObjectIds.length).toBeGreaterThan(0);
-      expect(chapter?.conceptIds.length).toBeGreaterThan(0);
+      expect(chapter?.curationStatus, `${ownerId} curation`).toBe('curated');
+      expect(chapter?.sourceTrail.some((source) => source.tier === 'canonical'), `${ownerId} canonical source trail`).toBe(true);
+      expect(chapter?.formalObjectIds.length, `${ownerId} chapter objects`).toBeGreaterThan(0);
+      expect(chapter?.conceptIds.length, `${ownerId} chapter concepts`).toBeGreaterThan(0);
+      expect(chapter?.citationIds.length, `${ownerId} chapter citations`).toBeGreaterThan(0);
       expect(objects.length, `${ownerId} formal objects`).toBeGreaterThan(0);
+      expect(objects.some((entry) => entry.sourceTrail.length > 0), `${ownerId} object source trail`).toBe(true);
+      expect(objects.some((entry) => entry.citationIds.length > 0), `${ownerId} object citations`).toBe(true);
       expect(ownerConcepts.length, `${ownerId} concepts`).toBeGreaterThan(0);
+      expect(ownerConcepts.some((entry) => entry.relatedConceptIds.length > 0), `${ownerId} concept relations`).toBe(true);
+      expect(matrixEntries?.length, `${ownerId} derivation matrix`).toBeGreaterThan(0);
 
       for (const sectionKey of d01SectionKeys) {
         expect(chapter?.sections[sectionKey]?.trim(), `${ownerId}.${sectionKey}`).toBeTruthy();
@@ -166,9 +188,7 @@ describe('first-batch pillar chapter coverage', () => {
     }
   });
 
-  it('publishes a derivation coverage matrix with source-supported notebook-style derivations or source-grounded not-supported rationale', () => {
-    expect(Object.keys(derivationCoverageByOwner)).toEqual([...firstBatchOwners]);
-
+  it('publishes first-batch derivation coverage with source-supported notebook-style derivations or source-grounded not-supported rationale', () => {
     for (const ownerId of firstBatchOwners) {
       const entries = derivationCoverageByOwner[ownerId];
       const chapter = chapterRegistry.find((entry) => entry.ownerId === ownerId);
@@ -214,5 +234,73 @@ describe('first-batch pillar chapter coverage', () => {
         }),
       ]),
     );
+  });
+});
+
+describe('complete corpus coverage for remaining pillars', () => {
+  it('curates all D-01 section keys for the remaining five pillar owners', () => {
+    for (const ownerId of remainingPillarOwners) {
+      const chapter = chapterRegistry.find((entry) => entry.ownerId === ownerId);
+
+      expect(chapter?.curationStatus, `${ownerId} curation`).toBe('curated');
+      expect(chapter?.sourceTrail).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: `${ownerId}-tex`, tier: 'canonical' }),
+          expect.objectContaining({ id: `${ownerId}-pdf`, tier: 'canonical' }),
+          expect.objectContaining({ id: `${ownerId}-bib`, tier: 'canonical' }),
+        ]),
+      );
+
+      for (const sectionKey of d01SectionKeys) {
+        expect(chapter?.sections[sectionKey], `${ownerId}.${sectionKey}`).toEqual(expect.any(String));
+        expect(chapter?.sections[sectionKey].length, `${ownerId}.${sectionKey}`).toBeGreaterThan(80);
+      }
+    }
+  });
+
+  it('contains exact stable formal-object IDs for the remaining five pillar anchors', () => {
+    const ids = formalRegistry.map((entry) => entry.id);
+
+    expect(ids).toEqual(expect.arrayContaining([...remainingStableIds]));
+  });
+
+  it('publishes an all-owner derivation coverage matrix without curated-only semantics', () => {
+    expect(Object.keys(derivationCoverageByOwner)).toEqual([...expectedCorpusIds]);
+
+    for (const ownerId of expectedCorpusIds) {
+      const entries = derivationCoverageByOwner[ownerId];
+      const chapter = chapterRegistry.find((entry) => entry.ownerId === ownerId);
+
+      expect(entries.length, `${ownerId} matrix entries`).toBeGreaterThan(0);
+
+      for (const entry of entries) {
+        expect(entry.sourcePath, `${ownerId} sourcePath`).toMatch(/^(science|pillars)\//u);
+        if (entry.status === 'supported') {
+          expect(entry.formalObjectIds.length, `${ownerId} supported ids`).toBeGreaterThan(0);
+          for (const objectId of entry.formalObjectIds) {
+            const object = formalRegistry.find((item) => item.id === objectId);
+            expect(object, `${ownerId}.${objectId}`).toBeDefined();
+            expect(['derivation', 'equation']).toContain(object?.kind);
+            expect(chapter?.sections.derivationContext).toContain(objectId);
+          }
+          expect(entry.rationale).toBeUndefined();
+        } else {
+          expect(entry.formalObjectIds).toEqual([]);
+          expect(entry.rationale?.length, `${ownerId} not-supported rationale`).toBeGreaterThan(40);
+          expect(entry.rationale).toContain(entry.sourcePath);
+          expect(chapter?.sections.derivationContext).toContain(entry.rationale as string);
+        }
+      }
+    }
+  });
+
+  it('uses reciprocal static concept links for concepts that reference each other', () => {
+    for (const concept of conceptRegistry) {
+      for (const relatedId of concept.relatedConceptIds) {
+        const related = conceptRegistry.find((entry) => entry.id === relatedId);
+        expect(related, `${concept.id} -> ${relatedId}`).toBeDefined();
+        expect(related?.relatedConceptIds, `${relatedId} reciprocal link to ${concept.id}`).toContain(concept.id);
+      }
+    }
   });
 });
