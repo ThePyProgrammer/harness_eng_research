@@ -1,0 +1,46 @@
+---
+import { bookSpine } from '../data/book-spine';
+
+const umbrella = bookSpine.find((item) => item.id === 'umbrella');
+const pillars = bookSpine.filter((item) => item.id !== 'overview' && item.id !== 'umbrella');
+
+if (!umbrella) {
+  throw new Error('Atlas constellation requires an umbrella spine item.');
+}
+---
+
+<section class="atlas-constellation" aria-labelledby="atlas-map-heading">
+  <div class="atlas-constellation__header">
+    <p class="atlas-constellation__eyebrow">Scholarly atlas of harness architecture</p>
+    <h2 id="atlas-map-heading">Harness Architecture Corpus Map</h2>
+    <p>
+      The umbrella framework anchors twelve source-backed research pillars. Follow the map in book-spine order to inspect
+      Phase 2 source-detail pages before the full curated chapters arrive.
+    </p>
+  </div>
+
+  <nav class="atlas-constellation__map" aria-label="Harness Architecture Corpus Map links">
+    <svg class="atlas-constellation__lines" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <circle cx="50" cy="50" r="31" pathLength="1" />
+      <path d="M50 50 L50 14 M50 50 L68 18 M50 50 L84 34 M50 50 L86 58 M50 50 L72 80 M50 50 L54 88 M50 50 L32 82 M50 50 L16 66 M50 50 L14 42 M50 50 L28 20 M50 50 L46 12 M50 50 L84 74" />
+    </svg>
+
+    <a class="atlas-constellation__node atlas-constellation__node--umbrella" href={umbrella.href}>
+      <span class="atlas-constellation__node-kicker">Umbrella framework</span>
+      <span class="atlas-constellation__node-title">{umbrella.title}</span>
+      <span class="atlas-constellation__node-action">Open umbrella framework</span>
+    </a>
+
+    <ol class="atlas-constellation__pillar-list" aria-label="Pillars in book spine order">
+      {pillars.map((pillar, index) => (
+        <li class={`atlas-constellation__pillar atlas-constellation__pillar--${index + 1}`}>
+          <a class="atlas-constellation__node atlas-constellation__node--pillar" href={pillar.href} aria-label={`Open ${pillar.title} source detail`}>
+            <span class="atlas-constellation__node-kicker">Pillar {String(index + 1).padStart(2, '0')}</span>
+            <span class="atlas-constellation__node-title">{pillar.title}</span>
+            <span class="atlas-constellation__node-action">Open {pillar.title} source detail</span>
+          </a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+</section>

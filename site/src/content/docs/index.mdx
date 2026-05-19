@@ -1,33 +1,29 @@
 ---
-title: Site Foundation
+title: Harness Architecture Book Wiki
 ---
 
-# Site Foundation
+import AtlasConstellation from '../../components/AtlasConstellation.astro';
 
-This foundation establishes the static site boundary for the Harness Architecture Book Wiki. The implementation lives under `site/`, while the canonical research corpus remains a read-only input owned by the repository’s existing paper structure.
+# Harness Architecture Book Wiki
 
-The site may link to and validate canonical corpus inputs, but builds must not move, replace, or take ownership of files in `science/paper/` or `pillars/*/paper/`. Archive material remains provenance material unless an explicit future page discusses it as provenance.
+<p class="atlas-home__eyebrow">Scholarly atlas of harness architecture</p>
 
-## Build contract
+<p class="atlas-home__lede">
+  A static book/wiki for the AI coding agent harness architecture corpus: an atlas-led path through the umbrella framework and all twelve pillars, with source trails back to the canonical papers.
+</p>
 
-Run validation before trusting a generated site:
+<p>
+  <a class="atlas-home__cta" href="#atlas-map-heading" aria-label="Explore the corpus map: Harness Architecture Corpus Map">Explore the corpus map</a>
+</p>
 
-```bash
-bun run validate
-```
+<AtlasConstellation />
 
-Build the static HTML and local index artifacts from the same workspace:
+## A book/wiki for source-grounded harness research
 
-```bash
-bun run build
-```
+The Harness Architecture Book Wiki is a reading interface for the corpus, not a replacement for it. Canonical content comes from `science/paper/` and `pillars/*/paper/`; the website explains, cross-links, and routes readers back to those source files instead of becoming an untraceable fork.
 
-`bun run build` validates provenance, produces static HTML assets, emits `dist/corpus-index.json`, and builds Pagefind local index files from the generated static site.
+The homepage begins as a map because researchers need both a linear book spine and an associative overview. Start at the umbrella framework to see the shared formal architecture, then follow the twelve pillar source-detail pages in conceptual-arc order: abstraction, information, reliability, coordination, temporal dynamics, economics, model routing, human interaction, quality, security, governance, and accretion.
 
-Deployment-specific wiring is deferred. This phase proves local static output only: no server runtime, database, CMS, account system, hosted search service, or corpus-mutating build step belongs in the foundation.
+Phase 2 pages are deliberately source-detail pages. They expose summaries, canonical `.tex` sources, PDFs, bibliographies, provenance status, and previous/next navigation so later curated chapters can expand the math without losing the trail back to the executable research corpus.
 
-## Corpus boundary
-
-The umbrella framework source starts at `science/paper/`. Pillar chapters start at `pillars/*/paper/`. Later inventory and provenance pages must trace each reader-facing page back to those canonical paths instead of becoming untraceable forks.
-
-[Inspect Corpus Inventory](/inventory/)
+[Open umbrella framework](/corpus/umbrella/)

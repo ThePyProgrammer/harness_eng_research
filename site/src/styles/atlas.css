@@ -33,6 +33,171 @@ body {
   margin: 0;
 }
 
+.atlas-home__eyebrow,
+.atlas-home__cta,
+.atlas-constellation__eyebrow,
+.atlas-constellation__node-kicker,
+.atlas-constellation__node-action {
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.atlas-home__eyebrow,
+.atlas-constellation__eyebrow {
+  color: var(--atlas-color-accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.atlas-home__lede,
+.atlas-constellation p,
+.atlas-constellation__node-title {
+  font-size: var(--atlas-font-size-body);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.atlas-home__cta {
+  align-items: center;
+  background: var(--atlas-color-accent);
+  border: 1px solid var(--atlas-color-accent);
+  border-radius: 999px;
+  color: var(--atlas-color-dominant);
+  display: inline-flex;
+  min-height: 44px;
+  padding: var(--atlas-space-sm) var(--atlas-space-lg);
+  text-decoration: none;
+}
+
+.atlas-constellation {
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--atlas-color-accent), transparent 88%), transparent 34%),
+    linear-gradient(color-mix(in srgb, var(--atlas-color-accent), transparent 92%) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--atlas-color-accent), transparent 94%) 1px, transparent 1px),
+    color-mix(in srgb, var(--atlas-color-secondary), white 7%);
+  background-size: auto, 28px 28px, 28px 28px, auto;
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 64%);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--atlas-color-accent), transparent 88%);
+  display: grid;
+  gap: var(--atlas-space-xl);
+  margin: var(--atlas-space-2xl) 0;
+  overflow: hidden;
+  padding: var(--atlas-space-xl);
+  position: relative;
+}
+
+.atlas-constellation__header {
+  display: grid;
+  gap: var(--atlas-space-sm);
+  max-width: 720px;
+}
+
+.atlas-constellation__header h2 {
+  font-size: var(--atlas-font-size-display);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.atlas-constellation__header p,
+.atlas-constellation__eyebrow {
+  margin: 0;
+}
+
+.atlas-constellation__map {
+  display: grid;
+  min-height: 620px;
+  place-items: center;
+  position: relative;
+}
+
+.atlas-constellation__lines {
+  color: color-mix(in srgb, var(--atlas-color-accent), transparent 42%);
+  height: min(520px, 70vw);
+  inset: 50% auto auto 50%;
+  max-height: 520px;
+  max-width: 520px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: min(520px, 70vw);
+  z-index: 0;
+}
+
+.atlas-constellation__lines circle,
+.atlas-constellation__lines path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.atlas-constellation__node {
+  align-items: start;
+  background: color-mix(in srgb, var(--atlas-color-dominant), white 12%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 48%);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--atlas-color-accent), transparent 90%);
+  color: var(--atlas-color-text);
+  display: grid;
+  gap: var(--atlas-space-xs);
+  min-height: 44px;
+  padding: var(--atlas-space-md);
+  text-decoration: none;
+}
+
+.atlas-constellation__node:hover,
+.atlas-constellation__node:focus-visible {
+  border-color: var(--atlas-color-accent);
+}
+
+.atlas-constellation__node--umbrella {
+  background: color-mix(in srgb, var(--atlas-color-accent), var(--atlas-color-dominant) 82%);
+  border-color: var(--atlas-color-accent);
+  max-width: 360px;
+  padding: var(--atlas-space-lg);
+  position: relative;
+  z-index: 2;
+}
+
+.atlas-constellation__node-kicker,
+.atlas-constellation__node-action {
+  color: var(--atlas-color-accent);
+}
+
+.atlas-constellation__node-title {
+  color: var(--atlas-color-text);
+}
+
+.atlas-constellation__pillar-list {
+  inset: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.atlas-constellation__pillar {
+  position: absolute;
+  width: min(220px, 28vw);
+}
+
+.atlas-constellation__pillar--1 { left: 39%; top: 0; }
+.atlas-constellation__pillar--2 { right: 15%; top: 6%; }
+.atlas-constellation__pillar--3 { right: 0; top: 24%; }
+.atlas-constellation__pillar--4 { right: 2%; top: 48%; }
+.atlas-constellation__pillar--5 { right: 13%; bottom: 7%; }
+.atlas-constellation__pillar--6 { left: 45%; bottom: 0; }
+.atlas-constellation__pillar--7 { left: 20%; bottom: 6%; }
+.atlas-constellation__pillar--8 { left: 0; bottom: 23%; }
+.atlas-constellation__pillar--9 { left: 0; top: 29%; }
+.atlas-constellation__pillar--10 { left: 13%; top: 7%; }
+.atlas-constellation__pillar--11 { left: 35%; top: 7%; }
+.atlas-constellation__pillar--12 { right: 0; bottom: 3%; }
+
 :where(a, button, [tabindex]):focus-visible {
   outline: 2px solid var(--atlas-color-accent);
   outline-offset: 2px;
@@ -299,6 +464,37 @@ body {
 }
 
 @media (max-width: 720px) {
+  .atlas-constellation {
+    margin: var(--atlas-space-xl) 0;
+    padding: var(--atlas-space-lg);
+  }
+
+  .atlas-constellation__map {
+    display: grid;
+    gap: var(--atlas-space-lg);
+    min-height: 0;
+    place-items: stretch;
+  }
+
+  .atlas-constellation__lines {
+    display: none;
+  }
+
+  .atlas-constellation__node--umbrella {
+    max-width: none;
+  }
+
+  .atlas-constellation__pillar-list {
+    display: grid;
+    gap: var(--atlas-space-md);
+    position: static;
+  }
+
+  .atlas-constellation__pillar {
+    position: static;
+    width: auto;
+  }
+
   .source-detail-shell {
     grid-template-columns: 1fr;
     padding: var(--atlas-space-xl) var(--atlas-space-md);
