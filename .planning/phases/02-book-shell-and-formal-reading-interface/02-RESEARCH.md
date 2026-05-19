@@ -454,20 +454,19 @@ import TheoremBlock from '../components/formal/TheoremBlock.astro'
 
 ## Open Questions
 
-1. **What exact conceptual-arc order should the planner lock?**
-   - What we know: D-06 requires conceptual-arc order, not inventory or alphabetical order. [VERIFIED: /home/prannayag/harness_eng/.planning/phases/02-book-shell-and-formal-reading-interface/02-CONTEXT.md]
-   - What's unclear: The discussion did not specify the exact twelve-pillar order. [VERIFIED: /home/prannayag/harness_eng/.planning/phases/02-book-shell-and-formal-reading-interface/02-CONTEXT.md]
-   - Recommendation: Use the proposed arc in Pattern 1 unless the planner documents a better conceptual sequence before implementation. [ASSUMED]
+All Phase 2 research questions are resolved for planning. The resolved decisions below are binding for the existing PLAN.md files unless a later user decision supersedes them.
 
-2. **Should source-detail pages be Starlight docs pages or plain Astro pages?**
-   - What we know: Existing site uses both Starlight MDX docs and a standalone Astro inventory page. [VERIFIED: /home/prannayag/harness_eng/site/src/content/docs/index.mdx] [VERIFIED: /home/prannayag/harness_eng/site/src/pages/inventory.astro]
-   - What's unclear: Starlight’s default previous/next behavior may be less directly controllable for generated pages than a custom footer component. [ASSUMED]
-   - Recommendation: Use Astro pages for generated source-detail routes plus Starlight sidebar links, because Phase 2 requires custom source panels and footer previous/next from shared spine data. [ASSUMED]
+1. **RESOLVED — Exact conceptual-arc order.**
+   - Resolution: Use this order everywhere the Phase 2 book spine, homepage constellation, source-detail page navigation, and footer previous/next links need corpus order: Overview, Umbrella framework, Abstraction, Information, Reliability, Coordination, Temporal, Economics, Model Routing, Human Interaction, Quality, Security, Governance, Accretion.
+   - Rationale: This matches the UI design contract and follows a foundations-to-operations conceptual arc while honoring D-05 and D-06.
 
-3. **How far should visual polish go in MVP mode?**
-   - What we know: D-10 asks for rich atlas identity with distinctive cartographic/constellation treatment, but D-12 makes readability non-negotiable. [VERIFIED: /home/prannayag/harness_eng/.planning/phases/02-book-shell-and-formal-reading-interface/02-CONTEXT.md]
-   - What's unclear: The exact illustration density and animation level are not specified. [VERIFIED: /home/prannayag/harness_eng/.planning/phases/02-book-shell-and-formal-reading-interface/02-CONTEXT.md]
-   - Recommendation: Prefer static SVG/CSS constellation and cartographic framing; avoid animation unless it is nonessential, keyboard-neutral, and `prefers-reduced-motion` safe. [ASSUMED]
+2. **RESOLVED — Source-detail page shell choice.**
+   - Resolution: Use Astro-generated `/corpus/[slug]/` pages from `corpusEntries`, but render the shared `bookSpine` navigation directly on those pages so the stable `Book spine` and current-page state are present even though the route is not a hand-authored Starlight docs page.
+   - Rationale: Dynamic Astro pages keep canonical source metadata single-sourced and satisfy D-07, while the explicit shared spine sidebar closes the chrome gap that plain Astro pages would otherwise create.
+
+3. **RESOLVED — MVP polish scope.**
+   - Resolution: Implement rich static scholarly-atlas polish with CSS/static SVG/HTML constellation, cartographic framing, source cards, and formal-reading surfaces; avoid animation unless nonessential and disabled under `prefers-reduced-motion: reduce`.
+   - Rationale: This satisfies D-09 and D-10 without violating D-12 readability, keyboard focus, contrast, math legibility, source-trail clarity, or narrow-screen reflow.
 
 ## Environment Availability
 
