@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { chapterRegistry } from '../data/chapters';
 import { conceptRegistry } from '../data/concepts';
 import { expectedCorpusIds } from '../data/corpus.schema';
-import { citations, formalRegistry } from '../data/formal-registry';
+import { citations, derivationCoverageByOwner, formalRegistry } from '../data/formal-registry';
 import {
   chapterRecordSchema,
   conceptRecordSchema,
@@ -199,6 +199,44 @@ function validateChapterSections(chapters: ChapterRecord[], errors: FormalRegist
   }
 }
 
+function validateDerivationCoverage(
+  formalObjects: FormalObject[],
+  chapters: ChapterRecord[],
+  errors: FormalRegistryValidationError[],
+): void {
+  const formalObjectById = new Map(formalObjects.map((object) => [object.id, object]));
+
+  for (const ownerId of expectedCorpusIds) {
+    const entries = derivationCoverageByOwner[ownerId];
+    const chapter = chapters.find((entry) => entry.ownerId === ownerId);
+    if (!entries?.length) {
+      addError(errors, ownerId, 'derivationCoverageByOwner', ownerId, 'Missing owner in derivation coverage matrix', 'Add a supported derivation/equation entry or source-grounded not-supported rationale.');
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.status === 'supported') {
+        if (entry.formalObjectIds.length === 0) {
+          addError(errors, ownerId, 'derivationCoverageByOwner.formalObjectIds', entry.sourcePath, 'Supported derivation has no formal object IDs', 'Link supported sources to derivation or equation objects.');
+        }
+        for (const objectId of entry.formalObjectIds) {
+          const object = formalObjectById.get(objectId);
+          if (!object || !['derivation', 'equation'].includes(object.kind)) {
+            addError(errors, ownerId, 'derivationCoverageByOwner.formalObjectIds', objectId, 'Supported derivation target must be a derivation or equation object', 'Create a notebook-style derivation/equation formal object for the source-supported entry.');
+          }
+          if (!chapter?.sections.derivationContext.includes(objectId)) {
+            addError(errors, ownerId, 'sections.derivationContext', objectId, 'Derivation context does not mention supported formal object', 'Reference the derivation or equation ID in the chapter derivation context.');
+          }
+        }
+      } else {
+        if (entry.formalObjectIds.length > 0 || !entry.rationale?.includes(entry.sourcePath) || entry.rationale.length <= 40) {
+          addError(errors, ownerId, 'derivationCoverageByOwner.rationale', entry.sourcePath, 'Unsupported derivation lacks source-grounded rationale', 'Provide a source-path-specific rationale and no formal object IDs.');
+        }
+      }
+    }
+  }
+}
+
 function validateTargets(
   formalObjects: FormalObject[],
   chapters: ChapterRecord[],
@@ -281,6 +319,7 @@ export function validateFormalRegistry(
     validateSourceTrail(concept.id, concept.ownerIds[0], concept.sourceTrail, repoRoot, errors);
   }
 
+  validateDerivationCoverage(formalObjects, chapters, errors);
   validateTargets(formalObjects, chapters, concepts, citationInput, errors);
 
   return { ok: errors.length === 0, errors };
