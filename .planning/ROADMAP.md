@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Site Foundation and Provenance Contract** - Create the isolated static site workspace, corpus inventory, source metadata model, and reproducible validation baseline.
 - [x] **Phase 2: Book Shell and Formal Reading Interface** - Deliver the homepage, book navigation, original visual system, and reusable formal reading components. (completed 2026-05-19)
-- [ ] **Phase 3: Curated Corpus Chapters and Formal Registry** - Publish the umbrella page, all twelve pillar chapters, glossary/concept index, citations, and formal object registry.
+- [x] **Phase 3: Curated Corpus Chapters and Formal Registry** - Publish the umbrella page, all twelve pillar chapters, glossary/concept index, citations, and formal object registry. (completed 2026-05-19)
 - [ ] **Phase 4: Local Discovery and Cross-Corpus Exploration** - Add local static search, reading paths, typed related links, and generated graph-style relationship data.
 - [ ] **Phase 5: Release Quality and Static Publication Readiness** - Harden validation, accessibility, math rendering, print styling, and clean-checkout static build output.
 
@@ -97,7 +97,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 03-05-PLAN.md — Harden Phase 3 requirement, rendering, and scope-boundary regression gates.
+- [x] 03-05-PLAN.md — Harden Phase 3 requirement, rendering, and scope-boundary regression gates.
 
 ### Phase 4: Local Discovery and Cross-Corpus Exploration
 
@@ -141,6 +141,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
-| 3. Curated Corpus Chapters and Formal Registry | 4/5 | In Progress|  |
+| 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
 | 4. Local Discovery and Cross-Corpus Exploration | 0/TBD | Not started | - |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
