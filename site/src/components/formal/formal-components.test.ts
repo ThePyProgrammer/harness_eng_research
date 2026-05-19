@@ -60,7 +60,7 @@ describe('formal reading component contract', () => {
   });
 
   it('formal registry and concept components expose typed registry metadata', () => {
-    expect(formalObjectListSource).toContain("type FormalObject");
+    expect(formalObjectListSource).toContain("import type { FormalObject");
     expect(formalObjectListSource).toContain('Stable ID');
     expect(formalObjectListSource).toContain('Source tier');
     expect(formalObjectListSource).toContain('Source status');
@@ -71,7 +71,7 @@ describe('formal reading component contract', () => {
     expect(formalObjectListSource).toContain('Synthesis/review');
     expect(formalObjectListSource).toContain('Archived provenance');
 
-    expect(conceptCardSource).toContain("type ConceptRecord");
+    expect(conceptCardSource).toContain("import type { ConceptRecord");
     expect(conceptCardSource).toContain('Aliases');
     expect(conceptCardSource).toContain('Notation');
     expect(conceptCardSource).toContain('Owning pillars');
