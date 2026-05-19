@@ -463,6 +463,194 @@ body {
   text-align: right;
 }
 
+.formal-block,
+.formal-citation,
+.formal-footnote,
+.formal-bibliography-entry,
+.formal-source-trail {
+  background: color-mix(in srgb, var(--atlas-color-secondary), white 8%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 68%);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--atlas-color-accent), transparent 90%);
+  color: var(--atlas-color-text);
+  display: grid;
+  font-family: var(--atlas-font-family-sans);
+  font-size: var(--atlas-font-size-body);
+  font-weight: 400;
+  gap: var(--atlas-space-md);
+  line-height: 1.5;
+  margin: var(--atlas-space-xl) 0;
+  padding: var(--atlas-space-lg);
+}
+
+.formal-block {
+  border-left: 4px solid var(--atlas-color-accent);
+}
+
+.formal-block__header,
+.formal-derivation__header,
+.formal-source-trail__header {
+  align-items: start;
+  display: flex;
+  gap: var(--atlas-space-md);
+  justify-content: space-between;
+}
+
+.formal-block__type,
+.formal-source-trail__eyebrow,
+.formal-citation__label,
+.formal-footnote__label,
+.formal-bibliography-entry__label,
+.formal-block__metadata dt,
+.formal-source-trail__row dt {
+  color: var(--atlas-color-accent);
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.formal-block__type,
+.formal-source-trail__eyebrow,
+.formal-citation__label,
+.formal-footnote__label,
+.formal-bibliography-entry__label {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.formal-block__title,
+.formal-source-trail__title {
+  font-size: var(--atlas-font-size-heading);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.formal-block__source-link,
+.formal-citation a,
+.formal-source-trail a {
+  align-items: center;
+  color: var(--atlas-color-accent);
+  display: inline-flex;
+  min-height: 44px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.formal-block__metadata,
+.formal-source-trail__metadata {
+  display: grid;
+  gap: var(--atlas-space-sm);
+  margin: 0;
+}
+
+.formal-block__meta-row,
+.formal-source-trail__row {
+  align-items: baseline;
+  display: grid;
+  gap: var(--atlas-space-md);
+  grid-template-columns: 168px minmax(0, 1fr);
+}
+
+.formal-block__meta-row dd,
+.formal-source-trail__row dd {
+  display: grid;
+  gap: var(--atlas-space-xs);
+  margin: 0;
+  min-width: 0;
+}
+
+.formal-block code,
+.formal-source-trail code,
+.formal-citation__key,
+.formal-bibliography-entry code {
+  font-family: var(--atlas-font-family-mono);
+  overflow-wrap: anywhere;
+}
+
+.formal-block__body p,
+.formal-citation__body,
+.formal-footnote p,
+.formal-bibliography-entry p {
+  margin: 0;
+}
+
+.formal-derivation__notebook {
+  display: grid;
+  gap: var(--atlas-space-lg);
+}
+
+.formal-derivation__cell {
+  background: var(--atlas-color-dominant);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 78%);
+  border-radius: 14px;
+  padding: var(--atlas-space-lg);
+}
+
+.formal-derivation__cell--prose {
+  font-family: var(--atlas-font-family-sans);
+}
+
+.formal-derivation__cell--math,
+.formal-derivation__cell--code,
+.formal-math-cell {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.formal-derivation__cell--code pre,
+.formal-derivation__cell--code code {
+  font-family: var(--atlas-font-family-mono);
+  margin: 0;
+  min-width: max-content;
+  white-space: pre;
+}
+
+.formal-derivation__cell--math .katex-display,
+.formal-math-cell .katex-display {
+  margin: 0;
+  min-width: max-content;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--atlas-space-xs);
+}
+
+.formal-source-trail {
+  box-shadow: none;
+  margin: var(--atlas-space-md) 0 0;
+}
+
+.formal-source-trail__row dd .source-status,
+.formal-source-trail__row dd .material-kind {
+  justify-self: start;
+}
+
+.material-kind--synthesis\/review {
+  color: var(--atlas-color-muted);
+}
+
+.material-kind--archived-provenance,
+.material-kind--archived\/provenance {
+  color: var(--atlas-color-destructive);
+}
+
+.formal-citation,
+.formal-footnote,
+.formal-bibliography-entry {
+  border-left: 4px solid color-mix(in srgb, var(--atlas-color-accent), transparent 30%);
+}
+
+.formal-citation__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--atlas-space-sm) var(--atlas-space-md);
+}
+
+.formal-citation__title {
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .atlas-constellation {
     margin: var(--atlas-space-xl) 0;
@@ -507,7 +695,12 @@ body {
   .source-panel__header,
   .source-panel__row,
   .material-kind-legend,
-  .book-footer-nav {
+  .book-footer-nav,
+  .formal-block__header,
+  .formal-derivation__header,
+  .formal-source-trail__header,
+  .formal-block__meta-row,
+  .formal-source-trail__row {
     display: grid;
     grid-template-columns: 1fr;
   }
