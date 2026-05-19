@@ -1,0 +1,56 @@
+---
+import FormalObjectList from '../../components/formal/FormalObjectList.astro';
+import { corpusEntries } from '../../data/corpus';
+import { formalRegistry } from '../../data/formal-registry';
+import type { FormalObject } from '../../data/formal-registry.schema';
+import '../../styles/atlas.css';
+
+const ownerLookup = Object.fromEntries(corpusEntries.map((item) => [item.id, item]));
+const kindOrder: FormalObject['kind'][] = ['definition', 'assumption', 'theorem', 'proposition', 'lemma', 'corollary', 'equation', 'derivation', 'citation'];
+const kindLabels: Record<FormalObject['kind'], string> = {
+  definition: 'Definition',
+  assumption: 'Assumption',
+  theorem: 'Theorem',
+  proposition: 'Proposition',
+  lemma: 'Lemma',
+  corollary: 'Corollary',
+  equation: 'Equation',
+  derivation: 'Derivation',
+  citation: 'Citation',
+};
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Browse formal registry | Harness Architecture Book Wiki</title>
+  </head>
+  <body class="atlas-page">
+    <main class="registry-page" data-pagefind-body>
+      <header class="registry-page__header">
+        <p class="source-detail__eyebrow">Stable formal object anchors</p>
+        <h1>Browse formal registry</h1>
+        <p>Browse formal objects grouped by corpus owner and kind. Each row links back to the rendered chapter block through its stable semantic ID.</p>
+      </header>
+
+      {corpusEntries.map((entry) => {
+        const ownerObjects = formalRegistry.filter((object) => object.ownerId === entry.id);
+        return (
+          <section class="registry-page__owner" aria-labelledby={`${entry.id}-registry-heading`}>
+            <h2 id={`${entry.id}-registry-heading`}>{entry.title}</h2>
+            {kindOrder.map((kind) => {
+              const objects = ownerObjects.filter((object) => object.kind === kind);
+              return objects.length > 0 ? (
+                <section class="registry-page__kind" aria-labelledby={`${entry.id}-${kind}-registry-heading`}>
+                  <h3 id={`${entry.id}-${kind}-registry-heading`}>{kindLabels[kind]}</h3>
+                  <FormalObjectList objects={objects} ownerLookup={ownerLookup} heading={`${entry.title}: ${kindLabels[kind]}`} />
+                </section>
+              ) : null;
+            })}
+          </section>
+        );
+      })}
+    </main>
+  </body>
+</html>

@@ -30,7 +30,7 @@ export const expectedCorpusIds = [
 const nonEmptyStringSchema = z.string().trim().min(1);
 
 export const corpusEntrySchema = z.object({
-  id: nonEmptyStringSchema,
+  id: z.enum(expectedCorpusIds),
   kind: corpusKindSchema,
   title: nonEmptyStringSchema,
   slug: nonEmptyStringSchema,
