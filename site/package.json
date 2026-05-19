@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build:astro": "astro build",
     "check": "astro check",
-    "validate": "bun run src/scripts/validate-corpus.ts",
+    "validate": "bun run src/scripts/validate-corpus.ts && bun run src/scripts/validate-formal-registry.ts",
     "index": "bun run src/scripts/generate-local-indexes.ts && if find dist -name '*.html' | grep -q .; then pagefind --site dist; else echo 'Skipping Pagefind: no static HTML found in dist yet.' >&2; fi",
     "build": "bun run validate && bun run build:astro && bun run index",
     "test": "vitest run"

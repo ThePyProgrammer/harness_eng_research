@@ -31,9 +31,9 @@ describe('formal registry schema contract', () => {
 
 describe('formal registry data contract', () => {
   it('parses the real Phase 3 registries and includes the umbrella vertical slice', () => {
-    expect(parseFormalRegistry(formalRegistry)).toBe(formalRegistry);
-    expect(parseChapterRegistry(chapterRegistry)).toBe(chapterRegistry);
-    expect(parseConceptRegistry(conceptRegistry)).toBe(conceptRegistry);
+    expect(parseFormalRegistry(formalRegistry)).toEqual(formalRegistry);
+    expect(parseChapterRegistry(chapterRegistry)).toEqual(chapterRegistry);
+    expect(parseConceptRegistry(conceptRegistry)).toEqual(conceptRegistry);
 
     expect(formalRegistry).toEqual(
       expect.arrayContaining([
