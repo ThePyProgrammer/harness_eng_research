@@ -1,0 +1,66 @@
+---
+import BookFooterNav from '../../components/BookFooterNav.astro';
+import SourceLinkPanel from '../../components/SourceLinkPanel.astro';
+import { bookSpine } from '../../data/book-spine';
+import { corpusEntries } from '../../data/corpus';
+import '../../styles/atlas.css';
+
+export function getStaticPaths() {
+  return corpusEntries.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const pageTitle = `${entry.title} | Harness Architecture Book Wiki`;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+  </head>
+  <body class="atlas-page source-detail-page">
+    <div class="source-detail-shell">
+      <aside class="book-spine-panel" aria-labelledby="book-spine-heading">
+        <p class="book-spine-panel__eyebrow">Book spine</p>
+        <h2 id="book-spine-heading">Book spine</h2>
+        <nav aria-label="Book spine">
+          <ol class="book-spine-list">
+            {bookSpine.map((item) => {
+              const isCurrent = item.id === entry.id;
+              return (
+                <li>
+                  <a class={`book-spine-list__link${isCurrent ? ' book-spine-list__link--current' : ''}`} href={item.href} aria-current={isCurrent ? 'page' : undefined}>
+                    <span>{item.title}</span>
+                    {isCurrent && <span class="book-spine-list__current-marker">Current page</span>}
+                  </a>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+      </aside>
+
+      <main class="source-detail" data-pagefind-body>
+        <header class="source-detail__header">
+          <p class="source-detail__eyebrow">Source-detail page</p>
+          <h1>{entry.title}</h1>
+          <p class="source-detail__summary">{entry.summary}</p>
+        </header>
+
+        <section class="source-detail__overview" aria-labelledby="source-detail-overview-heading">
+          <h2 id="source-detail-overview-heading">Phase 2 source detail</h2>
+          <p>
+            This lightweight page preserves source traceability for the canonical corpus entry. Phase 3 can expand it into a curated chapter without changing the shared book spine or provenance links.
+          </p>
+        </section>
+
+        <SourceLinkPanel entry={entry} />
+        <BookFooterNav currentId={entry.id} />
+      </main>
+    </div>
+  </body>
+</html>

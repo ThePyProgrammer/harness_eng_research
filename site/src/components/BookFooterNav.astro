@@ -1,0 +1,27 @@
+---
+import { getPreviousNext } from '../data/book-spine';
+
+interface Props {
+  currentId: string;
+}
+
+const { currentId } = Astro.props;
+const { previous, next } = getPreviousNext(currentId);
+---
+
+<nav class="book-footer-nav" aria-label="Previous and next book spine entries">
+  <div>
+    {previous && (
+      <a class="book-footer-nav__link book-footer-nav__link--previous" href={previous.href}>
+        Previous: {previous.title}
+      </a>
+    )}
+  </div>
+  <div>
+    {next && (
+      <a class="book-footer-nav__link book-footer-nav__link--next" href={next.href}>
+        Next: {next.title}
+      </a>
+    )}
+  </div>
+</nav>
