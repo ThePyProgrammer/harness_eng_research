@@ -14,6 +14,18 @@ const sourceTrailSource = readFixture('./SourceTrail.astro');
 const formalObjectListSource = readFixture('./FormalObjectList.astro');
 const conceptCardSource = readFixture('./ConceptCard.astro');
 const fixtureSource = readFixture('../../content/docs/formal-reading-fixture.mdx');
+const corpusPageSource = readFixture('../../pages/corpus/[slug].astro');
+const formalRegistryPageSource = readFixture('../../pages/formal-registry/index.astro');
+const glossaryPageSource = readFixture('../../pages/glossary/index.astro');
+const phaseThreeSources = [corpusPageSource, formalRegistryPageSource, glossaryPageSource].join('\n');
+
+function withoutComments(source: string): string {
+  return source
+    .replace(/<!--[^]*?-->/gu, '')
+    .replace(/\/\/.*$/gmu, '')
+    .replace(/\/\*[^]*?\*\//gu, '');
+}
+
 
 describe('formal reading component contract', () => {
   it('fixture imports and renders every formal component', () => {
@@ -115,5 +127,62 @@ describe('formal reading component contract', () => {
   it('keeps the fixture out of public search indexing', () => {
     expect(fixtureSource).toContain('pagefind: false');
     expect(fixtureSource).toContain('robots: noindex');
+  });
+
+  it('03-PATTERNS analog: corpus route renders required chapter headings and typed registry helpers', () => {
+    expect(corpusPageSource).toContain("import FormalObjectList from '../../components/formal/FormalObjectList.astro'");
+    expect(corpusPageSource).toContain("import ConceptCard from '../../components/formal/ConceptCard.astro'");
+    expect(corpusPageSource).toContain("import DerivationWalkthrough from '../../components/formal/DerivationWalkthrough.astro'");
+    expect(corpusPageSource).toContain('getChapterByOwner');
+    expect(corpusPageSource).toContain('formalObjectLookup');
+    expect(corpusPageSource).toContain('conceptLookup');
+    expect(corpusPageSource).toContain('getStaticPaths()');
+    expect(corpusPageSource).toContain("['problem', 'Problem']");
+    expect(corpusPageSource).toContain("['coreModel', 'Core model']");
+    expect(corpusPageSource).toContain("['keyNotation', 'Key notation']");
+    expect(corpusPageSource).toContain("['definitions', 'Definitions']");
+    expect(corpusPageSource).toContain("['formalClaims', 'Formal claims']");
+    expect(corpusPageSource).toContain("['derivationContext', 'Derivation/proof context']");
+    expect(corpusPageSource).toContain("['interpretation', 'Interpretation']");
+    expect(corpusPageSource).toContain("['relatedPillars', 'Related pillars']");
+    expect(corpusPageSource).toContain("['citations', 'Citations']");
+    expect(corpusPageSource).toContain("['sourceTrail', 'Source trail']");
+    expect(corpusPageSource).toContain("object.kind === 'derivation' || object.kind === 'equation'");
+    expect(corpusPageSource).toContain('<SourceTrail slot="source-trail"');
+    expect(corpusPageSource).toContain('sourceTierLabels');
+    expect(corpusPageSource).toContain('Canonical');
+    expect(corpusPageSource).toContain('Supporting research');
+    expect(corpusPageSource).toContain('Synthesis/review');
+    expect(corpusPageSource).toContain('Archived provenance');
+  });
+
+  it('03-PATTERNS analog: formal registry route groups by owner and kind with direct stable anchors', () => {
+    expect(formalRegistryPageSource).toContain('Browse formal registry');
+    expect(formalRegistryPageSource).toContain('corpusEntries.map');
+    expect(formalRegistryPageSource).toContain('kindOrder.map');
+    expect(formalRegistryPageSource).toContain('object.ownerId === entry.id');
+    expect(formalRegistryPageSource).toContain('<FormalObjectList objects={objects}');
+    expect(formalObjectListSource).toContain('#${object.id}');
+    expect(formalObjectListSource).toContain('Anchor link');
+  });
+
+  it('03-PATTERNS analog: glossary route renders concept cards with registry metadata fields', () => {
+    expect(glossaryPageSource).toContain("import ConceptCard from '../../components/formal/ConceptCard.astro'");
+    expect(glossaryPageSource).toContain('Concept cards expose canonical terms');
+    expect(glossaryPageSource).toContain('Alias links');
+    expect(glossaryPageSource).toContain('concept.aliases.map');
+    expect(glossaryPageSource).toContain('<ConceptCard concept={concept}');
+    expect(conceptCardSource).toContain('Aliases');
+    expect(conceptCardSource).toContain('Notation');
+    expect(conceptCardSource).toContain('Owning pillars');
+    expect(conceptCardSource).toContain('Related formal objects');
+    expect(conceptCardSource).toContain('Related concepts');
+    expect(conceptCardSource).toContain('Source tiers');
+  });
+
+  it('filters comments while rejecting graph, hosted search, database, auth, and runtime-fetch scope creep', () => {
+    const source = withoutComments(phaseThreeSources);
+
+    expect(source).not.toMatch(/\b(cytoscape|d3|graph database|hosted search|algolia|meilisearch|auth|login|database|fetch\()\b/iu);
   });
 });
