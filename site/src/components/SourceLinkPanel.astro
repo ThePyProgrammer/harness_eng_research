@@ -1,0 +1,103 @@
+---
+import { sourceStatusLabels } from '../data/corpus.schema';
+import type { CorpusEntry } from '../data/corpus.schema';
+
+interface Props {
+  entry: CorpusEntry;
+}
+
+const { entry } = Astro.props;
+
+const materialKinds = [
+  {
+    id: 'canonical',
+    label: 'canonical',
+    description: 'Active umbrella or pillar paper material under science/paper/ or pillars/*/paper/.',
+  },
+  {
+    id: 'supporting',
+    label: 'supporting',
+    description: 'Pillar-local notes or research that supports a canonical paper.',
+  },
+  {
+    id: 'synthesis-review',
+    label: 'synthesis/review',
+    description: 'Cross-pillar synthesis or review material under science or pillar review folders.',
+  },
+  {
+    id: 'archived-provenance',
+    label: 'archived/provenance',
+    description: 'Archive-backed provenance material only, never an active source replacement.',
+  },
+] as const;
+
+function repositoryHref(path: string): string {
+  return `/${path}`;
+}
+---
+
+<section class="source-panel" aria-labelledby={`${entry.id}-source-trail`}>
+  <div class="source-panel__header">
+    <div>
+      <p class="source-panel__eyebrow">Source trail</p>
+      <h2 id={`${entry.id}-source-trail`} class="source-panel__title">Source trail</h2>
+    </div>
+    <span class={`source-status source-status--${entry.sourceStatus}`}>
+      {sourceStatusLabels[entry.sourceStatus]}
+    </span>
+  </div>
+
+  <dl class="source-panel__metadata">
+    <div class="source-panel__row">
+      <dt>Material kind</dt>
+      <dd>
+        <span class="material-kind material-kind--canonical">canonical</span>
+        <span class="source-panel__note">Current entry is rendered from canonical corpus metadata.</span>
+      </dd>
+    </div>
+    <div class="source-panel__row">
+      <dt>Kind</dt>
+      <dd>{entry.kind}</dd>
+    </div>
+    <div class="source-panel__row">
+      <dt>Slug</dt>
+      <dd><code>{entry.slug}</code></dd>
+    </div>
+    <div class="source-panel__row">
+      <dt>Canonical .tex</dt>
+      <dd>
+        <a href={repositoryHref(entry.canonicalTex)}>Canonical .tex source</a>
+        <code>{entry.canonicalTex}</code>
+      </dd>
+    </div>
+    <div class="source-panel__row">
+      <dt>PDF</dt>
+      <dd>
+        <a href={repositoryHref(entry.canonicalPdf)}>Canonical PDF</a>
+        <code>{entry.canonicalPdf}</code>
+      </dd>
+    </div>
+    {entry.bibliography && (
+      <div class="source-panel__row">
+        <dt>Bibliography</dt>
+        <dd>
+          <a href={repositoryHref(entry.bibliography)}>Bibliography source</a>
+          <code>{entry.bibliography}</code>
+        </dd>
+      </div>
+    )}
+    <div class="source-panel__row">
+      <dt>Source status</dt>
+      <dd>{sourceStatusLabels[entry.sourceStatus]}</dd>
+    </div>
+  </dl>
+
+  <div class="material-kind-legend" aria-label="Material kind treatment legend">
+    {materialKinds.map((kind) => (
+      <article class={`material-kind-card material-kind-card--${kind.id}`}>
+        <h3><span class={`material-kind material-kind--${kind.id}`}>{kind.label}</span></h3>
+        <p>{kind.description}</p>
+      </article>
+    ))}
+  </div>
+</section>
