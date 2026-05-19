@@ -8,7 +8,7 @@ export interface DerivationCoverageEntry {
   rationale?: string;
 }
 
-type CuratedOwnerId = 'abstraction' | 'information' | 'reliability' | 'coordination' | 'temporal' | 'economics' | 'model-routing';
+type CuratedOwnerId = Exclude<OwnerId, 'umbrella'>;
 
 interface CuratedPillarSeed {
   ownerId: CuratedOwnerId;
@@ -68,8 +68,8 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'Gap decomposition equation',
     derivationStatement: 'Notebook derivation: start with the paper-level gap notation G(S,P); decompose implementation error into specification ambiguity, interface loss, and refinement drift; then read harness controls as terms that shrink or expose those components before code is accepted.',
     notation: ['\\mathcal{G}(S,P)', 'S', 'P'],
-    relatedConcepts: ['harness-architecture', 'semantic-axis', 'context-degradation'],
-    relatedObjects: ['umbrella.harness-architecture', 'information.context-degradation'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Abstraction pillar paper and its bibliography trail under pillars/abstraction/paper/.',
   },
   {
@@ -88,8 +88,8 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'Context loss equation',
     derivationStatement: 'Notebook derivation: write delivered context as selected relevant information minus omitted relevant information plus distracting irrelevant information; the context-degradation term grows with omission and distraction, motivating tiered memory and reuse discovery.',
     notation: ['C_{task}', 'I_{relevant}', 'D_{context}'],
-    relatedConcepts: ['harness-architecture', 'semantic-axis', 'specification-refinement-gap'],
-    relatedObjects: ['umbrella.harness-architecture', 'abstraction.specification-refinement-gap'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Information pillar paper and its bibliography trail under pillars/information/paper/.',
   },
   {
@@ -108,8 +108,8 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'Pipeline reliability equation',
     derivationStatement: 'Notebook derivation: assume n required steps, each succeeds independently with probability p; multiply the success probabilities to obtain R = p^n; differentiating log R with respect to log p gives elasticity n, exposing why long harness pipelines need verification gates.',
     notation: ['R=p^n', 'p', 'n'],
-    relatedConcepts: ['harness-architecture', 'execution-axis', 'verification-scheduling'],
-    relatedObjects: ['umbrella.harness-architecture', 'coordination.quality-adjusted-speedup'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Reliability pillar paper and bibliography trail under pillars/reliability/paper/.',
   },
   {
@@ -128,8 +128,8 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'Speedup adjustment equation',
     derivationStatement: 'Notebook derivation: begin with ideal parallel speedup, subtract coordination overhead and expected merge repair, then multiply by a quality-retention term; the remaining expression is the quality-adjusted speedup available to the harness.',
     notation: ['S_q', 'O_{coord}', 'Q_{retained}'],
-    relatedConcepts: ['harness-architecture', 'execution-axis', 'compound-error'],
-    relatedObjects: ['umbrella.harness-architecture', 'reliability.compound-error-bound'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Coordination pillar paper and its bibliography trail under pillars/coordination/paper/.',
   },
   {
@@ -148,9 +148,49 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'VIPH equation',
     derivationStatement: 'Notebook derivation: count completed iterations, multiply by the fraction that pass verification, and divide by elapsed wall-clock hours; the resulting VIPH metric exposes the speed-quality tradeoff in temporal harness design.',
     notation: ['VIPH', 'V/H', 'T_{verify}'],
-    relatedConcepts: ['harness-architecture', 'execution-axis', 'compound-error'],
-    relatedObjects: ['umbrella.harness-architecture', 'reliability.compound-error-bound'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Temporal pillar paper and its bibliography trail under pillars/temporal/paper/.',
+  },
+  {
+    ownerId: 'quality',
+    definitionId: 'quality.ai-code-slop',
+    claimId: 'quality.layered-defense-detection',
+    derivationId: 'quality.defect-cost-equation',
+    citationObjectId: 'quality.canonical-paper-citation',
+    conceptId: 'ai-code-slop',
+    title: 'Quality',
+    definitionTitle: 'AI code slop',
+    definitionStatement: 'AI code slop is individually plausible generated code that passes superficial inspection while carrying maintainability, semantic, or architectural defects that accumulate as quality debt in the repository.',
+    claimTitle: 'Layered defense detection limit',
+    claimKind: 'proposition',
+    claimStatement: 'Quality improves when harnesses combine static checks, review heuristics, architectural invariants, and provenance-aware evaluation, because no single detector reliably catches all slop modes described by the Quality paper.',
+    derivationTitle: 'Defect cost equation',
+    derivationStatement: 'Notebook derivation: express expected quality cost as defect probability multiplied by downstream repair cost, then show how layered detection reduces either the probability of acceptance or the cost of catching the defect before accretion.',
+    notation: ['C_q', 'p_{defect}', 'L_{defense}'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
+    citationStatement: 'Canonical citation record for the Quality pillar paper and its bibliography trail under pillars/quality/paper/.',
+  },
+  {
+    ownerId: 'governance',
+    definitionId: 'governance.governance-capacity',
+    claimId: 'governance.governance-ratchet',
+    derivationId: 'governance.capacity-ratchet-equation',
+    citationObjectId: 'governance.canonical-paper-citation',
+    conceptId: 'governance-ratchet',
+    title: 'Governance',
+    definitionTitle: 'Governance capacity',
+    definitionStatement: 'Governance capacity is the ability of a harness organization to preserve decisions, enforce constraints, and keep architectural intent alive as agents generate more changes than humans can inspect directly.',
+    claimTitle: 'Governance ratchet',
+    claimKind: 'theorem',
+    claimStatement: 'A governance ratchet appears when each accepted decision increases future enforcement obligations; if ratchet load exceeds governance capacity, architectural theory decays even while local patches continue to pass.',
+    derivationTitle: 'Capacity ratchet equation',
+    derivationStatement: 'Notebook derivation: compare accumulated ratchet load from decisions and generated changes against available governance capacity; preservation succeeds while R_{drift} remains below C_{gov} and fails when the inequality reverses.',
+    notation: ['R_{drift}', 'C_{gov}', 'D_t'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
+    citationStatement: 'Canonical citation record for the Governance pillar paper and its bibliography trail under pillars/governance/paper/.',
   },
   {
     ownerId: 'economics',
@@ -168,9 +208,29 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'CVIH equation',
     derivationStatement: 'Notebook derivation: compare expected value gained from better information, lower error probability, or faster completion against marginal harness cost; positive CVIH indicates that retrieval, verification, or escalation is worth paying for.',
     notation: ['CVIH', 'E[V]', 'C_{token}'],
-    relatedConcepts: ['harness-architecture', 'stage-specific-routing', 'verified-iterations-per-hour'],
-    relatedObjects: ['umbrella.harness-architecture', 'model-routing.stage-specific-routing', 'temporal.verified-iterations-per-hour'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Economics pillar paper and its bibliography trail under pillars/economics/paper/.',
+  },
+  {
+    ownerId: 'human-interaction',
+    definitionId: 'human-interaction.attention-allocation',
+    claimId: 'human-interaction.autonomy-boundary',
+    derivationId: 'human-interaction.attention-budget-equation',
+    citationObjectId: 'human-interaction.canonical-paper-citation',
+    conceptId: 'attention-allocation',
+    title: 'Human Interaction',
+    definitionTitle: 'Attention allocation',
+    definitionStatement: 'Attention allocation is the distribution of scarce human review, approval, and steering effort across autonomous agent work so that the human remains effective at boundaries where judgment changes system risk.',
+    claimTitle: 'Autonomy boundary condition',
+    claimKind: 'proposition',
+    claimStatement: 'Human-in-the-loop harnesses are safest when autonomy expands only where trust calibration, review evidence, and task reversibility justify moving attention away from direct supervision.',
+    derivationTitle: 'Attention budget equation',
+    derivationStatement: 'Notebook derivation: allocate a finite human attention budget across supervision points by expected risk reduction; the canonical source supports treating review effort as scarce and therefore scheduled rather than continuously available.',
+    notation: ['A_h', 'B_{attention}', 'R_{human}'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
+    citationStatement: 'Canonical citation record for the Human Interaction pillar paper and its bibliography trail under pillars/human-interaction/paper/.',
   },
   {
     ownerId: 'model-routing',
@@ -188,28 +248,51 @@ const curatedPillars: CuratedPillarSeed[] = [
     derivationTitle: 'Stage utility equation',
     derivationStatement: 'Notebook derivation: express each candidate model choice by expected quality gain minus latency and token cost for a given stage; choose the model with maximum stage utility and escalate when uncertainty or risk crosses the stage threshold.',
     notation: ['U(m,s)', 'Q_m', 'C_m'],
-    relatedConcepts: ['harness-architecture', 'cost-value-information-harness', 'verified-iterations-per-hour'],
-    relatedObjects: ['umbrella.harness-architecture', 'economics.cost-value-information-harness', 'temporal.verified-iterations-per-hour'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
     citationStatement: 'Canonical citation record for the Model Routing pillar paper and its bibliography trail under pillars/model-routing/paper/.',
   },
+  {
+    ownerId: 'security',
+    definitionId: 'security.prompt-injection-boundary',
+    claimId: 'security.defense-in-depth-sandbox',
+    derivationId: 'security.attack-surface-equation',
+    citationObjectId: 'security.canonical-paper-citation',
+    conceptId: 'prompt-injection-boundary',
+    title: 'Security',
+    definitionTitle: 'Prompt injection boundary',
+    definitionStatement: 'A prompt injection boundary is the trust boundary where untrusted text, tool output, repository content, or web content can influence agent instructions and therefore must be isolated from privileged harness control.',
+    claimTitle: 'Defense-in-depth sandbox condition',
+    claimKind: 'theorem',
+    claimStatement: 'Security improves when prompt injection defenses, sandboxing, credential scoping, and output filtering are layered, because failure of any single boundary should not grant the agent uncontrolled authority.',
+    derivationTitle: 'Attack surface equation',
+    derivationStatement: 'Notebook derivation: model harness attack surface as the sum of exposed tools, credentials, untrusted context channels, and output sinks; each security layer reduces a term or blocks propagation across the prompt-injection boundary.',
+    notation: ['A_{surface}', 'T_{untrusted}', 'B_{prompt}'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
+    citationStatement: 'Canonical citation record for the Security pillar paper and its bibliography trail under pillars/security/paper/.',
+  },
+  {
+    ownerId: 'accretion',
+    definitionId: 'accretion.plausible-local-change',
+    claimId: 'accretion.collective-harm-threshold',
+    derivationId: 'accretion.accumulation-drift-equation',
+    citationObjectId: 'accretion.canonical-paper-citation',
+    conceptId: 'plausible-local-change',
+    title: 'Accretion',
+    definitionTitle: 'Plausible local change',
+    definitionStatement: 'A plausible local change is an AI-generated modification that appears acceptable in isolation but contributes to collectively harmful drift when many such changes accumulate across the codebase.',
+    claimTitle: 'Collective harm threshold',
+    claimKind: 'lemma',
+    claimStatement: 'Accretion risk emerges when the aggregate cost of many plausible local changes exceeds the review system ability to detect architectural erosion, even if each accepted change seemed defensible alone.',
+    derivationTitle: 'Accumulation drift equation',
+    derivationStatement: 'Notebook derivation: sum local plausibility-weighted changes over time and compare the accumulated drift against detection and repair capacity; the accretion source supports this aggregate view of individually plausible but collectively harmful code.',
+    notation: ['\\sum_t \\Delta_t', 'D_{accretion}', 'C_{repair}'],
+    relatedConcepts: ['harness-architecture'],
+    relatedObjects: ['umbrella.harness-architecture'],
+    citationStatement: 'Canonical citation record for the Accretion pillar paper and its bibliography trail under pillars/accretion/paper/.',
+  },
 ];
-
-const pillarSummaries = corpusEntries.filter((entry) => entry.kind === 'pillar');
-
-const minimalObjects: FormalObject[] = pillarSummaries
-  .filter((entry) => !curatedPillars.some((pillar) => pillar.ownerId === entry.id))
-  .map((entry) => ({
-    id: `${entry.id}.chapter-seed`,
-    ownerId: entry.id,
-    kind: 'definition',
-    title: `${entry.title} chapter seed`,
-    statement: `Build-safe minimal formal record for the ${entry.title} pillar. This preserves owner-prefixed anchors and canonical source trails until the full curated derivations are expanded in later Phase 3 plans.`,
-    notation: [],
-    sourceTrail: canonicalSources(entry.id),
-    conceptIds: [`${entry.id}-framework`],
-    citationIds: [`${entry.id}-paper`],
-    relatedObjectIds: ['umbrella.harness-architecture'],
-  }));
 
 const curatedObjects: FormalObject[] = curatedPillars.flatMap((pillar) => [
   {
@@ -268,28 +351,39 @@ export const citations: CitationRecord[] = [
     label: 'A Formal Framework for AI Coding Agent Harness Architecture',
     sourceTrail: canonicalSources('umbrella'),
   },
-  ...pillarSummaries.map((entry) => ({
-    id: `${entry.id}-paper`,
-    label: `${entry.title} canonical paper`,
-    sourceTrail: canonicalSources(entry.id),
-  })),
+  ...corpusEntries
+    .filter((entry) => entry.kind === 'pillar')
+    .map((entry) => ({
+      id: `${entry.id}-paper`,
+      label: `${entry.title} canonical paper`,
+      sourceTrail: canonicalSources(entry.id),
+    })),
 ];
 
-export const derivationCoverageByOwner: Record<CuratedOwnerId, DerivationCoverageEntry[]> = Object.fromEntries(
-  curatedPillars.map((pillar) => {
-    const entry = corpusEntry(pillar.ownerId);
-    return [
-      pillar.ownerId,
-      [
-        {
-          sourcePath: entry.canonicalTex,
-          status: 'supported',
-          formalObjectIds: [pillar.derivationId],
-        },
-      ],
-    ];
-  }),
-) as Record<CuratedOwnerId, DerivationCoverageEntry[]>;
+export const derivationCoverageByOwner: Record<OwnerId, DerivationCoverageEntry[]> = {
+  umbrella: [
+    {
+      sourcePath: corpusEntry('umbrella').canonicalTex,
+      status: 'supported',
+      formalObjectIds: ['umbrella.harness-axis-equation'],
+    },
+  ],
+  ...Object.fromEntries(
+    curatedPillars.map((pillar) => {
+      const entry = corpusEntry(pillar.ownerId);
+      return [
+        pillar.ownerId,
+        [
+          {
+            sourcePath: entry.canonicalTex,
+            status: 'supported',
+            formalObjectIds: [pillar.derivationId],
+          },
+        ],
+      ];
+    }),
+  ),
+} as Record<OwnerId, DerivationCoverageEntry[]>;
 
 export const formalRegistry = parseFormalRegistry([
   {
@@ -300,13 +394,28 @@ export const formalRegistry = parseFormalRegistry([
     statement: 'Harness architecture is the surrounding system that mediates human intent, context, agent execution, verification, coordination, governance, economics, human attention, model routing, and security across AI coding agents.',
     notation: ['\\mathcal{G}(S,P)', 'R=p^n', 'R_{\\text{drift}} < C_{\\text{gov}}'],
     sourceTrail: canonicalSources('umbrella'),
-    conceptIds: ['harness-architecture', 'semantic-axis', 'execution-axis', 'assurance-axis'],
+    conceptIds: ['harness-architecture'],
     citationIds: ['science-paper'],
-    relatedObjectIds: ['reliability.compound-error-bound'],
+    relatedObjectIds: ['umbrella.harness-axis-equation', 'reliability.compound-error-bound'],
+  },
+  {
+    id: 'umbrella.harness-axis-equation',
+    ownerId: 'umbrella',
+    kind: 'equation',
+    title: 'Harness axis decomposition',
+    statement: 'Notebook equation: the umbrella source decomposes harness architecture into semantic, execution, assurance, operational, human, routing, security, and accretion dimensions, allowing each pillar object to remain source-grounded while participating in the same registry projection.',
+    notation: ['H = S + E + A + O + U'],
+    sourceTrail: canonicalSources('umbrella'),
+    conceptIds: ['harness-architecture'],
+    citationIds: ['science-paper'],
+    relatedObjectIds: ['umbrella.harness-architecture'],
   },
   ...curatedObjects,
-  ...minimalObjects,
 ]);
 
-export const firstBatchFormalObjectIds = curatedPillars.map((pillar) => pillar.claimId);
-export const firstBatchOwners = curatedPillars.map((pillar) => pillar.ownerId) as OwnerId[];
+export const firstBatchFormalObjectIds = curatedPillars
+  .filter((pillar) => ['abstraction', 'information', 'reliability', 'coordination', 'temporal', 'economics', 'model-routing'].includes(pillar.ownerId))
+  .map((pillar) => pillar.claimId);
+export const firstBatchOwners = curatedPillars
+  .filter((pillar) => ['abstraction', 'information', 'reliability', 'coordination', 'temporal', 'economics', 'model-routing'].includes(pillar.ownerId))
+  .map((pillar) => pillar.ownerId) as OwnerId[];
