@@ -381,22 +381,16 @@ export const relationRecordSchema = z.object({
 | A4 | Pagefind fixture tests should be split between deterministic generated data checks and smaller build-level search checks. | Common Pitfalls | Planner may choose a different test boundary if Pagefind test utilities are available. |
 | A5 | Package download counts were not needed because no new package install is recommended. | Package Legitimacy Audit | If planner adds packages, a fresh audit with downloads and slopcheck is required. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should graph artifacts be rendered primarily as accessible HTML lists, inline SVG, or both?**
-   - What we know: D-14 allows static generated pages/diagrams or HTML with clickable nodes and links. [VERIFIED: CONTEXT.md]
-   - What's unclear: The exact artifact format is not locked. [VERIFIED: CONTEXT.md]
-   - Recommendation: Plan accessible HTML neighborhoods first, with optional lightweight SVG overview only if it remains readable and testable. [ASSUMED]
+   - RESOLVED: Plan graph artifacts as accessible static HTML neighborhoods first, with clickable links and semantic list fallbacks as the required v1 surface. A lightweight inline SVG overview is allowed only when it remains readable, has `aria-hidden` decorative connectors or equivalent text alternatives, and passes renderability validation. This follows D-13 through D-16 and the UI-SPEC graph contract; do not introduce a runtime graph database or heavyweight client graph engine.
 
 2. **How many representative search queries are enough for QUAL-03?**
-   - What we know: D-08 requires expected pages or formal-object anchors across required result classes. [VERIFIED: CONTEXT.md]
-   - What's unclear: The exact fixture count is not specified. [VERIFIED: CONTEXT.md]
-   - Recommendation: Use at least one query per required result class plus anchor-focused queries for key formal objects such as `quality.ai-code-slop`, `reliability.compound-error-bound`, and `security.prompt-injection-boundary`. [VERIFIED: codebase][ASSUMED]
+   - RESOLVED: Use at least one deterministic fixture query per required result class: Pages/Pillars, Formal Objects, Concepts, Citations, and Reading Paths. Add anchor-focused formal-object fixtures for real registry IDs, preferring `quality.ai-code-slop`, `reliability.compound-error-bound`, and `security.prompt-injection-boundary` when present. Each fixture must assert the expected result type plus expected href or anchor substring; a fixture that only checks for any non-empty result is insufficient per D-08.
 
 3. **Should the search page use Pagefind filters or purely client-side grouping after results load?**
-   - What we know: Pagefind supports filters and custom API results. [CITED: https://pagefind.app/docs/api/]
-   - What's unclear: The current content metadata may need extra `data-pagefind-meta`/filter fields to make filters useful. [CITED: https://pagefind.app/docs/metadata/]
-   - Recommendation: Generate/type result-category metadata first, then group client-side; add filters after metadata is validated. [ASSUMED]
+   - RESOLVED: Generate and validate result-category metadata first, load `/search-index.json` in the search UI, then group Pagefind results client-side by joining Pagefind result URLs/sub-result URLs to generated records by href or stable ID. Filters may be added only after metadata is validated; they are not required for the first grouped search slice. If no generated record matches a Pagefind result, render a safe fallback from the raw Pagefind title, excerpt/plain excerpt, url, and type metadata.
 
 ## Environment Availability
 

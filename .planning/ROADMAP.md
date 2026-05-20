@@ -113,8 +113,29 @@ Plans:
   4. User can navigate typed related links between pillars, concepts, definitions, theorem-like claims, and citations.
   5. User can view graph-style local context or generated relationship data without a runtime graph database, and build validation rejects invalid relation types or missing target IDs.
 
-**Plans**: TBD
+**Plans**: 5 plans
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Render curated branching reading paths for the five required discovery themes.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — Add typed relation taxonomy, validation, and related-link chapter navigation.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-03-PLAN.md — Add grouped local static search with anchor-aware search records and quality fixtures.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-04-PLAN.md — Generate static graph overview and local context pages from validated discovery metadata.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04-05-PLAN.md — Wire discovery validation/index generation into the site workflow and close Phase 4 gates.
 
 ### Phase 5: Release Quality and Static Publication Readiness
 
@@ -142,5 +163,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
-| 4. Local Discovery and Cross-Corpus Exploration | 0/TBD | Not started | - |
+| 4. Local Discovery and Cross-Corpus Exploration | 0/5 | Planned | - |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
