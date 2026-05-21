@@ -13,6 +13,43 @@ function cloneFixture(): {
   };
 }
 
+describe('RelatedLinks source integration', () => {
+  it('renders the required related links heading and row fields', async () => {
+    const source = await Bun.file(new URL('../components/discovery/RelatedLinks.astro', import.meta.url)).text();
+
+    expect(source).toContain('Related links');
+    expect(source).toContain('relation.type.label');
+    expect(source).toContain('relation.target.title');
+    expect(source).toContain('relation.target.familyLabel');
+    expect(source).toContain('relation.record.rationale');
+    expect(source).toContain('relation.target.href');
+  });
+
+  it('renders the required empty related-link copy only inside RelatedLinks', async () => {
+    const relatedSource = await Bun.file(new URL('../components/discovery/RelatedLinks.astro', import.meta.url)).text();
+    const chapterSource = await Bun.file(new URL('../pages/corpus/[slug].astro', import.meta.url)).text();
+
+    expect(relatedSource).toContain('No typed relations have been registered for this item yet.');
+    expect(chapterSource).not.toContain('No typed relations have been registered for this item yet.');
+  });
+
+  it('keeps chapter provenance and footer navigation while rendering RelatedLinks', async () => {
+    const source = await Bun.file(new URL('../pages/corpus/[slug].astro', import.meta.url)).text();
+
+    expect(source).toContain("import RelatedLinks from '../../components/discovery/RelatedLinks.astro'");
+    expect(source).toContain('<RelatedLinks source={{ family: \'chapter\', id: entry.id }}');
+    expect(source).toContain('<SourceLinkPanel entry={entry} />');
+    expect(source).toContain('<BookFooterNav currentId={entry.id} />');
+  });
+
+  it('renders formal-object scoped typed related links from FormalObjectList', async () => {
+    const source = await Bun.file(new URL('../components/formal/FormalObjectList.astro', import.meta.url)).text();
+
+    expect(source).toContain("import RelatedLinks from '../discovery/RelatedLinks.astro'");
+    expect(source).toContain('<RelatedLinks source={{ family: \'formal-object\', id: object.id }}');
+  });
+});
+
 describe('validateDiscovery', () => {
   it('validates the real Phase 4 relation metadata', () => {
     expect(validateDiscovery()).toEqual({ ok: true, errors: [] });
