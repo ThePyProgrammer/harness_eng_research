@@ -1,0 +1,51 @@
+---
+import ReadingPathMap from '../../components/discovery/ReadingPathMap.astro';
+import { bookSpine } from '../../data/book-spine';
+import { readingPaths } from '../../data/reading-paths';
+import '../../styles/atlas.css';
+
+export function getStaticPaths() {
+  return readingPaths.map((path) => ({
+    params: { slug: path.slug },
+    props: { path },
+  }));
+}
+
+const { path } = Astro.props;
+const pageTitle = `${path.title} reading path | Harness Architecture Book Wiki`;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+  </head>
+  <body class="atlas-page reading-path-page">
+    <div class="source-detail-shell reading-path-page__shell">
+      <aside class="book-spine-panel" aria-labelledby="book-spine-heading">
+        <p class="book-spine-panel__eyebrow">Book spine</p>
+        <h2 id="book-spine-heading">Book spine</h2>
+        <nav aria-label="Book spine">
+          <ol class="book-spine-list">
+            {bookSpine.map((item) => (
+              <li>
+                <a class="book-spine-list__link" href={item.href}>{item.title}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </aside>
+
+      <main class="source-detail reading-path-page__main" data-pagefind-body>
+        <header class="source-detail__header reading-path-page__header">
+          <p class="source-detail__eyebrow">Reading path</p>
+          <h1>{path.title}</h1>
+          <p class="source-detail__summary">{path.purpose}</p>
+        </header>
+
+        <ReadingPathMap path={path} />
+      </main>
+    </div>
+  </body>
+</html>

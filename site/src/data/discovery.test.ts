@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { chapterRegistry } from './chapters';
 import { conceptRegistry } from './concepts';
@@ -76,3 +78,32 @@ describe('reading path data contract', () => {
   });
 });
 
+describe('reading path page and component source contracts', () => {
+  const pageSource = readFileSync(
+    fileURLToPath(new URL('../pages/reading-paths/[slug].astro', import.meta.url)),
+    'utf8',
+  );
+  const componentSource = readFileSync(
+    fileURLToPath(new URL('../components/discovery/ReadingPathMap.astro', import.meta.url)),
+    'utf8',
+  );
+
+  it('generates static route pages from the curated readingPaths registry', () => {
+    expect(pageSource).toContain('export function getStaticPaths()');
+    expect(pageSource).toMatch(/readingPaths\.map/u);
+  });
+
+  it('marks reading path content as local-search body content', () => {
+    expect(pageSource).toContain('data-pagefind-body');
+  });
+
+  it('keeps required route-stop guidance and link labels visible in source', () => {
+    expect(componentSource).toContain('Why this stop matters');
+    expect(componentSource).toContain('Open stop');
+  });
+
+  it('marks decorative connector SVG as hidden and unfocusable', () => {
+    expect(componentSource).toContain('aria-hidden="true"');
+    expect(componentSource).toContain('focusable="false"');
+  });
+});
