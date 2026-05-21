@@ -123,7 +123,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — Add typed relation taxonomy, validation, and related-link chapter navigation.
+- [x] 04-02-PLAN.md — Add typed relation taxonomy, validation, and related-link chapter navigation.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -163,5 +163,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
-| 4. Local Discovery and Cross-Corpus Exploration | 1/5 | In Progress|  |
+| 4. Local Discovery and Cross-Corpus Exploration | 2/5 | In Progress|  |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
