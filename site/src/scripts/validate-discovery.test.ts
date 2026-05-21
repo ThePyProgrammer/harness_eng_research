@@ -93,6 +93,18 @@ describe('validateDiscovery', () => {
     expect(validateDiscovery()).toMatchObject({ ok: true, errors: [] });
   });
 
+  it('returns JSON-facing totals for paths, relations, graph, search fixtures, and errors', () => {
+    expect(validateDiscovery().totals).toMatchObject({
+      paths: 5,
+      relationTypes: relationTypes.length,
+      relations: relationRecords.length,
+      searchFixtures: 5,
+      errors: 0,
+    });
+    expect(validateDiscovery().totals.graphNodes).toBeGreaterThan(0);
+    expect(validateDiscovery().totals.graphNeighborhoods).toBeGreaterThan(0);
+  });
+
   it('validates representative search fixtures for every required result class', () => {
     const result = validateDiscovery();
 

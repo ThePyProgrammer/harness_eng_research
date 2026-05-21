@@ -20,9 +20,25 @@ export interface WriteCorpusIndexOptions {
   outputDir?: string;
 }
 
+export interface RelationIndex {
+  generatedBy: 'site/src/scripts/generate-local-indexes.ts';
+  typeCount: number;
+  recordCount: number;
+  types: typeof relationTypes;
+  records: typeof relationRecords;
+}
+
+export interface ReadingPathsIndex {
+  generatedBy: 'site/src/scripts/generate-local-indexes.ts';
+  pathCount: number;
+  paths: typeof readingPaths;
+}
+
 const generatedBy = 'site/src/scripts/generate-local-indexes.ts' as const;
 const outputFileName = 'corpus-index.json';
 const searchOutputFileName = 'search-index.json';
+const relationOutputFileName = 'relation-index.json';
+const readingPathsOutputFileName = 'reading-paths-index.json';
 const graphOutputFileName = 'graph-index.json';
 const resultClasses: SearchResultType[] = ['Pages', 'Formal Objects', 'Concepts', 'Citations', 'Reading Paths'];
 
@@ -150,6 +166,24 @@ export function buildDiscoverySearchIndex(entries: CorpusEntry[] = corpusEntries
     resultClasses,
     records,
   });
+}
+
+export function buildRelationIndex(): RelationIndex {
+  return {
+    generatedBy,
+    typeCount: relationTypes.length,
+    recordCount: relationRecords.length,
+    types: relationTypes.map((type) => ({ ...type })),
+    records: relationRecords.map((record) => ({ ...record })),
+  };
+}
+
+export function buildReadingPathsIndex(): ReadingPathsIndex {
+  return {
+    generatedBy,
+    pathCount: readingPaths.length,
+    paths: readingPaths.map((path) => ({ ...path })),
+  };
 }
 
 function graphNodeId(target: RelationTarget | { family: GraphNodeFamily; id: string }): string {
@@ -348,6 +382,32 @@ export function writeDiscoverySearchIndex(options: WriteCorpusIndexOptions = {})
   return outputPath;
 }
 
+export function writeRelationIndex(options: WriteCorpusIndexOptions = {}): string {
+  const root = siteRoot();
+  const outputDir = options.outputDir ?? 'dist';
+  const safeOutputDir = assertInsideSite(outputDir, root);
+  const outputPath = resolve(safeOutputDir, relationOutputFileName);
+  const payload = `${JSON.stringify(buildRelationIndex(), null, 2)}\n`;
+
+  mkdirSync(safeOutputDir, { recursive: true });
+  writeFileSync(outputPath, payload, 'utf-8');
+
+  return outputPath;
+}
+
+export function writeReadingPathsIndex(options: WriteCorpusIndexOptions = {}): string {
+  const root = siteRoot();
+  const outputDir = options.outputDir ?? 'dist';
+  const safeOutputDir = assertInsideSite(outputDir, root);
+  const outputPath = resolve(safeOutputDir, readingPathsOutputFileName);
+  const payload = `${JSON.stringify(buildReadingPathsIndex(), null, 2)}\n`;
+
+  mkdirSync(safeOutputDir, { recursive: true });
+  writeFileSync(outputPath, payload, 'utf-8');
+
+  return outputPath;
+}
+
 export function writeGraphIndex(options: WriteCorpusIndexOptions = {}): string {
   const root = siteRoot();
   const outputDir = options.outputDir ?? 'dist';
@@ -361,14 +421,22 @@ export function writeGraphIndex(options: WriteCorpusIndexOptions = {}): string {
   return outputPath;
 }
 
+export function writeAllLocalIndexes(options: WriteCorpusIndexOptions = {}): string[] {
+  return [
+    writeCorpusIndex(options),
+    writeDiscoverySearchIndex(options),
+    writeRelationIndex(options),
+    writeReadingPathsIndex(options),
+    writeGraphIndex(options),
+  ];
+}
+
 function runCli(): number {
   try {
-    writeCorpusIndex();
-    writeDiscoverySearchIndex();
-    writeGraphIndex();
-    console.error('Successfully created: dist/corpus-index.json');
-    console.error('Successfully created: dist/search-index.json');
-    console.error('Successfully created: dist/graph-index.json');
+    const outputPaths = writeAllLocalIndexes();
+    for (const outputPath of outputPaths) {
+      console.error(`Successfully created: ${relative(siteRoot(), outputPath)}`);
+    }
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

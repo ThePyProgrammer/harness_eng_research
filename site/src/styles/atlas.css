@@ -872,11 +872,32 @@ body {
   gap: var(--atlas-space-md);
 }
 
-.related-links {
+.related-links,
+.chapter-graph-context {
   background: color-mix(in srgb, var(--atlas-color-secondary), white 8%);
   border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 68%);
   border-radius: 18px;
   padding: var(--atlas-space-lg);
+}
+
+.chapter-graph-context {
+  display: grid;
+  gap: var(--atlas-space-md);
+}
+
+.chapter-graph-context__eyebrow {
+  color: var(--atlas-color-accent);
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.chapter-graph-context h2,
+.chapter-graph-context p {
+  margin: 0;
 }
 
 .related-links__eyebrow,
@@ -980,8 +1001,7 @@ body {
 .reading-path-map__eyebrow,
 .reading-path-branch__kicker,
 .reading-path-stop__kicker,
-.reading-path-stop__metadata dt,
-.reading-path-stop__link {
+.reading-path-stop__metadata dt {
   color: var(--atlas-color-accent);
   font-size: var(--atlas-font-size-label);
   font-weight: 600;
@@ -1095,8 +1115,13 @@ body {
 
 .reading-path-stop__link {
   align-items: center;
+  color: var(--atlas-color-accent);
   display: inline-flex;
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
   justify-self: start;
+  line-height: 1.4;
+  margin: 0;
   min-height: 44px;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
