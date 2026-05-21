@@ -1,0 +1,72 @@
+---
+import { buildGraphIndex } from '../../scripts/generate-local-indexes';
+import '../../styles/atlas.css';
+
+const graph = buildGraphIndex();
+const owners = graph.overview.nodes.filter((node) => node.family === 'chapter');
+const paths = graph.overview.nodes.filter((node) => node.family === 'reading-path');
+const categories = graph.overview.nodes.filter((node) => node.family === 'relation-category');
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Graph overview | Harness Architecture Book Wiki</title>
+  </head>
+  <body class="atlas-page">
+    <main class="graph-page" data-pagefind-body>
+      <header class="graph-page__header">
+        <p class="source-detail__eyebrow">Static graph context</p>
+        <h1>Graph overview</h1>
+        <p>High-level owners, reading paths, and relation categories summarize the corpus graph without turning every formal object into a dense hairball.</p>
+        <a class="graph-neighborhood__cta" href="#owners">Open graph overview</a>
+      </header>
+
+      <section class="graph-overview" aria-labelledby="overview-map-heading">
+        <div>
+          <h2 id="overview-map-heading">Global graph overview</h2>
+          <p>Use this static overview to choose an owner, a path, or a relationship category before opening local context pages.</p>
+        </div>
+        <svg class="graph-overview__connectors" viewBox="0 0 100 48" aria-hidden="true" focusable="false">
+          <path d="M10 24 H90 M50 24 V8 M50 24 V40" />
+        </svg>
+        <nav class="graph-overview__nodes" aria-label="Global graph overview links">
+          {graph.overview.nodes.slice(0, 18).map((node) => (
+            <a class="graph-node" href={node.href}>
+              <span class="graph-node__type">{node.family}</span>
+              <span class="graph-node__label">{node.label}</span>
+            </a>
+          ))}
+        </nav>
+      </section>
+
+      <section class="graph-page__grid" id="owners" aria-labelledby="graph-owners-heading">
+        <h2 id="graph-owners-heading">Owners</h2>
+        <ul class="graph-card-list">
+          {owners.map((node) => (
+            <li><a href={`/graph/${encodeURIComponent(node.id)}/`}>{node.label}</a><p>{node.summary}</p></li>
+          ))}
+        </ul>
+      </section>
+
+      <section class="graph-page__grid" aria-labelledby="graph-paths-heading">
+        <h2 id="graph-paths-heading">Reading paths</h2>
+        <ul class="graph-card-list">
+          {paths.map((node) => (
+            <li><a href={`/graph/${encodeURIComponent(node.id)}/`}>{node.label}</a><p>{node.summary}</p></li>
+          ))}
+        </ul>
+      </section>
+
+      <section class="graph-page__grid" aria-labelledby="graph-categories-heading">
+        <h2 id="graph-categories-heading">Relation categories</h2>
+        <ul class="graph-card-list">
+          {categories.map((node) => (
+            <li id={node.id.replace('relation-category:', '')}><a href={node.href}>{node.label}</a><p>{node.summary}</p></li>
+          ))}
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

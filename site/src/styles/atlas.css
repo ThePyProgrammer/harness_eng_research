@@ -1239,6 +1239,186 @@ body {
   text-underline-offset: 3px;
 }
 
+.graph-page {
+  display: grid;
+  gap: var(--atlas-space-2xl);
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: var(--atlas-space-3xl) var(--atlas-space-lg);
+}
+
+.graph-page__header,
+.graph-neighborhood__header {
+  display: grid;
+  gap: var(--atlas-space-md);
+  max-width: 760px;
+}
+
+.graph-page__header h1,
+.graph-neighborhood__header h2,
+.graph-overview h2,
+.graph-page__grid h2 {
+  font-size: var(--atlas-font-size-display);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.graph-neighborhood__cta,
+.graph-node,
+.graph-card-list a,
+.graph-link-list a,
+.graph-page__back a {
+  align-items: center;
+  color: var(--atlas-color-accent);
+  display: inline-flex;
+  min-height: 44px;
+}
+
+.graph-neighborhood__cta {
+  background: var(--atlas-color-accent);
+  border-radius: 999px;
+  color: var(--atlas-color-dominant);
+  justify-content: center;
+  padding: var(--atlas-space-sm) var(--atlas-space-lg);
+  text-decoration: none;
+  width: fit-content;
+}
+
+.graph-overview,
+.graph-neighborhood,
+.graph-page__grid {
+  background: color-mix(in srgb, var(--atlas-color-secondary), white 8%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 68%);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--atlas-color-accent), transparent 88%);
+  display: grid;
+  gap: var(--atlas-space-lg);
+  padding: var(--atlas-space-lg);
+}
+
+.graph-overview__connectors,
+.graph-neighborhood__connectors {
+  color: color-mix(in srgb, var(--atlas-color-accent), transparent 36%);
+  pointer-events: none;
+}
+
+.graph-overview__connectors path,
+.graph-neighborhood__connectors path,
+.graph-neighborhood__connectors circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.graph-overview__nodes,
+.graph-neighborhood__node-list,
+.graph-card-list,
+.graph-link-list,
+.graph-relation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.graph-overview__nodes,
+.graph-card-list {
+  display: grid;
+  gap: var(--atlas-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.graph-neighborhood__canvas {
+  display: grid;
+  gap: var(--atlas-space-lg);
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  position: relative;
+}
+
+.graph-neighborhood__connectors {
+  inset: 0;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
+}
+
+.graph-neighborhood__canvas > *:not(svg) {
+  position: relative;
+  z-index: 1;
+}
+
+.graph-neighborhood__node-list,
+.graph-neighborhood__details {
+  display: grid;
+  gap: var(--atlas-space-md);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.graph-node {
+  align-items: start;
+  background: color-mix(in srgb, var(--atlas-color-dominant), white 12%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 48%);
+  border-radius: 16px;
+  color: var(--atlas-color-text);
+  display: grid;
+  gap: var(--atlas-space-xs);
+  min-height: 44px;
+  padding: var(--atlas-space-md);
+  text-decoration: none;
+}
+
+.graph-node:hover,
+.graph-node:focus-visible {
+  border-color: var(--atlas-color-accent);
+}
+
+.graph-node--current {
+  background: color-mix(in srgb, var(--atlas-color-accent), var(--atlas-color-dominant) 86%);
+}
+
+.graph-node__type,
+.graph-relation-list__label,
+.graph-link-list span,
+.graph-node__label {
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.graph-node__type,
+.graph-relation-list__label,
+.graph-link-list span {
+  color: var(--atlas-color-accent);
+}
+
+.graph-node__summary,
+.graph-card-list p,
+.graph-relation-list p {
+  color: var(--atlas-color-muted);
+  font-size: var(--atlas-font-size-body);
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.graph-link-list,
+.graph-relation-list {
+  display: grid;
+  gap: var(--atlas-space-sm);
+}
+
+.graph-link-list li,
+.graph-relation-list li,
+.graph-card-list li {
+  background: color-mix(in srgb, var(--atlas-color-dominant), white 9%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 76%);
+  border-radius: 14px;
+  display: grid;
+  gap: var(--atlas-space-xs);
+  padding: var(--atlas-space-md);
+}
+
 @media (max-width: 720px) {
   .atlas-constellation {
     margin: var(--atlas-space-xl) 0;
@@ -1306,8 +1486,22 @@ body {
     display: none;
   }
 
-  .reading-path-map__branch-list {
+  .reading-path-map__branch-list,
+  .graph-neighborhood__canvas,
+  .graph-neighborhood__node-list,
+  .graph-neighborhood__details,
+  .graph-overview__nodes,
+  .graph-card-list {
     grid-template-columns: 1fr;
+  }
+
+  .graph-page {
+    padding: var(--atlas-space-xl) var(--atlas-space-md);
+  }
+
+  .graph-neighborhood__connectors,
+  .graph-overview__connectors {
+    display: none;
   }
 
   .reading-path-branch__stops {
