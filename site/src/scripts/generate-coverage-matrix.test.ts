@@ -1,0 +1,120 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { buildCoverageMatrix, writeAllCoverageArtifacts, writeCoverageMatrix } from './generate-coverage-matrix';
+
+const testSiteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+describe('generate-coverage-matrix', () => {
+  it('builds umbrella plus twelve-pillar coverage from real registry data', () => {
+    const matrix = buildCoverageMatrix();
+
+    expect(matrix.generatedBy).toBe('site/src/scripts/generate-coverage-matrix.ts');
+    expect(matrix.ownerCount).toBe(13);
+    expect(matrix.owners).toHaveLength(13);
+    expect(matrix.owners[0]).toMatchObject({
+      ownerId: 'umbrella',
+      ownerTitle: 'A Formal Framework for AI Coding Agent Harness Architecture',
+      chapterHref: '/corpus/umbrella/',
+    });
+    expect(new Set(matrix.owners.map((owner) => owner.ownerId))).toEqual(
+      new Set([
+        'umbrella',
+        'abstraction',
+        'information',
+        'reliability',
+        'coordination',
+        'temporal',
+        'quality',
+        'governance',
+        'economics',
+        'human-interaction',
+        'model-routing',
+        'security',
+        'accretion',
+      ]),
+    );
+  });
+
+  it('reports required chapter, formal, citation, source, derivation, and discovery fields per owner', () => {
+    const matrix = buildCoverageMatrix();
+    const reliability = matrix.owners.find((owner) => owner.ownerId === 'reliability');
+
+    expect(reliability?.chapterSections.map((section) => section.key)).toEqual([
+      'problem',
+      'coreModel',
+      'keyNotation',
+      'definitions',
+      'formalClaims',
+      'derivationContext',
+      'interpretation',
+      'relatedPillars',
+      'citations',
+      'sourceTrail',
+    ]);
+    expect(reliability?.chapterSections.every((section) => section.present)).toBe(true);
+    expect(reliability?.formalObjectCount).toBeGreaterThan(0);
+    expect(reliability?.conceptCount).toBeGreaterThan(0);
+    expect(reliability?.citationCount).toBeGreaterThan(0);
+    expect(reliability?.sourceTrailCount).toBeGreaterThan(0);
+    expect(reliability?.derivationCoverage.label).toBe('Supported');
+    expect(reliability?.derivationCoverage.rationale).toContain('pillars/reliability/paper/reliability_architecture.tex');
+    expect(reliability?.discoveryPresence).toMatchObject({
+      search: true,
+      graph: true,
+      readingPaths: true,
+      relations: true,
+    });
+    expect(reliability?.diagnostics).toEqual([]);
+  });
+
+  it('preserves exact limited derivation labels when source data contains non-full support states', () => {
+    const matrix = buildCoverageMatrix({
+      derivationCoverageByOwner: {
+        reliability: [
+          {
+            sourcePath: 'pillars/reliability/paper/reliability_architecture.tex',
+            status: 'not-supported',
+            formalObjectIds: [],
+            rationale: 'pillars/reliability/paper/reliability_architecture.tex names reliability risks but does not support this derivation.',
+          },
+        ],
+        security: [
+          {
+            sourcePath: 'pillars/security/paper/security_architecture.tex',
+            status: 'thin-support',
+            formalObjectIds: [],
+            rationale: 'pillars/security/paper/security_architecture.tex has thin source support for this equation and needs an explicit limitation.',
+          },
+        ],
+      },
+    });
+
+    expect(matrix.owners.find((owner) => owner.ownerId === 'reliability')?.derivationCoverage.label).toBe('Not supported by canonical source');
+    expect(matrix.owners.find((owner) => owner.ownerId === 'security')?.derivationCoverage.label).toBe('Thin source support');
+  });
+
+  it('writes coverage-matrix.json inside site/dist only', () => {
+    mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
+    const outputDir = mkdtempSync(join(testSiteRoot, 'dist', 'coverage-matrix-'));
+
+    const outputPath = writeCoverageMatrix({ outputDir });
+    const payload = JSON.parse(readFileSync(outputPath, 'utf-8'));
+
+    expect(outputPath.endsWith('coverage-matrix.json')).toBe(true);
+    expect(payload.generatedBy).toBe('site/src/scripts/generate-coverage-matrix.ts');
+    expect(payload.ownerCount).toBe(13);
+    expect(() => writeCoverageMatrix({ outputDir: '../dist' })).toThrow('Output directory must stay inside site/');
+  });
+
+  it('writes all coverage artifacts in one bounded invocation', () => {
+    mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
+    const outputDir = mkdtempSync(join(testSiteRoot, 'dist', 'coverage-artifacts-'));
+
+    const outputPaths = writeAllCoverageArtifacts({ outputDir });
+
+    expect(outputPaths.map((path) => path.split('/').at(-1))).toEqual(['coverage-matrix.json']);
+    expect(existsSync(join(outputDir, 'coverage-matrix.json'))).toBe(true);
+  });
+});
