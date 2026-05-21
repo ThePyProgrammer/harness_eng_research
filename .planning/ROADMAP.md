@@ -160,8 +160,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-02-PLAN.md — Generate and render corpus-wide release coverage evidence.
-- [ ] 05-03-PLAN.md — Validate representative canonical math/source fixtures.
+- [x] 05-02-PLAN.md — Generate and render corpus-wide release coverage evidence.
+- [x] 05-03-PLAN.md — Validate representative canonical math/source fixtures.
 
 **Wave 3** *(blocked on Wave 2 completion where noted)*
 
@@ -183,4 +183,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
 | 4. Local Discovery and Cross-Corpus Exploration | 5/5 | Complete   | 2026-05-21 |
-| 5. Release Quality and Static Publication Readiness | 1/6 | In Progress|  |
+| 5. Release Quality and Static Publication Readiness | 3/6 | In Progress|  |
