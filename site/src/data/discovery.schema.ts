@@ -103,6 +103,35 @@ export const relationRecordSchema = z.object({
 export const relationTypeRegistrySchema = z.array(relationTypeRecordSchema);
 export const relationRecordRegistrySchema = z.array(relationRecordSchema);
 
+export const searchResultTypeSchema = z.enum([
+  'Pages',
+  'Formal Objects',
+  'Concepts',
+  'Citations',
+  'Reading Paths',
+]);
+
+export const discoverySearchRecordSchema = z.object({
+  id: nonEmptyStringSchema,
+  resultType: searchResultTypeSchema,
+  stableId: nonEmptyStringSchema,
+  title: nonEmptyStringSchema,
+  href: hrefSchema,
+  snippet: nonEmptyStringSchema,
+  ownerId: ownerIdSchema.optional(),
+  ownerTitle: nonEmptyStringSchema.optional(),
+  objectKind: nonEmptyStringSchema.optional(),
+  aliases: z.array(nonEmptyStringSchema).default([]),
+  sourceLabel: nonEmptyStringSchema.optional(),
+});
+
+export const discoverySearchIndexSchema = z.object({
+  generatedBy: nonEmptyStringSchema,
+  recordCount: z.number().int().nonnegative(),
+  resultClasses: z.array(searchResultTypeSchema).min(1),
+  records: z.array(discoverySearchRecordSchema),
+});
+
 export type DiscoveryTargetType = z.infer<typeof discoveryTargetTypeSchema>;
 export type DiscoveryTargetRef = z.infer<typeof discoveryTargetRefSchema>;
 export type ReadingPathStop = z.infer<typeof readingPathStopSchema>;
@@ -114,6 +143,9 @@ export type RelationDirection = z.infer<typeof relationDirectionSchema>;
 export type RelationTarget = z.infer<typeof relationTargetSchema>;
 export type RelationTypeRecord = z.infer<typeof relationTypeRecordSchema>;
 export type RelationRecord = z.infer<typeof relationRecordSchema>;
+export type SearchResultType = z.infer<typeof searchResultTypeSchema>;
+export type DiscoverySearchRecord = z.infer<typeof discoverySearchRecordSchema>;
+export type DiscoverySearchIndex = z.infer<typeof discoverySearchIndexSchema>;
 
 export function parseReadingPaths(paths: unknown): ReadingPath[] {
   return readingPathRegistrySchema.parse(paths);
@@ -125,4 +157,8 @@ export function parseRelationTypes(types: unknown): RelationTypeRecord[] {
 
 export function parseRelationRecords(records: unknown): RelationRecord[] {
   return relationRecordRegistrySchema.parse(records);
+}
+
+export function parseDiscoverySearchIndex(index: unknown): DiscoverySearchIndex {
+  return discoverySearchIndexSchema.parse(index);
 }
