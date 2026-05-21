@@ -70,12 +70,59 @@ export const readingPathSchema = z.object({
 
 export const readingPathRegistrySchema = z.array(readingPathSchema);
 
+export const relationTargetFamilySchema = discoveryTargetTypeSchema;
+export const relationCategorySchema = z.enum(['conceptual', 'source-provenance', 'learning-path']);
+export const relationDirectionSchema = z.enum(['directed', 'bidirectional']);
+export const relationTypeIdSchema = slugIdSchema;
+
+export const relationTargetSchema = z.object({
+  family: relationTargetFamilySchema,
+  id: z.string().trim().min(1),
+});
+
+export const relationTypeRecordSchema = z.object({
+  id: relationTypeIdSchema,
+  label: nonEmptyStringSchema,
+  category: relationCategorySchema,
+  directed: z.boolean(),
+  allowedSourceFamilies: z.array(relationTargetFamilySchema).min(1),
+  allowedTargetFamilies: z.array(relationTargetFamilySchema).min(1),
+  description: nonEmptyStringSchema,
+});
+
+export const relationRecordSchema = z.object({
+  id: slugIdSchema,
+  typeId: relationTypeIdSchema,
+  label: nonEmptyStringSchema,
+  source: relationTargetSchema,
+  target: relationTargetSchema,
+  direction: relationDirectionSchema,
+  rationale: nonEmptyStringSchema,
+});
+
+export const relationTypeRegistrySchema = z.array(relationTypeRecordSchema);
+export const relationRecordRegistrySchema = z.array(relationRecordSchema);
+
 export type DiscoveryTargetType = z.infer<typeof discoveryTargetTypeSchema>;
 export type DiscoveryTargetRef = z.infer<typeof discoveryTargetRefSchema>;
 export type ReadingPathStop = z.infer<typeof readingPathStopSchema>;
 export type ReadingPathBranch = z.infer<typeof readingPathBranchSchema>;
 export type ReadingPath = z.infer<typeof readingPathSchema>;
+export type RelationTargetFamily = z.infer<typeof relationTargetFamilySchema>;
+export type RelationCategory = z.infer<typeof relationCategorySchema>;
+export type RelationDirection = z.infer<typeof relationDirectionSchema>;
+export type RelationTarget = z.infer<typeof relationTargetSchema>;
+export type RelationTypeRecord = z.infer<typeof relationTypeRecordSchema>;
+export type RelationRecord = z.infer<typeof relationRecordSchema>;
 
 export function parseReadingPaths(paths: unknown): ReadingPath[] {
   return readingPathRegistrySchema.parse(paths);
+}
+
+export function parseRelationTypes(types: unknown): RelationTypeRecord[] {
+  return relationTypeRegistrySchema.parse(types);
+}
+
+export function parseRelationRecords(records: unknown): RelationRecord[] {
+  return relationRecordRegistrySchema.parse(records);
 }
