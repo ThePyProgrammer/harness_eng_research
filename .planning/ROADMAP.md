@@ -127,7 +127,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-03-PLAN.md — Add grouped local static search with anchor-aware search records and quality fixtures.
+- [x] 04-03-PLAN.md — Add grouped local static search with anchor-aware search records and quality fixtures.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -163,5 +163,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
-| 4. Local Discovery and Cross-Corpus Exploration | 2/5 | In Progress|  |
+| 4. Local Discovery and Cross-Corpus Exploration | 3/5 | In Progress|  |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
