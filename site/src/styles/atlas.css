@@ -1444,6 +1444,172 @@ body {
   padding: var(--atlas-space-md);
 }
 
+.release-readiness,
+.release-readiness__header,
+.release-readiness__summary,
+.release-readiness__proof-list,
+.release-readiness__actions,
+.release-readiness__diagnostics,
+.release-readiness__diagnostic-group,
+.release-readiness__empty,
+.coverage-matrix,
+.coverage-matrix__header,
+.coverage-matrix__details,
+.coverage-matrix__presence-list {
+  display: grid;
+  gap: var(--atlas-space-md);
+}
+
+.release-readiness {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: var(--atlas-space-3xl) var(--atlas-space-lg);
+}
+
+.release-readiness__header,
+.release-readiness__summary,
+.coverage-matrix,
+.release-readiness__diagnostics {
+  background: color-mix(in srgb, var(--atlas-color-secondary), white 8%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 68%);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--atlas-color-accent), transparent 88%);
+  padding: var(--atlas-space-lg);
+}
+
+.release-readiness__header h1,
+.release-readiness__summary h2,
+.coverage-matrix__header h2,
+.release-readiness__diagnostics h2 {
+  font-weight: 600;
+  margin: 0;
+}
+
+.release-readiness__header h1 {
+  font-size: var(--atlas-font-size-display);
+  line-height: 1.15;
+}
+
+.release-readiness__summary h2,
+.coverage-matrix__header h2,
+.release-readiness__diagnostics h2 {
+  font-size: var(--atlas-font-size-heading);
+  line-height: 1.2;
+}
+
+.release-readiness__header p,
+.release-readiness__summary p,
+.coverage-matrix__header p,
+.coverage-matrix__table p,
+.release-readiness__empty p,
+.release-readiness__diagnostic-group li {
+  font-size: var(--atlas-font-size-body);
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.release-readiness__eyebrow,
+.release-readiness__status-label,
+.release-readiness__proof-list dt,
+.coverage-matrix__table th,
+.coverage-matrix__table summary {
+  color: var(--atlas-color-accent);
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.release-readiness__eyebrow {
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.release-readiness__proof-list {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 0;
+}
+
+.release-readiness__proof-list div,
+.release-readiness__empty,
+.release-readiness__diagnostic-group {
+  background: color-mix(in srgb, var(--atlas-color-dominant), white 10%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 72%);
+  border-radius: 14px;
+  padding: var(--atlas-space-md);
+}
+
+.release-readiness__proof-list dd {
+  margin: 0;
+}
+
+.release-readiness__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--atlas-space-md);
+}
+
+.release-readiness__actions a {
+  align-items: center;
+  color: var(--atlas-color-accent);
+  display: inline-flex;
+  min-height: 44px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.release-readiness__primary-action {
+  background: var(--atlas-color-accent);
+  border-radius: 999px;
+  color: var(--atlas-color-dominant) !important;
+  padding: var(--atlas-space-sm) var(--atlas-space-lg);
+  text-decoration: none;
+}
+
+.coverage-matrix__table-wrap {
+  overflow-x: auto;
+}
+
+.coverage-matrix__table {
+  border-collapse: collapse;
+  min-width: 1040px;
+  width: 100%;
+}
+
+.coverage-matrix__table th,
+.coverage-matrix__table td {
+  border-bottom: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 78%);
+  padding: var(--atlas-space-sm);
+  text-align: left;
+  vertical-align: top;
+}
+
+.coverage-matrix__table td,
+.coverage-matrix__table a,
+.coverage-matrix__table code {
+  overflow-wrap: anywhere;
+}
+
+.coverage-matrix__details ul,
+.coverage-matrix__presence-list,
+.release-readiness__diagnostic-group ul {
+  margin: 0;
+  padding-left: var(--atlas-space-lg);
+}
+
+.coverage-matrix__details summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.coverage-matrix__table code,
+.release-readiness__diagnostic-group code {
+  font-family: var(--atlas-font-family-mono);
+  font-size: var(--atlas-font-size-label);
+}
+
 @media (max-width: 720px) {
   .atlas-constellation {
     margin: var(--atlas-space-xl) 0;
@@ -1520,8 +1686,30 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .graph-page {
+  .graph-page,
+  .release-readiness {
     padding: var(--atlas-space-xl) var(--atlas-space-md);
+  }
+
+  .release-readiness__summary,
+  .coverage-matrix__table,
+  .coverage-matrix__table thead,
+  .coverage-matrix__table tbody,
+  .coverage-matrix__table tr,
+  .coverage-matrix__table th,
+  .coverage-matrix__table td {
+    display: grid;
+    min-width: 0;
+  }
+
+  .coverage-matrix__table tr {
+    border-bottom: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 70%);
+    gap: var(--atlas-space-sm);
+    padding: var(--atlas-space-md) 0;
+  }
+
+  .coverage-matrix__table thead {
+    display: none;
   }
 
   .graph-neighborhood__connectors,

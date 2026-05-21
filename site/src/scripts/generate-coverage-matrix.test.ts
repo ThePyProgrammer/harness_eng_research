@@ -140,7 +140,8 @@ describe('generate-coverage-matrix', () => {
     expect(source).toContain('Diagnostics');
     expect(source).toContain('Thin source support — release allowed only with the recorded source-grounded limitation.');
     expect(source).toContain('Not supported by canonical source — do not present as a full derivation.');
-    expect(source).toContain("import { buildCoverageMatrix } from '../scripts/generate-coverage-matrix'");
+    expect(source).toContain("import { buildCoverageMatrix");
+    expect(source).toContain("from '../scripts/generate-coverage-matrix'");
     expect(source).not.toContain('fetch(');
   });
 

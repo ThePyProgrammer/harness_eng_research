@@ -1,0 +1,185 @@
+---
+import { buildCoverageMatrix, type OwnerCoverage } from '../scripts/generate-coverage-matrix';
+import '../styles/atlas.css';
+
+const matrix = buildCoverageMatrix();
+const diagnosticCount = matrix.diagnostics.length;
+const limitedDerivationCopy: Record<string, string> = {
+  'Thin source support': 'Thin source support — release allowed only with the recorded source-grounded limitation.',
+  'Not supported by canonical source': 'Not supported by canonical source — do not present as a full derivation.',
+};
+
+function sectionSummary(owner: OwnerCoverage): string {
+  const covered = owner.chapterSections.filter((section) => section.present).length;
+  return `${covered}/${owner.chapterSections.length} sections`;
+}
+
+function diagnosticHref(owner: OwnerCoverage): string {
+  return `#${owner.ownerId}-diagnostics`;
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Release readiness | Harness Architecture Book Wiki</title>
+  </head>
+  <body class="atlas-page">
+    <main class="release-readiness" data-pagefind-body>
+      <header class="release-readiness__header">
+        <p class="release-readiness__eyebrow">Release readiness evidence</p>
+        <h1>Release readiness</h1>
+        <p>
+          Compact coverage evidence for the umbrella framework and all twelve pillars, generated from typed chapter,
+          formal registry, citation, source trail, and discovery data before static publication.
+        </p>
+      </header>
+
+      <section class="release-readiness__summary" aria-labelledby="release-summary-heading">
+        <div>
+          <p class="release-readiness__status-label">{diagnosticCount === 0 ? 'Passed' : 'Blocked'}</p>
+          <h2 id="release-summary-heading">
+            {diagnosticCount === 0 ? 'Release readiness passed.' : 'Release readiness blocked.'}
+          </h2>
+          <p>
+            {diagnosticCount === 0
+              ? 'Release readiness passed. Static output, coverage evidence, source trails, citations, graph targets, math fixtures, accessibility checks, and print readiness are publishable.'
+              : 'Release readiness blocked. Fix the failing gates below before publishing.'}
+          </p>
+        </div>
+        <dl class="release-readiness__proof-list" aria-label="Release proof totals">
+          <div>
+            <dt>Coverage owners</dt>
+            <dd>{matrix.ownerCount}</dd>
+          </div>
+          <div>
+            <dt>Coverage diagnostics</dt>
+            <dd>{diagnosticCount}</dd>
+          </div>
+          <div>
+            <dt>Clean-checkout proof</dt>
+            <dd>Pending unified gate</dd>
+          </div>
+          <div>
+            <dt>Deployable static output</dt>
+            <dd>Pending output-shape gate</dd>
+          </div>
+        </dl>
+        <nav class="release-readiness__actions" aria-label="Release readiness actions">
+          <a class="release-readiness__primary-action" href="/coverage-matrix.json">Run Release Check</a>
+          <a href="#coverage-matrix">Review Coverage Matrix</a>
+          <a href="javascript:print()">Print research handout</a>
+        </nav>
+      </section>
+
+      <section class="coverage-matrix" id="coverage-matrix" aria-labelledby="coverage-matrix-heading">
+        <div class="coverage-matrix__header">
+          <p class="release-readiness__eyebrow">Coverage Matrix</p>
+          <h2 id="coverage-matrix-heading">Umbrella plus twelve-pillar coverage</h2>
+          <p>
+            Each row proves chapter sections, formal objects, concepts, citations, source trails, derivation support or source-grounded rationale,
+            discovery/index presence, and diagnostics for one corpus owner.
+          </p>
+        </div>
+
+        <div class="coverage-matrix__table-wrap">
+          <table class="coverage-matrix__table">
+            <thead>
+              <tr>
+                <th scope="col">Owner</th>
+                <th scope="col">Chapter sections</th>
+                <th scope="col">Formal objects</th>
+                <th scope="col">Concepts</th>
+                <th scope="col">Citations</th>
+                <th scope="col">Source trails</th>
+                <th scope="col">Derivation coverage</th>
+                <th scope="col">Discovery/index presence</th>
+                <th scope="col">Diagnostics</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.owners.map((owner) => (
+                <tr>
+                  <th scope="row">
+                    <a href={owner.chapterHref}>{owner.ownerTitle}</a>
+                  </th>
+                  <td>
+                    <details class="coverage-matrix__details">
+                      <summary>{sectionSummary(owner)}</summary>
+                      <ul>
+                        {owner.chapterSections.map((section) => (
+                          <li>
+                            <a href={section.href}>{section.key}</a>: {section.present ? 'Present' : 'Missing'}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </td>
+                  <td>
+                    <details class="coverage-matrix__details">
+                      <summary>{owner.formalObjectCount}</summary>
+                      <ul>
+                        {owner.formalAnchors.slice(0, 6).map((anchor) => <li><a href={anchor}>{anchor.split('#')[1]}</a></li>)}
+                      </ul>
+                    </details>
+                  </td>
+                  <td>{owner.conceptCount}</td>
+                  <td>{owner.citationCount}</td>
+                  <td>
+                    <details class="coverage-matrix__details">
+                      <summary>{owner.sourceTrailCount}</summary>
+                      <ul>
+                        {owner.sourceTrails.slice(0, 5).map((source) => (
+                          <li><code>{source.path}</code></li>
+                        ))}
+                      </ul>
+                    </details>
+                  </td>
+                  <td>
+                    <strong>{limitedDerivationCopy[owner.derivationCoverage.label] ?? owner.derivationCoverage.label}</strong>
+                    <p>{owner.derivationCoverage.rationale}</p>
+                  </td>
+                  <td>
+                    <ul class="coverage-matrix__presence-list">
+                      <li>Search: {owner.discoveryPresence.search ? 'Present' : 'Missing'}</li>
+                      <li>Graph: {owner.discoveryPresence.graph ? 'Present' : 'Missing'}</li>
+                      <li>Reading paths: {owner.discoveryPresence.readingPaths ? 'Present' : 'Missing'}</li>
+                      <li>Relations: {owner.discoveryPresence.relations ? 'Present' : 'Missing'}</li>
+                    </ul>
+                  </td>
+                  <td>
+                    <a href={diagnosticHref(owner)}>{owner.diagnostics.length === 0 ? 'No release diagnostics yet' : `${owner.diagnostics.length} diagnostics`}</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="release-readiness__diagnostics" aria-labelledby="diagnostics-heading">
+        <h2 id="diagnostics-heading">Diagnostics</h2>
+        {diagnosticCount === 0 ? (
+          <article class="release-readiness__empty">
+            <h3>No release diagnostics yet</h3>
+            <p>Run the release-readiness command to generate coverage evidence, validation results, print checks, and deployable output diagnostics.</p>
+          </article>
+        ) : (
+          matrix.owners.map((owner) => (
+            <article id={`${owner.ownerId}-diagnostics`} class="release-readiness__diagnostic-group">
+              <h3>{owner.ownerTitle}</h3>
+              <ul>
+                {owner.diagnostics.map((diagnostic) => (
+                  <li>
+                    {diagnostic.gate}: {diagnostic.entryId} failed at <code>{diagnostic.path}</code>. Reason: {diagnostic.reason}. Next step: {diagnostic.nextStep}.
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))
+        )}
+      </section>
+    </main>
+  </body>
+</html>
