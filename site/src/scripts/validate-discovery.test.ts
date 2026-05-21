@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { relationRecords, relationTypes } from '../data/relations';
-import type { DiscoverySearchRecord, RelationRecord, RelationTypeRecord } from '../data/discovery.schema';
-import { buildDiscoverySearchIndex } from './generate-local-indexes';
+import type { DiscoverySearchRecord, GraphIndex, RelationRecord, RelationTypeRecord } from '../data/discovery.schema';
+import { buildDiscoverySearchIndex, buildGraphIndex } from './generate-local-indexes';
 import { formatDiscoveryError, validateDiscovery } from './validate-discovery';
 
 function cloneFixture(): {
   relationTypes: RelationTypeRecord[];
   relationRecords: RelationRecord[];
   searchRecords: DiscoverySearchRecord[];
+  graphIndex: GraphIndex;
 } {
   return {
     relationTypes: structuredClone(relationTypes),
     relationRecords: structuredClone(relationRecords),
     searchRecords: structuredClone(buildDiscoverySearchIndex().records),
+    graphIndex: structuredClone(buildGraphIndex()),
   };
 }
 
@@ -220,6 +222,74 @@ describe('validateDiscovery', () => {
       expect.arrayContaining([
         expect.stringContaining('Invalid direction for relation type'),
         expect.stringContaining('Relation family is not allowed'),
+      ]),
+    );
+  });
+
+  it('fails graph nodes with missing labels and missing hrefs', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0].current = {
+      ...fixture.graphIndex.neighborhoods[0].current,
+      label: '',
+      href: '',
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Missing graph node label'),
+        expect.stringContaining('Missing graph node href'),
+      ]),
+    );
+  });
+
+  it('fails graph edges that point at missing node IDs', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0].edges[0] = {
+      ...fixture.graphIndex.neighborhoods[0].edges[0],
+      targetId: 'concept:not-renderable',
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Graph edge target is not renderable')]),
+    );
+  });
+
+  it('fails graph edges with invalid relation types', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0].edges[0] = {
+      ...fixture.graphIndex.neighborhoods[0].edges[0],
+      relationTypeId: 'not-registered',
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Graph edge relation type does not exist')]),
+    );
+  });
+
+  it('fails unrenderable neighborhood IDs and path membership references', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0] = {
+      ...fixture.graphIndex.neighborhoods[0],
+      id: 'concept:not-renderable',
+      pathMemberships: [{ pathId: 'missing-path', pathTitle: 'Missing path', stopTitle: 'Missing stop', href: '/reading-paths/missing-path/' }],
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Neighborhood ID does not match a renderable graph node'),
+        expect.stringContaining('Graph path membership does not reference a known reading path'),
       ]),
     );
   });
