@@ -8,6 +8,61 @@ import { buildCorpusIndex, buildDiscoverySearchIndex, writeCorpusIndex, writeDis
 
 const testSiteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
+describe('SearchPanel source integration', () => {
+  it('uses the required placeholder and grouped result labels', async () => {
+    const source = await Bun.file(new URL('../components/discovery/SearchPanel.astro', import.meta.url)).text();
+
+    expect(source).toContain('Search pages, formal objects, concepts, citations, and paths');
+    expect(source).toContain('Pages');
+    expect(source).toContain('Formal Objects');
+    expect(source).toContain('Concepts');
+    expect(source).toContain('Citations');
+    expect(source).toContain('Reading Paths');
+  });
+
+  it('renders formal-object metadata in the required order before the anchor action', async () => {
+    const source = await Bun.file(new URL('../components/discovery/SearchPanel.astro', import.meta.url)).text();
+    const objectKind = source.indexOf('record.objectKind');
+    const stableId = source.indexOf('record.stableId');
+    const ownerTitle = source.indexOf('record.ownerTitle');
+    const snippet = source.indexOf('record.snippet');
+    const action = source.indexOf('Open anchored result');
+
+    expect(objectKind).toBeGreaterThan(-1);
+    expect(stableId).toBeGreaterThan(objectKind);
+    expect(ownerTitle).toBeGreaterThan(stableId);
+    expect(snippet).toBeGreaterThan(ownerTitle);
+    expect(action).toBeGreaterThan(snippet);
+  });
+
+  it('fetches generated search metadata and joins Pagefind results by href and stable ID', async () => {
+    const source = await Bun.file(new URL('../components/discovery/SearchPanel.astro', import.meta.url)).text();
+
+    expect(source).toContain("fetch('/search-index.json')");
+    expect(source).toContain('recordsByHref');
+    expect(source).toContain('recordsByStableId');
+    expect(source).toContain('findGeneratedRecord');
+    expect(source).toContain('renderFallbackResult');
+  });
+
+  it('does not render unsafe raw Pagefind content as HTML', async () => {
+    const source = await Bun.file(new URL('../components/discovery/SearchPanel.astro', import.meta.url)).text();
+
+    expect(source).not.toContain('set:html');
+    expect(source).not.toContain('innerHTML');
+    expect(source).not.toContain('.content');
+  });
+
+  it('adds a static search page shell with Pagefind fallback body content', async () => {
+    const source = await Bun.file(new URL('../pages/search.astro', import.meta.url)).text();
+
+    expect(source).toContain("import SearchPanel from '../components/discovery/SearchPanel.astro'");
+    expect(source).toContain('<SearchPanel />');
+    expect(source).toContain('data-pagefind-body');
+    expect(source).toContain('No local results found');
+  });
+});
+
 describe('generate-local-indexes', () => {
   it('writes corpus-index.json under the provided output directory with entryCount 13', () => {
     mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
