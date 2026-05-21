@@ -86,7 +86,7 @@ describe('validateAccessibilitySemantics', () => {
 
   it('fails color-only status indicators with html.status-text diagnostics', () => {
     withDistFixture((distRoot) => {
-      writePage(distRoot, 'index.html', completeHtml.replace('Passed', '').replace('Pass', '').replace('Fail', '').replace('Thin source support', '').replace('Not supported', ''));
+      writePage(distRoot, 'index.html', completeHtml.replace('<p>Passed</p>', '<p class="release-status release-status--passed"></p>').replace('Pass', '').replace('Fail', '').replace('Thin source support', '').replace('Not supported', ''));
 
       const result = validateAccessibilitySemantics({ distRoot, cssText: completeCss });
 
