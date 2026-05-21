@@ -165,8 +165,8 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion where noted)*
 
-- [ ] 05-04-PLAN.md — Add print/citation styling and static print readiness validation.
-- [ ] 05-05-PLAN.md — Validate deployable output shape, local artifacts, and internal anchors.
+- [x] 05-04-PLAN.md — Add print/citation styling and static print readiness validation.
+- [x] 05-05-PLAN.md — Validate deployable output shape, local artifacts, and internal anchors.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -183,4 +183,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
 | 4. Local Discovery and Cross-Corpus Exploration | 5/5 | Complete   | 2026-05-21 |
-| 5. Release Quality and Static Publication Readiness | 3/6 | In Progress|  |
+| 5. Release Quality and Static Publication Readiness | 5/6 | In Progress|  |
