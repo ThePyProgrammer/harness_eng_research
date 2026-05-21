@@ -1,0 +1,68 @@
+---
+import type { ReadingPath } from '../../data/discovery.schema';
+
+interface Props {
+  path: ReadingPath;
+}
+
+const { path } = Astro.props;
+const targetTypeLabels: Record<string, string> = {
+  chapter: 'Chapter',
+  concept: 'Concept',
+  'formal-object': 'Formal object',
+  citation: 'Citation',
+  'reading-path': 'Reading path',
+};
+---
+
+<section class="reading-path-map" aria-labelledby={`${path.slug}-route-map-heading`}>
+  <div class="reading-path-map__header">
+    <p class="reading-path-map__eyebrow">Branching route map</p>
+    <h2 id={`${path.slug}-route-map-heading`}>{path.title}</h2>
+    <p>{path.theme}</p>
+  </div>
+
+  <nav class="reading-path-map__branches" aria-label={`${path.title} route branches`}>
+    <svg class="reading-path-map__connectors" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <path d="M8 18 C28 18 32 34 50 34 S72 18 92 18" />
+      <path d="M8 82 C28 82 32 66 50 66 S72 82 92 82" />
+      <path d="M50 34 L50 66" />
+    </svg>
+
+    <ol class="reading-path-map__branch-list">
+      {path.branches.map((branch, branchIndex) => (
+        <li class="reading-path-branch">
+          <div class="reading-path-branch__header">
+            <p class="reading-path-branch__kicker">Branch {String(branchIndex + 1).padStart(2, '0')}</p>
+            <h3>{branch.title}</h3>
+            <p>{branch.summary}</p>
+          </div>
+
+          <ol class="reading-path-branch__stops">
+            {branch.stops.map((stop, stopIndex) => (
+              <li class="reading-path-stop">
+                <article class="reading-path-stop__card">
+                  <div class="reading-path-stop__header">
+                    <p class="reading-path-stop__kicker">Stop {String(stopIndex + 1).padStart(2, '0')} · {targetTypeLabels[stop.target.type]}</p>
+                    <h4>{stop.title}</h4>
+                  </div>
+                  <dl class="reading-path-stop__metadata">
+                    <div>
+                      <dt>Target</dt>
+                      <dd><code>{stop.target.id}</code></dd>
+                    </div>
+                    <div>
+                      <dt>Why this stop matters</dt>
+                      <dd>{stop.why}</dd>
+                    </div>
+                  </dl>
+                  <a class="reading-path-stop__link" href={stop.target.href}>Open stop</a>
+                </article>
+              </li>
+            ))}
+          </ol>
+        </li>
+      ))}
+    </ol>
+  </nav>
+</section>

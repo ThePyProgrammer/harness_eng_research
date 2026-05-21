@@ -850,6 +850,162 @@ body {
   font-weight: 600;
 }
 
+.reading-path-page__main,
+.reading-path-map,
+.reading-path-map__header,
+.reading-path-map__branches,
+.reading-path-map__branch-list,
+.reading-path-branch,
+.reading-path-branch__header,
+.reading-path-branch__stops,
+.reading-path-stop__card,
+.reading-path-stop__header,
+.reading-path-stop__metadata {
+  display: grid;
+  gap: var(--atlas-space-md);
+}
+
+.reading-path-map {
+  background:
+    radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--atlas-color-accent), transparent 88%), transparent 32%),
+    linear-gradient(color-mix(in srgb, var(--atlas-color-accent), transparent 92%) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--atlas-color-accent), transparent 94%) 1px, transparent 1px),
+    color-mix(in srgb, var(--atlas-color-secondary), white 7%);
+  background-size: auto, 28px 28px, 28px 28px, auto;
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 64%);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--atlas-color-accent), transparent 88%);
+  gap: var(--atlas-space-xl);
+  overflow: hidden;
+  padding: var(--atlas-space-xl);
+  position: relative;
+}
+
+.reading-path-map__eyebrow,
+.reading-path-branch__kicker,
+.reading-path-stop__kicker,
+.reading-path-stop__metadata dt,
+.reading-path-stop__link {
+  color: var(--atlas-color-accent);
+  font-size: var(--atlas-font-size-label);
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.reading-path-map__eyebrow,
+.reading-path-branch__kicker,
+.reading-path-stop__kicker {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reading-path-map__header h2,
+.reading-path-branch__header h3,
+.reading-path-stop__header h4 {
+  font-weight: 600;
+  margin: 0;
+}
+
+.reading-path-map__header h2 {
+  font-size: var(--atlas-font-size-display);
+  line-height: 1.15;
+}
+
+.reading-path-branch__header h3,
+.reading-path-stop__header h4 {
+  font-size: var(--atlas-font-size-heading);
+  line-height: 1.2;
+}
+
+.reading-path-map__header p,
+.reading-path-branch__header p,
+.reading-path-stop__metadata dd {
+  font-size: var(--atlas-font-size-body);
+  font-weight: 400;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.reading-path-map__branches {
+  position: relative;
+}
+
+.reading-path-map__connectors {
+  color: color-mix(in srgb, var(--atlas-color-accent), transparent 48%);
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
+}
+
+.reading-path-map__connectors path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.reading-path-map__branch-list {
+  gap: var(--atlas-space-xl);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.reading-path-branch {
+  background: color-mix(in srgb, var(--atlas-color-dominant), white 10%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 64%);
+  border-radius: 18px;
+  padding: var(--atlas-space-lg);
+}
+
+.reading-path-branch__stops {
+  list-style: decimal-leading-zero;
+  margin: 0;
+  padding-left: var(--atlas-space-lg);
+}
+
+.reading-path-stop__card {
+  background: color-mix(in srgb, var(--atlas-color-secondary), white 8%);
+  border: 1px solid color-mix(in srgb, var(--atlas-color-accent), transparent 70%);
+  border-left: 4px solid var(--atlas-color-accent);
+  border-radius: 14px;
+  padding: var(--atlas-space-md);
+}
+
+.reading-path-stop__metadata {
+  margin: 0;
+}
+
+.reading-path-stop__metadata div {
+  display: grid;
+  gap: var(--atlas-space-sm);
+}
+
+.reading-path-stop__metadata dd {
+  margin: 0;
+}
+
+.reading-path-stop__metadata code {
+  font-family: var(--atlas-font-family-mono);
+  overflow-wrap: anywhere;
+}
+
+.reading-path-stop__link {
+  align-items: center;
+  display: inline-flex;
+  justify-self: start;
+  min-height: 44px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 @media (max-width: 720px) {
   .atlas-constellation {
     margin: var(--atlas-space-xl) 0;
@@ -904,6 +1060,22 @@ body {
   .concept-card__metadata div {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .reading-path-map {
+    padding: var(--atlas-space-lg);
+  }
+
+  .reading-path-map__connectors {
+    display: none;
+  }
+
+  .reading-path-map__branch-list {
+    grid-template-columns: 1fr;
+  }
+
+  .reading-path-branch__stops {
+    padding-left: var(--atlas-space-md);
   }
 
   .source-status,
