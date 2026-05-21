@@ -156,7 +156,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Create unified release-readiness command over existing validators.
+- [x] 05-01-PLAN.md — Create unified release-readiness command over existing validators.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -183,4 +183,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
 | 4. Local Discovery and Cross-Corpus Exploration | 5/5 | Complete   | 2026-05-21 |
-| 5. Release Quality and Static Publication Readiness | 0/6 | Not started | - |
+| 5. Release Quality and Static Publication Readiness | 1/6 | In Progress|  |
