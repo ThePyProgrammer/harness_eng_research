@@ -4,12 +4,15 @@ import { citations, formalRegistry } from '../data/formal-registry';
 import {
   relationRecordSchema,
   relationTypeRecordSchema,
+  type DiscoverySearchRecord,
+  type SearchResultType,
   type RelationRecord,
   type RelationTarget,
   type RelationTypeRecord,
 } from '../data/discovery.schema';
 import { readingPaths } from '../data/reading-paths';
 import { relationRecords as defaultRelationRecords, relationTypes as defaultRelationTypes } from '../data/relations';
+import { buildDiscoverySearchIndex } from './generate-local-indexes';
 
 export interface DiscoveryValidationError {
   entryId: string;
@@ -19,14 +22,24 @@ export interface DiscoveryValidationError {
   nextStep: string;
 }
 
+export interface DiscoverySearchFixture {
+  query: string;
+  resultType: SearchResultType;
+  expectedHrefIncludes?: string;
+  expectedStableId?: string;
+}
+
 export interface DiscoveryValidationResult {
   ok: boolean;
   errors: DiscoveryValidationError[];
+  searchFixtures: DiscoverySearchFixture[];
 }
 
 interface DiscoveryFixture {
   relationTypes?: RelationTypeRecord[];
   relationRecords?: RelationRecord[];
+  searchRecords?: DiscoverySearchRecord[];
+  searchFixtures?: DiscoverySearchFixture[];
 }
 
 function addError(
@@ -108,6 +121,39 @@ function validateTargetExists(
   }
 }
 
+const defaultSearchFixtures: DiscoverySearchFixture[] = [
+  {
+    query: 'Reliability',
+    resultType: 'Pages',
+    expectedStableId: 'reliability',
+    expectedHrefIncludes: '/corpus/reliability/',
+  },
+  {
+    query: 'compound error sensitivity',
+    resultType: 'Formal Objects',
+    expectedStableId: 'reliability.compound-error-bound',
+    expectedHrefIncludes: '#reliability.compound-error-bound',
+  },
+  {
+    query: 'context degradation',
+    resultType: 'Concepts',
+    expectedStableId: 'context-degradation',
+    expectedHrefIncludes: '#context-degradation',
+  },
+  {
+    query: 'security canonical paper',
+    resultType: 'Citations',
+    expectedStableId: 'security-paper',
+    expectedHrefIncludes: '#security-paper',
+  },
+  {
+    query: 'production hardening',
+    resultType: 'Reading Paths',
+    expectedStableId: 'production-hardening',
+    expectedHrefIncludes: '/reading-paths/production-hardening/',
+  },
+];
+
 function validateRecordSemantics(
   records: RelationRecord[],
   types: RelationTypeRecord[],
@@ -144,15 +190,71 @@ function validateRecordSemantics(
   }
 }
 
+function searchableText(record: DiscoverySearchRecord): string {
+  return [record.title, record.stableId, record.snippet, record.ownerTitle, record.objectKind, ...(record.aliases ?? [])]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function validateSearchFixtures(
+  records: DiscoverySearchRecord[],
+  fixtures: DiscoverySearchFixture[],
+  errors: DiscoveryValidationError[],
+): void {
+  for (const fixture of fixtures) {
+    if (!fixture.expectedHrefIncludes && !fixture.expectedStableId) {
+      addError(
+        errors,
+        `search:${fixture.query}`,
+        'searchFixtures.expected',
+        fixture.query,
+        'Search fixture must assert an expected href or anchor',
+        'Add expectedHrefIncludes or expectedStableId so QUAL-03 catches drift instead of accepting any non-empty result.',
+      );
+      continue;
+    }
+
+    const queryTokens = fixture.query.toLowerCase().split(/\s+/u).filter(Boolean);
+    const match = records.find((record) => {
+      if (record.resultType !== fixture.resultType) {
+        return false;
+      }
+      if (fixture.expectedStableId && record.stableId !== fixture.expectedStableId) {
+        return false;
+      }
+      if (fixture.expectedHrefIncludes && !record.href.includes(fixture.expectedHrefIncludes)) {
+        return false;
+      }
+      const text = searchableText(record);
+      return queryTokens.every((token) => text.includes(token));
+    });
+
+    if (!match) {
+      addError(
+        errors,
+        `search:${fixture.query}`,
+        'searchFixtures.expectedResult',
+        fixture.expectedHrefIncludes ?? fixture.expectedStableId ?? fixture.query,
+        `Missing expected search result for query "${fixture.query}" in ${fixture.resultType}`,
+        'Update the generated search record or fixture target so the expected page or anchor is discoverable.',
+      );
+    }
+  }
+}
+
 export function validateDiscovery(fixture: DiscoveryFixture = {}): DiscoveryValidationResult {
   const errors: DiscoveryValidationError[] = [];
   const relationTypes = fixture.relationTypes ?? defaultRelationTypes;
   const relationRecords = fixture.relationRecords ?? defaultRelationRecords;
+  const searchRecords = fixture.searchRecords ?? buildDiscoverySearchIndex().records;
+  const searchFixtures = fixture.searchFixtures ?? defaultSearchFixtures;
 
   validateTypeDefinitions(relationTypes, errors);
   validateRecordSemantics(relationRecords, relationTypes, errors);
+  validateSearchFixtures(searchRecords, searchFixtures, errors);
 
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, searchFixtures };
 }
 
 export function formatDiscoveryError(error: DiscoveryValidationError): string {
@@ -168,6 +270,7 @@ function runCli(): number {
       ok: result.ok,
       total_relation_types: defaultRelationTypes.length,
       total_relation_records: defaultRelationRecords.length,
+      total_search_fixtures: result.searchFixtures.length,
       total_errors: result.errors.length,
       errors: result.errors,
     };
@@ -178,7 +281,7 @@ function runCli(): number {
       console.error(output);
     }
   } else if (result.ok) {
-    console.log(`OK: ${defaultRelationTypes.length} relation types and ${defaultRelationRecords.length} relation records validated, 0 errors found.`);
+    console.log(`OK: ${defaultRelationTypes.length} relation types, ${defaultRelationRecords.length} relation records, and ${result.searchFixtures.length} search fixtures validated, 0 errors found.`);
   } else {
     console.error(`ERRORS: ${result.errors.length} discovery validation error(s):`);
     for (const error of result.errors) {

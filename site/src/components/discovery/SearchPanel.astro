@@ -1,0 +1,297 @@
+---
+---
+
+<section class="search-panel" aria-labelledby="search-panel-heading">
+  <header class="search-panel__header">
+    <p class="source-detail__eyebrow">Local search</p>
+    <h2 id="search-panel-heading">Search the corpus atlas</h2>
+    <p>Search pages, formal objects, concepts, citations, and reading paths using only static indexes generated with the site.</p>
+  </header>
+
+  <form class="search-panel__form" data-search-form role="search">
+    <label class="search-panel__label" for="atlas-search-input">Search corpus</label>
+    <div class="search-panel__controls">
+      <input
+        id="atlas-search-input"
+        class="search-panel__input"
+        name="q"
+        type="search"
+        placeholder="Search pages, formal objects, concepts, citations, and paths"
+        autocomplete="off"
+        data-search-input
+      />
+      <button class="search-panel__button" type="submit">Search corpus</button>
+    </div>
+  </form>
+
+  <p class="search-panel__status" data-search-status role="status">Enter a query to search the local static index.</p>
+  <div class="search-panel__results" data-search-results aria-live="polite"></div>
+</section>
+
+<script>
+  type ResultType = 'Pages' | 'Formal Objects' | 'Concepts' | 'Citations' | 'Reading Paths';
+
+  interface DiscoverySearchRecord {
+    id: string;
+    resultType: ResultType;
+    stableId: string;
+    title: string;
+    href: string;
+    snippet: string;
+    ownerId?: string;
+    ownerTitle?: string;
+    objectKind?: string;
+    aliases?: string[];
+    sourceLabel?: string;
+  }
+
+  interface PagefindSearchResult {
+    id?: string;
+    url?: string;
+    title?: string;
+    excerpt?: string;
+    plain_excerpt?: string;
+    meta?: Record<string, string>;
+    data?: () => Promise<PagefindSearchResult>;
+    sub_results?: PagefindSearchResult[];
+  }
+
+  interface PagefindApi {
+    search: (query: string) => Promise<{ results: PagefindSearchResult[] }>;
+  }
+
+  declare global {
+    interface Window {
+      pagefind?: PagefindApi;
+    }
+  }
+
+  const resultTypes: ResultType[] = ['Pages', 'Formal Objects', 'Concepts', 'Citations', 'Reading Paths'];
+  const maxDisplayedResults = 30;
+  const recordsByHref = new Map<string, DiscoverySearchRecord>();
+  const recordsByStableId = new Map<string, DiscoverySearchRecord>();
+  const form = document.querySelector<HTMLFormElement>('[data-search-form]');
+  const input = document.querySelector<HTMLInputElement>('[data-search-input]');
+  const status = document.querySelector<HTMLElement>('[data-search-status]');
+  const resultsRoot = document.querySelector<HTMLElement>('[data-search-results]');
+
+  function normalizeHref(href: string | undefined): string {
+    if (!href) {
+      return '';
+    }
+    try {
+      const url = new URL(href, window.location.origin);
+      return `${url.pathname}${url.hash}`;
+    } catch {
+      return href;
+    }
+  }
+
+  function stableIdFromHref(href: string | undefined): string | undefined {
+    const normalized = normalizeHref(href);
+    const hash = normalized.split('#')[1];
+    return hash ? decodeURIComponent(hash) : undefined;
+  }
+
+  function appendText(parent: HTMLElement, tagName: keyof HTMLElementTagNameMap, className: string, text: string): HTMLElement {
+    const child = document.createElement(tagName);
+    child.className = className;
+    child.textContent = text;
+    parent.append(child);
+    return child;
+  }
+
+  async function loadGeneratedRecords(): Promise<void> {
+    const response = await fetch('/search-index.json');
+    if (!response.ok) {
+      throw new Error(`Search metadata request failed with ${response.status}`);
+    }
+    const payload = await response.json() as { records: DiscoverySearchRecord[] };
+    for (const record of payload.records) {
+      recordsByHref.set(normalizeHref(record.href), record);
+      recordsByStableId.set(record.stableId, record);
+    }
+  }
+
+  async function loadPagefind(): Promise<PagefindApi> {
+    if (window.pagefind) {
+      return window.pagefind;
+    }
+    const pagefindPath = '/pagefind/pagefind.js';
+    await import(/* @vite-ignore */ pagefindPath);
+    if (!window.pagefind) {
+      throw new Error('Pagefind static bundle did not initialize.');
+    }
+    return window.pagefind;
+  }
+
+  async function pagefindData(result: PagefindSearchResult): Promise<PagefindSearchResult> {
+    return result.data ? await result.data() : result;
+  }
+
+  function findGeneratedRecord(result: PagefindSearchResult): DiscoverySearchRecord | undefined {
+    const href = normalizeHref(result.url);
+    const exactMatch = recordsByHref.get(href);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    const stableId = result.meta?.stableId ?? result.meta?.id ?? stableIdFromHref(result.url) ?? result.id;
+    return stableId ? recordsByStableId.get(stableId) : undefined;
+  }
+
+  function groupedContainer(): Map<ResultType, HTMLElement> {
+    const groups = new Map<ResultType, HTMLElement>();
+    if (!resultsRoot) {
+      return groups;
+    }
+    resultsRoot.replaceChildren();
+
+    for (const resultType of resultTypes) {
+      const section = document.createElement('section');
+      section.className = 'search-result-group';
+      section.dataset.resultGroup = resultType;
+      section.hidden = true;
+      const heading = document.createElement('h3');
+      heading.className = 'search-result-group__title';
+      heading.textContent = resultType;
+      section.append(heading);
+      const list = document.createElement('ol');
+      list.className = 'search-result-group__items';
+      section.append(list);
+      resultsRoot.append(section);
+      groups.set(resultType, list);
+    }
+
+    return groups;
+  }
+
+  function revealGroup(list: HTMLElement): void {
+    const section = list.closest<HTMLElement>('.search-result-group');
+    if (section) {
+      section.hidden = false;
+    }
+  }
+
+  function renderGeneratedRecord(record: DiscoverySearchRecord, list: HTMLElement): void {
+    revealGroup(list);
+    const item = document.createElement('li');
+    item.className = 'search-result-item';
+    const link = document.createElement('a');
+    link.className = 'search-result-item__title';
+    link.href = record.href;
+    link.textContent = record.title;
+    item.append(link);
+
+    if (record.resultType === 'Formal Objects') {
+      const metadata = document.createElement('dl');
+      metadata.className = 'search-result-item__metadata search-result-item__metadata--formal';
+      const fields = [
+        ['Object kind', record.objectKind ?? 'formal object'],
+        ['Stable ID', record.stableId],
+        ['Owner chapter/pillar', record.ownerTitle ?? record.ownerId ?? 'Unknown owner'],
+        ['Matched snippet', record.snippet],
+      ];
+      for (const [label, value] of fields) {
+        const row = document.createElement('div');
+        appendText(row, 'dt', 'search-result-item__meta-label', label);
+        appendText(row, 'dd', 'search-result-item__meta-value', value);
+        metadata.append(row);
+      }
+      item.append(metadata);
+      const anchor = document.createElement('a');
+      anchor.className = 'search-result-item__anchor';
+      anchor.href = record.href;
+      anchor.textContent = 'Open anchored result';
+      item.append(anchor);
+    } else {
+      appendText(item, 'p', 'search-result-item__snippet', record.snippet);
+      if (record.ownerTitle) {
+        appendText(item, 'p', 'search-result-item__context', record.ownerTitle);
+      }
+    }
+
+    list.append(item);
+  }
+
+  function renderFallbackResult(result: PagefindSearchResult, list: HTMLElement): void {
+    revealGroup(list);
+    const item = document.createElement('li');
+    item.className = 'search-result-item search-result-item--fallback';
+    const link = document.createElement('a');
+    link.className = 'search-result-item__title';
+    link.href = normalizeHref(result.url) || '#';
+    link.textContent = result.title ?? 'Untitled local result';
+    item.append(link);
+    appendText(item, 'p', 'search-result-item__snippet', result.plain_excerpt ?? result.excerpt ?? 'Local Pagefind result without generated metadata.');
+    appendText(item, 'p', 'search-result-item__context', result.meta?.type ?? 'Unmatched Pagefind result');
+    list.append(item);
+  }
+
+  async function renderResults(query: string): Promise<void> {
+    if (!status || !resultsRoot) {
+      return;
+    }
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      status.textContent = 'Enter a query to search the local static index.';
+      resultsRoot.replaceChildren();
+      return;
+    }
+
+    status.textContent = 'Searching local index...';
+    const pagefind = await loadPagefind();
+    const pagefindResults = await pagefind.search(trimmedQuery);
+    const groups = groupedContainer();
+    let renderedCount = 0;
+
+    for (const result of pagefindResults.results.slice(0, maxDisplayedResults)) {
+      const data = await pagefindData(result);
+      const candidates = [data, ...(data.sub_results ?? [])];
+      for (const candidate of candidates) {
+        const record = findGeneratedRecord(candidate);
+        if (record) {
+          const list = groups.get(record.resultType);
+          if (list) {
+            renderGeneratedRecord(record, list);
+            renderedCount += 1;
+          }
+        } else {
+          const list = groups.get((candidate.meta?.type as ResultType | undefined) ?? 'Pages');
+          if (list) {
+            renderFallbackResult(candidate, list);
+            renderedCount += 1;
+          }
+        }
+      }
+    }
+
+    if (renderedCount === 0) {
+      resultsRoot.replaceChildren();
+      const empty = document.createElement('section');
+      empty.className = 'search-panel__empty';
+      appendText(empty, 'h3', 'search-panel__empty-title', 'No local results found');
+      appendText(empty, 'p', 'search-panel__empty-body', 'Try a pillar name, formal object ID, concept alias, citation key, or reading path theme.');
+      resultsRoot.append(empty);
+      status.textContent = 'No local results found';
+      return;
+    }
+
+    status.textContent = `${renderedCount} local result${renderedCount === 1 ? '' : 's'} grouped by type.`;
+  }
+
+  loadGeneratedRecords().catch((error: unknown) => {
+    if (status) {
+      status.textContent = error instanceof Error ? error.message : 'Discovery metadata could not be rendered.';
+    }
+  });
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    renderResults(input?.value ?? '').catch((error: unknown) => {
+      if (status) {
+        status.textContent = error instanceof Error ? error.message : 'Discovery metadata could not be rendered.';
+      }
+    });
+  });
+</script>
