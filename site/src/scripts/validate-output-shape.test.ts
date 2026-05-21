@@ -183,6 +183,22 @@ describe('validate-output-shape', () => {
     });
   });
 
+  it('fails javascript hrefs in generated static pages', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="javascript:print()">Print</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.href',
+        path: 'site/dist/index.html',
+        reason: expect.stringContaining('javascript:'),
+      }));
+    });
+  });
+
   it('reports malformed percent-encoded fragments as structured diagnostics', () => {
     withFixture((distDir) => {
       writeHtml(join(distDir, 'index.html'), '<a href="#%E0%A4%A">Malformed fragment</a>');

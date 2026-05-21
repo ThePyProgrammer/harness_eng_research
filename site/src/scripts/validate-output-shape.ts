@@ -54,7 +54,7 @@ interface HtmlPage {
 
 const siteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const displayDistPrefix = 'site/dist';
-const ignoredHrefSchemes = /^(?:https?:|mailto:|tel:|data:|javascript:)/iu;
+const ignoredHrefSchemes = /^(?:https?:|mailto:|tel:|data:)/iu;
 const deployableAssetExtensions = new Set(['.css', '.js', '.mjs', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.otf', '.map', '.json', '.xml', '.txt', '.webmanifest']);
 
 function defaultDistDir(): string {
@@ -332,6 +332,19 @@ function validateHtmlLinks(distDir: string, pages: HtmlPage[], errors: OutputSha
 
   for (const page of pages) {
     for (const href of hrefs(page.html)) {
+      if (/^javascript:/iu.test(href)) {
+        linksChecked += 1;
+        addError(
+          errors,
+          page.relativePath,
+          'html.href',
+          displayPath(page.absolutePath, distDir),
+          `Local href ${href} uses a javascript: URL`,
+          'Replace JavaScript URLs with buttons or safe static links before publishing.',
+        );
+        continue;
+      }
+
       if (!isLocalHref(href)) {
         continue;
       }

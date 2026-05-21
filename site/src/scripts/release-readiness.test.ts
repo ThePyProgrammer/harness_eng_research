@@ -140,6 +140,7 @@ describe('release readiness', () => {
     expect(pageSource).not.toContain('Release readiness passed. Static output');
     expect(pageSource).toContain('Coverage readiness');
     expect(pageSource).toContain('Run the unified release gate');
+    expect(pageSource).not.toContain('javascript:print()');
   });
 
   it('groups plain output under all final gate headings', () => {
