@@ -444,22 +444,19 @@ const requiredPrintSignals = [
 | A3 | No new external packages are needed for Phase 5. | Standard Stack / Package Audit | If wrong, planner may need a human verification checkpoint for any added package. |
 | A4 | Broad print selectors can accidentally hide research provenance structures. | Common Pitfalls | If wrong, print validation may be too conservative, but preserving source trails is a locked requirement. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Where should the unified command live?**
-   - What we know: Context delegates exact command location to downstream planning and allows `site/`, repository root, or both. [CITED: .planning/phases/05-release-quality-and-static-publication-readiness/05-CONTEXT.md]
-   - What's unclear: Whether the user prefers root convenience wrappers in addition to `site/package.json`. [ASSUMED]
-   - Recommendation: Put the canonical implementation in `site/src/scripts/release-readiness.ts` and `site/package.json`, with an optional root wrapper only if existing repo conventions justify it. [ASSUMED]
+1. **Where should the unified command live? — RESOLVED**
+   - Decision: The canonical implementation lives under `site/`: `site/src/scripts/release-readiness.ts` with `release`, `release:json`, and `release:clean-proof` scripts in `site/package.json`. No repository-root wrapper is planned for Phase 5. This implements D-10 while preserving the locked project boundary that site implementation stays under `site/` and canonical corpus files remain read-only inputs.
+   - Reflected by plans: 05-01 creates the initial `site/` command; 05-06 completes final orchestration and clean-checkout proof wiring.
 
-2. **Which math snippets are representative enough?**
-   - What we know: Phase requires umbrella and multiple pillar papers, not every equation in all papers. [CITED: .planning/REQUIREMENTS.md]
-   - What's unclear: Exact fixture count and pillar selection. [ASSUMED]
-   - Recommendation: Use umbrella plus at least reliability, information, coordination, economics, and security because they exercise equations, notation, citations, and multiple pillar paths. [ASSUMED]
+2. **Which math snippets are representative enough? — RESOLVED**
+   - Decision: Use umbrella plus `reliability`, `information`, `coordination`, `economics`, and `security` fixtures. This satisfies QUAL-02 by covering the umbrella paper and multiple pillar papers while keeping the fixture set bounded and source-grounded.
+   - Reflected by plans: 05-03 requires default fixtures for exactly those owner IDs and maps each fixture to canonical `.tex` snippets plus existing formal registry IDs.
 
-3. **Should coverage report be a static page, JSON artifact, or both?**
-   - What we know: Context requires a generated human-readable report/page, with underlying data available to validators where useful. [CITED: .planning/phases/05-release-quality-and-static-publication-readiness/05-CONTEXT.md]
-   - What's unclear: Preferred URL and whether JSON should be checked into source or generated into `dist/`. [ASSUMED]
-   - Recommendation: Render `/release-readiness/` from typed data and write generated JSON into `dist/coverage-matrix.json` during release. [ASSUMED]
+3. **Should coverage report be a static page, JSON artifact, or both? — RESOLVED**
+   - Decision: Produce both: render the human-readable `/release-readiness/` static page from typed coverage data at Astro build time, and write machine-readable `dist/coverage-matrix.json` during release after `build:astro` and local index generation so later output-shape validation sees the artifact. The JSON is generated output, not checked-in source.
+   - Reflected by plans: 05-02 creates the page and coverage generator; 05-05 validates `coverage-matrix.json` in `dist`; 05-06 orders `build:astro` and `index` before `writeCoverageMatrix({ outputDir: "dist" })` and output-shape validation.
 
 ## Environment Availability
 

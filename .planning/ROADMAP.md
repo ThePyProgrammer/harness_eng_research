@@ -150,8 +150,27 @@ Plans:
   3. Builder can start from a clean checkout, install dependencies, build the site, generate local search/graph/citation indexes, and produce deployable static output.
   4. User can use print- or citation-friendly page styling for research reading and sharing.
 
-**Plans**: TBD
+**Plans**: 6 plans
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Create unified release-readiness command over existing validators.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — Generate and render corpus-wide release coverage evidence.
+- [ ] 05-03-PLAN.md — Validate representative canonical math/source fixtures.
+
+**Wave 3** *(blocked on Wave 2 completion where noted)*
+
+- [ ] 05-04-PLAN.md — Add print/citation styling and static print readiness validation.
+- [ ] 05-05-PLAN.md — Validate deployable output shape, local artifacts, and internal anchors.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05-06-PLAN.md — Compose all focused gates into the final clean-checkout release proof.
 
 ## Progress
 
@@ -164,4 +183,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
 | 4. Local Discovery and Cross-Corpus Exploration | 5/5 | Complete   | 2026-05-21 |
-| 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
+| 5. Release Quality and Static Publication Readiness | 0/6 | Not started | - |
