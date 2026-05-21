@@ -1,0 +1,169 @@
+---
+import { chapterRegistry } from '../../data/chapters';
+import { conceptRegistry } from '../../data/concepts';
+import { corpusEntries } from '../../data/corpus';
+import { citations, formalRegistry } from '../../data/formal-registry';
+import { readingPaths } from '../../data/reading-paths';
+import { relationRecords, relationTypes } from '../../data/relations';
+import type { RelationCategory, RelationRecord, RelationTarget, RelationTargetFamily, RelationTypeRecord } from '../../data/discovery.schema';
+
+interface Props {
+  source: RelationTarget;
+  headingId?: string;
+  showEmpty?: boolean;
+}
+
+interface RenderedTarget {
+  title: string;
+  familyLabel: string;
+  href: string;
+}
+
+interface RenderedRelation {
+  record: RelationRecord;
+  type: RelationTypeRecord;
+  target: RenderedTarget;
+}
+
+const { source, headingId = `${source.family}-${source.id}-related-links`, showEmpty = true } = Astro.props;
+
+const typeById = new Map(relationTypes.map((type) => [type.id, type]));
+const corpusByOwner = new Map(corpusEntries.map((entry) => [entry.id, entry]));
+const chapterByOwner = new Map(chapterRegistry.map((chapter) => [chapter.ownerId, chapter]));
+const conceptById = new Map(conceptRegistry.map((concept) => [concept.id, concept]));
+const formalById = new Map(formalRegistry.map((object) => [object.id, object]));
+const citationById = new Map(citations.map((citation) => [citation.id, citation]));
+const readingPathBySlug = new Map(readingPaths.map((path) => [path.slug, path]));
+
+const familyLabels: Record<RelationTargetFamily, string> = {
+  chapter: 'Chapter',
+  concept: 'Concept',
+  'formal-object': 'Formal object',
+  citation: 'Citation',
+  'reading-path': 'Reading path',
+};
+
+const categoryLabels: Record<RelationCategory, string> = {
+  conceptual: 'Conceptual',
+  'source-provenance': 'Source/provenance',
+  'learning-path': 'Learning path',
+};
+
+function sameTarget(left: RelationTarget, right: RelationTarget): boolean {
+  return left.family === right.family && left.id === right.id;
+}
+
+function targetHref(target: RelationTarget): string {
+  if (target.family === 'chapter') {
+    const entry = corpusByOwner.get(target.id);
+    return entry ? `/corpus/${entry.slug}/` : '#';
+  }
+  if (target.family === 'concept') {
+    return `/glossary/#${target.id}`;
+  }
+  if (target.family === 'formal-object') {
+    const object = formalById.get(target.id);
+    const owner = object ? corpusByOwner.get(object.ownerId) : undefined;
+    return owner ? `/corpus/${owner.slug}/#${target.id}` : `#${target.id}`;
+  }
+  if (target.family === 'citation') {
+    return `/formal-registry/#${target.id}`;
+  }
+  return `/reading-paths/${target.id}/`;
+}
+
+function targetTitle(target: RelationTarget): string {
+  if (target.family === 'chapter') {
+    return chapterByOwner.get(target.id)?.title ?? corpusByOwner.get(target.id)?.title ?? target.id;
+  }
+  if (target.family === 'concept') {
+    return conceptById.get(target.id)?.term ?? target.id;
+  }
+  if (target.family === 'formal-object') {
+    return formalById.get(target.id)?.title ?? target.id;
+  }
+  if (target.family === 'citation') {
+    return citationById.get(target.id)?.label ?? target.id;
+  }
+  return readingPathBySlug.get(target.id)?.title ?? target.id;
+}
+
+function relationTargetFor(record: RelationRecord): RelationTarget | null {
+  if (sameTarget(record.source, source)) {
+    return record.target;
+  }
+  if (record.direction === 'bidirectional' && sameTarget(record.target, source)) {
+    return record.source;
+  }
+  return null;
+}
+
+const relations = relationRecords
+  .map((record): RenderedRelation | null => {
+    const target = relationTargetFor(record);
+    const type = typeById.get(record.typeId);
+    if (!target || !type) {
+      return null;
+    }
+
+    return {
+      record,
+      type,
+      target: {
+        title: targetTitle(target),
+        familyLabel: familyLabels[target.family],
+        href: targetHref(target),
+      },
+    };
+  })
+  .filter((relation): relation is RenderedRelation => relation !== null);
+
+const groupedRelations = Array.from(
+  relations.reduce((groups, relation) => {
+    const key = `${relation.type.category}:${relation.type.id}`;
+    const group = groups.get(key) ?? { type: relation.type, items: [] as RenderedRelation[] };
+    group.items.push(relation);
+    groups.set(key, group);
+    return groups;
+  }, new Map<string, { type: RelationTypeRecord; items: RenderedRelation[] }>()).values(),
+);
+---
+
+{relations.length > 0 || showEmpty ? (
+  <section class="related-links" aria-labelledby={headingId}>
+    <header class="related-links__header">
+      <p class="related-links__eyebrow">Typed relationship metadata</p>
+      <h2 id={headingId}>Related links</h2>
+    </header>
+
+    {relations.length === 0 ? (
+      <p class="related-links__empty" role="status">No typed relations have been registered for this item yet.</p>
+    ) : (
+      <div class="related-links__groups">
+        {groupedRelations.map((group) => (
+          <section class="related-links__group" aria-labelledby={`${headingId}-${group.type.id}`}>
+            <h3 id={`${headingId}-${group.type.id}`}>
+              <span class="related-links__category">{categoryLabels[group.type.category]}</span>
+              <span>{group.type.label}</span>
+            </h3>
+            <ol class="related-links__list">
+              {group.items.map((relation) => (
+                <li class="related-links__row">
+                  <div class="related-links__row-main">
+                    <p class="related-links__label">{relation.type.label}</p>
+                    <h4>{relation.target.title}</h4>
+                    <p>{relation.record.rationale}</p>
+                  </div>
+                  <div class="related-links__row-meta">
+                    <span class="related-links__family">{relation.target.familyLabel}</span>
+                    <a href={relation.target.href}>Open related link</a>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
+    )}
+  </section>
+) : null}
