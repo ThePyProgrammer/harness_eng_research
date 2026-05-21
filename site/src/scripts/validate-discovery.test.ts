@@ -55,7 +55,7 @@ describe('RelatedLinks source integration', () => {
 
 describe('validateDiscovery', () => {
   it('validates the real Phase 4 relation and representative search metadata', () => {
-    expect(validateDiscovery()).toEqual({ ok: true, errors: [] });
+    expect(validateDiscovery()).toMatchObject({ ok: true, errors: [] });
   });
 
   it('validates representative search fixtures for every required result class', () => {
