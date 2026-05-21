@@ -1610,6 +1610,177 @@ body {
   font-size: var(--atlas-font-size-label);
 }
 
+@media print {
+  @page {
+    margin: 0.75in;
+  }
+
+  html,
+  body,
+  .atlas-page {
+    background: #fff !important;
+    color: #000;
+  }
+
+  body {
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  .atlas-page,
+  .source-detail-shell,
+  .source-detail,
+  .registry-page,
+  .graph-page,
+  .release-readiness {
+    display: block;
+    margin: 0;
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .book-spine-panel,
+  .book-footer-nav,
+  .graph-neighborhood__cta,
+  .search-panel,
+  .route-map,
+  .reading-path-map__connectors,
+  .graph-overview__connectors,
+  .graph-neighborhood__connectors,
+  .atlas-constellation__lines,
+  .release-readiness__actions {
+    display: none !important;
+  }
+
+  .source-detail__header,
+  .chapter-section,
+  .chapter-graph-context,
+  .related-links,
+  .source-panel,
+  .formal-block,
+  .formal-derivation,
+  .formal-citation,
+  .formal-footnote,
+  .formal-bibliography-entry,
+  .formal-source-trail,
+  .formal-registry-list,
+  .formal-registry-row,
+  .concept-card,
+  .release-readiness__header,
+  .release-readiness__summary,
+  .release-readiness__diagnostics,
+  .release-readiness__diagnostic-group,
+  .coverage-matrix,
+  .coverage-matrix__details,
+  .coverage-matrix__presence-list {
+    background: #fff !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    color: #000;
+    display: block;
+  }
+
+  .formal-block,
+  .formal-derivation,
+  .formal-citation,
+  .formal-footnote,
+  .formal-bibliography-entry,
+  .formal-source-trail,
+  .source-panel,
+  .release-readiness__summary,
+  .coverage-matrix,
+  .release-readiness__diagnostics {
+    border: 1px solid #999;
+    border-left: 3px solid #333;
+    margin: 16px 0;
+    padding: 12px;
+  }
+
+  h1,
+  h2,
+  h3,
+  .formal-block__title,
+  .formal-source-trail__title {
+    break-after: avoid;
+    color: #000;
+  }
+
+  p,
+  li,
+  dd,
+  dt,
+  code,
+  .formal-block__body,
+  .formal-derivation__cell,
+  .formal-citation__body,
+  .formal-footnote,
+  .formal-bibliography-entry,
+  .formal-source-trail__row,
+  .source-panel__row,
+  .coverage-matrix__table,
+  .coverage-matrix__table p,
+  .release-readiness__diagnostic-group li {
+    color: #000;
+    overflow-wrap: anywhere;
+  }
+
+  .formal-block__header,
+  .formal-derivation__header,
+  .formal-source-trail__header,
+  .formal-block__meta-row,
+  .formal-source-trail__row,
+  .source-panel__row,
+  .chapter-page__metadata div {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: 1fr;
+  }
+
+  .coverage-matrix__table-wrap {
+    overflow: visible;
+  }
+
+  .coverage-matrix__table {
+    border-collapse: collapse;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .coverage-matrix__table th,
+  .coverage-matrix__table td {
+    border: 1px solid #aaa;
+    padding: 6px;
+  }
+
+  .coverage-matrix__details summary {
+    min-height: 0;
+  }
+
+  a,
+  .formal-block__source-link,
+  .formal-citation a,
+  .formal-source-trail a,
+  .formal-registry-row__anchor,
+  .concept-card a {
+    color: #000;
+    min-height: 0;
+    text-decoration: underline;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-family: var(--atlas-font-family-mono);
+    font-size: 9pt;
+    overflow-wrap: anywhere;
+  }
+
+  a[href^="#"]::after,
+  a[href^="javascript:"]::after {
+    content: "";
+  }
+}
+
 @media (max-width: 720px) {
   .atlas-constellation {
     margin: var(--atlas-space-xl) 0;
