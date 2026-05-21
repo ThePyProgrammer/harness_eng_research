@@ -75,10 +75,28 @@ export const relationCategorySchema = z.enum(['conceptual', 'source-provenance',
 export const relationDirectionSchema = z.enum(['directed', 'bidirectional']);
 export const relationTypeIdSchema = slugIdSchema;
 
-export const relationTargetSchema = z.object({
-  family: relationTargetFamilySchema,
-  id: z.string().trim().min(1),
-});
+export const relationTargetSchema = z.discriminatedUnion('family', [
+  z.object({
+    family: z.literal('chapter'),
+    id: ownerIdSchema,
+  }),
+  z.object({
+    family: z.literal('concept'),
+    id: slugIdSchema,
+  }),
+  z.object({
+    family: z.literal('formal-object'),
+    id: formalObjectIdSchema,
+  }),
+  z.object({
+    family: z.literal('citation'),
+    id: slugIdSchema,
+  }),
+  z.object({
+    family: z.literal('reading-path'),
+    id: slugIdSchema,
+  }),
+]);
 
 export const relationTypeRecordSchema = z.object({
   id: relationTypeIdSchema,

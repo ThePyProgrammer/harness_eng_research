@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chapterRegistry } from '../data/chapters';
 import { conceptRegistry } from '../data/concepts';
 import { corpusEntries } from '../data/corpus';
 import type { CorpusEntry } from '../data/corpus.schema';
@@ -83,6 +82,7 @@ function pageRecords(entries: CorpusEntry[]): DiscoverySearchRecord[] {
     snippet: `${entry.kind === 'umbrella' ? 'Umbrella framework' : 'Pillar'} page: ${entry.summary}`,
     ownerId: entry.id,
     ownerTitle: entry.title,
+    aliases: [],
     sourceLabel: entry.canonicalTex,
   }));
 }
@@ -194,6 +194,10 @@ function relationTargetToGraphFamily(family: RelationTarget['family']): GraphNod
   return family;
 }
 
+function discoveryTargetToRelationTarget(target: { type: RelationTarget['family']; id: string }): RelationTarget {
+  return { family: target.type, id: target.id } as RelationTarget;
+}
+
 function graphNodeForTarget(target: RelationTarget): GraphNode {
   const id = graphNodeId({ family: relationTargetToGraphFamily(target.family), id: target.id });
 
@@ -249,7 +253,7 @@ function pathMembershipsFor(nodeId: string): GraphPathMembership[] {
   for (const path of readingPaths) {
     for (const branch of path.branches) {
       for (const stop of branch.stops) {
-        if (graphNodeId({ family: stop.target.type, id: stop.target.id }) === nodeId) {
+        if (graphNodeId(discoveryTargetToRelationTarget(stop.target)) === nodeId) {
           memberships.push({
             pathId: path.slug,
             pathTitle: path.title,
@@ -300,13 +304,13 @@ function overviewCategoryNode(category: string): GraphNode {
 
 export function buildGraphIndex(): GraphIndex {
   const relationNodes = relationRecords.flatMap((record) => [graphNodeForTarget(record.source), graphNodeForTarget(record.target)]);
-  const pathStopNodes = readingPaths.flatMap((path) => path.branches.flatMap((branch) => branch.stops.map((stop) => graphNodeForTarget({ family: stop.target.type, id: stop.target.id }))));
+  const pathStopNodes = readingPaths.flatMap((path) => path.branches.flatMap((branch) => branch.stops.map((stop) => graphNodeForTarget(discoveryTargetToRelationTarget(stop.target)))));
   const nodeById = new Map(uniqueNodes([...relationNodes, ...pathStopNodes]).map((node) => [node.id, node]));
   const relationEdges = relationRecords.map(edgeFromRelation);
   const pathEdges = readingPaths.flatMap((path) => path.branches.flatMap((branch) => branch.stops.map((stop) => ({
     id: `path:${path.slug}:${branch.id}:${stop.id}`,
     sourceId: `reading-path:${path.slug}`,
-    targetId: graphNodeId({ family: stop.target.type, id: stop.target.id }),
+    targetId: graphNodeId(discoveryTargetToRelationTarget(stop.target)),
     relationTypeId: 'next-readings',
     label: 'next readings',
     category: 'learning-path' as const,

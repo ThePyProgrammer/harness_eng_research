@@ -44,7 +44,7 @@ export const relationTypes = parseRelationTypes([
     label: 'next readings',
     category: 'learning-path',
     directed: true,
-    allowedSourceFamilies: allFamilies,
+    allowedSourceFamilies: [...allFamilies],
     allowedTargetFamilies: ['reading-path', 'chapter', 'formal-object', 'concept'],
     description: 'The target is a recommended next stop for studying the source context.',
   },

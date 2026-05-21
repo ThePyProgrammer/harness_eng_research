@@ -229,7 +229,7 @@ describe('validateDiscovery', () => {
     const fixture = cloneFixture();
     fixture.relationRecords[0] = {
       ...fixture.relationRecords[0],
-      source: { family: 'chapter', id: 'missing-chapter' },
+      source: { family: 'chapter', id: 'missing-chapter' as never },
     };
     fixture.relationRecords[1] = {
       ...fixture.relationRecords[1],
@@ -251,7 +251,7 @@ describe('validateDiscovery', () => {
     const fixture = cloneFixture();
     fixture.relationRecords[0] = {
       ...fixture.relationRecords[0],
-      direction: 'reverse',
+      direction: 'reverse' as never,
     };
     fixture.relationRecords[1] = {
       ...fixture.relationRecords[1],

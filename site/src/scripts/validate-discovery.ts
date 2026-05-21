@@ -251,14 +251,6 @@ function validateGraphIndex(
   relationTypes: RelationTypeRecord[],
   errors: DiscoveryValidationError[],
 ): void {
-  const registryNodeIds = new Set<string>();
-  const idsByFamily = knownTargetIds();
-  for (const family of Object.keys(idsByFamily) as RelationTarget['family'][]) {
-    for (const id of idsByFamily[family]) {
-      registryNodeIds.add(`${family}:${id}`);
-    }
-  }
-
   const allNodes = [
     ...graphIndex.overview.nodes,
     ...graphIndex.neighborhoods.flatMap((neighborhood) => [neighborhood.current, ...neighborhood.nodes, ...neighborhood.nextHops]),
@@ -281,7 +273,7 @@ function validateGraphIndex(
   }
 
   for (const neighborhood of graphIndex.neighborhoods) {
-    if (neighborhood.id !== neighborhood.current.id || !registryNodeIds.has(neighborhood.id)) {
+    if (neighborhood.id !== neighborhood.current.id || !nodeIds.has(neighborhood.id)) {
       addError(errors, neighborhood.id, 'graph.neighborhood.id', neighborhood.current.id, 'Neighborhood ID does not match a renderable graph node', 'Build local graph routes from generated current node IDs only.');
     }
     for (const membership of neighborhood.pathMemberships) {
