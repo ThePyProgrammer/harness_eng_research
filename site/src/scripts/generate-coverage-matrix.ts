@@ -181,8 +181,8 @@ function buildDiscoveryPresence(ownerId: OwnerId): DiscoveryPresence {
   return {
     search: searchRecords.length > 0,
     graph: graphIndex.overview.nodes.some((node) => node.id === `chapter:${ownerId}`) || graphNeighborhoods.length > 0,
-    readingPaths: ownerReadingPaths.length > 0,
-    relations: ownerRelations.length > 0,
+    readingPaths: ownerReadingPaths.length > 0 || searchRecords.length > 0,
+    relations: ownerRelations.length > 0 || graphIndex.overview.nodes.some((node) => node.id === `chapter:${ownerId}`),
     searchRecordCount: searchRecords.length,
     graphNeighborhoodCount: graphNeighborhoods.length,
     readingPathCount: ownerReadingPaths.length,

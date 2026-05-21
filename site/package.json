@@ -10,9 +10,14 @@
     "validate": "bun run src/scripts/validate-corpus.ts && bun run src/scripts/validate-formal-registry.ts && bun run src/scripts/validate-discovery.ts",
     "release": "bun run src/scripts/release-readiness.ts",
     "release:json": "bun run src/scripts/release-readiness.ts --json",
+    "coverage": "bun run src/scripts/generate-coverage-matrix.ts",
+    "validate:math": "bun run src/scripts/validate-math-fixtures.ts",
     "validate:accessibility": "bun run src/scripts/validate-accessibility-semantics.ts",
+    "validate:print": "bun run src/scripts/validate-print-readiness.ts",
+    "validate:output": "bun run src/scripts/validate-output-shape.ts",
     "index": "bun run src/scripts/generate-local-indexes.ts && if find dist -name '*.html' | grep -q .; then pagefind --site dist; else echo 'Skipping Pagefind: no static HTML found in dist yet.' >&2; fi",
     "build": "bun run validate && bun run build:astro && bun run index",
+    "release:clean-proof": "bun install --frozen-lockfile && bun run release",
     "test": "vitest run"
   },
   "dependencies": {
