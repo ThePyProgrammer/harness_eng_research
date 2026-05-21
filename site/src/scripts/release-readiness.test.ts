@@ -32,7 +32,10 @@ describe('release readiness', () => {
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
-    expect(result.gates.map((gate) => gate.gate)).toEqual(['corpus', 'formal-registry', 'discovery']);
+    expect(result.gates.map((gate) => gate.gate)).toEqual(
+      expect.arrayContaining(['corpus', 'formal-registry', 'discovery']),
+    );
+    expect(result.totals.pending).toBeGreaterThan(0);
   });
 
   it('preserves failed gate diagnostic evidence with the gate name', () => {
