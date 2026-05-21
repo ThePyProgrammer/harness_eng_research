@@ -1,6 +1,7 @@
 ---
 import BookFooterNav from '../../components/BookFooterNav.astro';
 import SourceLinkPanel from '../../components/SourceLinkPanel.astro';
+import RelatedLinks from '../../components/discovery/RelatedLinks.astro';
 import DefinitionBlock from '../../components/formal/DefinitionBlock.astro';
 import TheoremBlock from '../../components/formal/TheoremBlock.astro';
 import DerivationWalkthrough from '../../components/formal/DerivationWalkthrough.astro';
@@ -241,6 +242,7 @@ const pageTitle = `${chapter.title} | Harness Architecture Book Wiki`;
           })}
         </section>
 
+        <RelatedLinks source={{ family: 'chapter', id: entry.id }} headingId={`${entry.id}-related-links`} />
         <SourceLinkPanel entry={entry} />
         <BookFooterNav currentId={entry.id} />
       </main>
