@@ -18,6 +18,39 @@ function cloneFixture(): {
   };
 }
 
+describe('Graph source integration', () => {
+  it('renders the graph overview CTA and source-backed graph index data', async () => {
+    const source = await Bun.file(new URL('../pages/graph/index.astro', import.meta.url)).text();
+
+    expect(source).toContain('Open graph overview');
+    expect(source).toContain('buildGraphIndex');
+    expect(source).toContain('graph.overview.nodes');
+  });
+
+  it('renders local context copy and semantic graph node links', async () => {
+    const source = await Bun.file(new URL('../components/discovery/GraphNeighborhood.astro', import.meta.url)).text();
+
+    expect(source).toContain('Open local context');
+    expect(source).toContain('Nearby nodes show validated next readings and typed relationships generated from static metadata.');
+    expect(source).toContain('<a class="graph-node');
+    expect(source).toContain('node.href');
+  });
+
+  it('marks decorative graph connector SVGs as hidden and unfocusable', async () => {
+    const source = await Bun.file(new URL('../components/discovery/GraphNeighborhood.astro', import.meta.url)).text();
+
+    expect(source).toContain('aria-hidden="true"');
+    expect(source).toContain('focusable="false"');
+  });
+
+  it('uses getStaticPaths over generated graph neighborhoods', async () => {
+    const source = await Bun.file(new URL('../pages/graph/[id].astro', import.meta.url)).text();
+
+    expect(source).toContain('export function getStaticPaths()');
+    expect(source).toContain('buildGraphIndex().neighborhoods');
+  });
+});
+
 describe('RelatedLinks source integration', () => {
   it('renders the required related links heading and row fields', async () => {
     const source = await Bun.file(new URL('../components/discovery/RelatedLinks.astro', import.meta.url)).text();
