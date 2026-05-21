@@ -26,7 +26,7 @@ function createCompleteDistFixture(): string {
     writeHtml(join(pageDir, 'index.html'), `<section id="${entry.id}.fixture-anchor"><a href="/glossary/">Glossary</a></section>`);
   }
 
-  for (const route of ['formal-registry', 'glossary', 'reading-paths', 'graph', 'release-readiness']) {
+  for (const route of ['formal-registry', 'glossary', 'reading-paths', 'reading-paths/building-a-harness', 'graph', 'release-readiness']) {
     const pageDir = join(distDir, route);
     mkdirSync(pageDir, { recursive: true });
     writeHtml(join(pageDir, 'index.html'), `<section id="${route}-anchor"><a href="/">Home</a></section>`);
