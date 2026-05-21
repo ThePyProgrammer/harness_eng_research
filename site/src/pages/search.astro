@@ -1,0 +1,24 @@
+---
+import SearchPanel from '../components/discovery/SearchPanel.astro';
+import '../styles/atlas.css';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Search | Harness Architecture Book Wiki</title>
+  </head>
+  <body class="atlas-page">
+    <main class="search-page">
+      <header class="search-page__header" data-pagefind-body>
+        <p class="source-detail__eyebrow">Discovery atlas</p>
+        <h1>Local search</h1>
+        <p>Search the static corpus across chapter pages, formal objects, glossary concepts, citations, and reading paths. Results use generated discovery metadata where available and fall back safely to Pagefind excerpts when a page hit has no typed record.</p>
+        <p class="search-page__fallback-index">Index fallback: pages, formal objects, concepts, citations, reading paths. No local results found. Try a pillar name, formal object ID, concept alias, citation key, or reading path theme.</p>
+      </header>
+
+      <SearchPanel />
+    </main>
+  </body>
+</html>

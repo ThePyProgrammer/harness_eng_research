@@ -22,11 +22,12 @@ describe('SearchPanel source integration', () => {
 
   it('renders formal-object metadata in the required order before the anchor action', async () => {
     const source = await Bun.file(new URL('../components/discovery/SearchPanel.astro', import.meta.url)).text();
-    const objectKind = source.indexOf('record.objectKind');
-    const stableId = source.indexOf('record.stableId');
-    const ownerTitle = source.indexOf('record.ownerTitle');
-    const snippet = source.indexOf('record.snippet');
-    const action = source.indexOf('Open anchored result');
+    const fieldsStart = source.indexOf('const fields = [');
+    const objectKind = source.indexOf('record.objectKind', fieldsStart);
+    const stableId = source.indexOf('record.stableId', fieldsStart);
+    const ownerTitle = source.indexOf('record.ownerTitle', fieldsStart);
+    const snippet = source.indexOf('record.snippet', fieldsStart);
+    const action = source.indexOf('Open anchored result', fieldsStart);
 
     expect(objectKind).toBeGreaterThan(-1);
     expect(stableId).toBeGreaterThan(objectKind);
