@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Book Shell and Formal Reading Interface** - Deliver the homepage, book navigation, original visual system, and reusable formal reading components. (completed 2026-05-19)
 - [x] **Phase 3: Curated Corpus Chapters and Formal Registry** - Publish the umbrella page, all twelve pillar chapters, glossary/concept index, citations, and formal object registry. (completed 2026-05-19)
 - [x] **Phase 4: Local Discovery and Cross-Corpus Exploration** - Add local static search, reading paths, typed related links, and generated graph-style relationship data. (completed 2026-05-21)
-- [ ] **Phase 5: Release Quality and Static Publication Readiness** - Harden validation, accessibility, math rendering, print styling, and clean-checkout static build output.
+- [x] **Phase 5: Release Quality and Static Publication Readiness** - Harden validation, accessibility, math rendering, print styling, and clean-checkout static build output. (completed 2026-05-21)
 
 ## Phase Details
 
@@ -170,7 +170,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05-06-PLAN.md — Compose all focused gates into the final clean-checkout release proof.
+- [x] 05-06-PLAN.md — Compose all focused gates into the final clean-checkout release proof.
 
 ## Progress
 
@@ -183,4 +183,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
 | 4. Local Discovery and Cross-Corpus Exploration | 5/5 | Complete   | 2026-05-21 |
-| 5. Release Quality and Static Publication Readiness | 5/6 | In Progress|  |
+| 5. Release Quality and Static Publication Readiness | 6/6 | Complete   | 2026-05-21 |
