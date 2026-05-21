@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Site Foundation and Provenance Contract** - Create the isolated static site workspace, corpus inventory, source metadata model, and reproducible validation baseline.
 - [x] **Phase 2: Book Shell and Formal Reading Interface** - Deliver the homepage, book navigation, original visual system, and reusable formal reading components. (completed 2026-05-19)
 - [x] **Phase 3: Curated Corpus Chapters and Formal Registry** - Publish the umbrella page, all twelve pillar chapters, glossary/concept index, citations, and formal object registry. (completed 2026-05-19)
-- [ ] **Phase 4: Local Discovery and Cross-Corpus Exploration** - Add local static search, reading paths, typed related links, and generated graph-style relationship data.
+- [x] **Phase 4: Local Discovery and Cross-Corpus Exploration** - Add local static search, reading paths, typed related links, and generated graph-style relationship data. (completed 2026-05-21)
 - [ ] **Phase 5: Release Quality and Static Publication Readiness** - Harden validation, accessibility, math rendering, print styling, and clean-checkout static build output.
 
 ## Phase Details
@@ -119,23 +119,23 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Render curated branching reading paths for the five required discovery themes.
+- [x] 04-01-PLAN.md — Render curated branching reading paths for the five required discovery themes.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — Add typed relation taxonomy, validation, and related-link chapter navigation.
+- [x] 04-02-PLAN.md — Add typed relation taxonomy, validation, and related-link chapter navigation.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-03-PLAN.md — Add grouped local static search with anchor-aware search records and quality fixtures.
+- [x] 04-03-PLAN.md — Add grouped local static search with anchor-aware search records and quality fixtures.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 04-04-PLAN.md — Generate static graph overview and local context pages from validated discovery metadata.
+- [x] 04-04-PLAN.md — Generate static graph overview and local context pages from validated discovery metadata.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 04-05-PLAN.md — Wire discovery validation/index generation into the site workflow and close Phase 4 gates.
+- [x] 04-05-PLAN.md — Wire discovery validation/index generation into the site workflow and close Phase 4 gates.
 
 ### Phase 5: Release Quality and Static Publication Readiness
 
@@ -163,5 +163,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
-| 4. Local Discovery and Cross-Corpus Exploration | 0/5 | Planned | - |
+| 4. Local Discovery and Cross-Corpus Exploration | 5/5 | Complete   | 2026-05-21 |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |

@@ -1,0 +1,88 @@
+---
+import type { GraphNeighborhood } from '../../data/discovery.schema';
+
+interface Props {
+  neighborhood: GraphNeighborhood;
+}
+
+const { neighborhood } = Astro.props;
+const linkedNodes = [neighborhood.current, ...neighborhood.nodes];
+const relationRows = neighborhood.edges.map((edge) => {
+  const source = linkedNodes.find((node) => node.id === edge.sourceId);
+  const target = linkedNodes.find((node) => node.id === edge.targetId);
+  return { edge, source, target };
+});
+---
+
+<section class="graph-neighborhood" aria-labelledby={`${neighborhood.id}-graph-heading`}>
+  <div class="graph-neighborhood__header">
+    <p class="source-detail__eyebrow">Local graph neighborhood</p>
+    <h2 id={`${neighborhood.id}-graph-heading`}>{neighborhood.title}</h2>
+    <p>Nearby nodes show validated next readings and typed relationships generated from static metadata.</p>
+    <a class="graph-neighborhood__cta" href={neighborhood.current.href}>Open local context</a>
+  </div>
+
+  <div class="graph-neighborhood__canvas" aria-label={`${neighborhood.current.label} graph nodes`}>
+    <svg class="graph-neighborhood__connectors" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <circle cx="50" cy="50" r="30" />
+      <path d="M50 50 L50 16 M50 50 L78 34 M50 50 L76 70 M50 50 L25 72 M50 50 L22 32" />
+    </svg>
+    <a class="graph-node graph-node--current" href={neighborhood.current.href}>
+      <span class="graph-node__type">{neighborhood.current.family}</span>
+      <span class="graph-node__label">{neighborhood.current.label}</span>
+      {neighborhood.current.summary && <span class="graph-node__summary">{neighborhood.current.summary}</span>}
+    </a>
+    <ol class="graph-neighborhood__node-list" aria-label="Nearby graph nodes">
+      {neighborhood.nodes.map((node) => (
+        <li>
+          <a class="graph-node" href={node.href}>
+            <span class="graph-node__type">{node.family}</span>
+            <span class="graph-node__label">{node.label}</span>
+            {node.summary && <span class="graph-node__summary">{node.summary}</span>}
+          </a>
+        </li>
+      ))}
+    </ol>
+  </div>
+
+  <div class="graph-neighborhood__details">
+    <section aria-labelledby={`${neighborhood.id}-next-hop-heading`}>
+      <h3 id={`${neighborhood.id}-next-hop-heading`}>Next readings</h3>
+      {neighborhood.nextHops.length > 0 ? (
+        <ul class="graph-link-list">
+          {neighborhood.nextHops.map((node) => (
+            <li><a href={node.href}>{node.label}</a><span>{node.family}</span></li>
+          ))}
+        </ul>
+      ) : (
+        <p>No direct next-hop graph links have been registered for this context.</p>
+      )}
+    </section>
+
+    <section aria-labelledby={`${neighborhood.id}-path-heading`}>
+      <h3 id={`${neighborhood.id}-path-heading`}>Route branches</h3>
+      {neighborhood.pathMemberships.length > 0 ? (
+        <ul class="graph-link-list">
+          {neighborhood.pathMemberships.map((path) => (
+            <li><a href={path.href}>{path.pathTitle}</a><span>{path.stopTitle}</span></li>
+          ))}
+        </ul>
+      ) : (
+        <p>This node is not currently a stop in a reading path.</p>
+      )}
+    </section>
+  </div>
+
+  <section class="graph-neighborhood__relations" aria-labelledby={`${neighborhood.id}-relations-heading`}>
+    <h3 id={`${neighborhood.id}-relations-heading`}>Typed relationships</h3>
+    <ul class="graph-relation-list">
+      {relationRows.map(({ edge, source, target }) => (
+        <li>
+          <span class="graph-relation-list__label">{edge.label}</span>
+          <span>{source?.label ?? edge.sourceId} → {target?.label ?? edge.targetId}</span>
+          <p>{edge.rationale}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+</section>

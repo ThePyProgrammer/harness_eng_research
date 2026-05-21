@@ -1,0 +1,31 @@
+---
+import GraphNeighborhood from '../../components/discovery/GraphNeighborhood.astro';
+import { buildGraphIndex } from '../../scripts/generate-local-indexes';
+import '../../styles/atlas.css';
+
+export function getStaticPaths() {
+  return buildGraphIndex().neighborhoods.map((neighborhood) => ({
+    params: { id: neighborhood.id },
+    props: { neighborhood },
+  }));
+}
+
+const { neighborhood } = Astro.props;
+const pageTitle = `${neighborhood.title} | Harness Architecture Book Wiki`;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+  </head>
+  <body class="atlas-page">
+    <main class="graph-page graph-page--local" data-pagefind-body>
+      <nav class="graph-page__back" aria-label="Graph navigation">
+        <a href="/graph/">Open graph overview</a>
+      </nav>
+      <GraphNeighborhood neighborhood={neighborhood} />
+    </main>
+  </body>
+</html>

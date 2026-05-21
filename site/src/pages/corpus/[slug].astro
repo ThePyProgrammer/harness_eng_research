@@ -1,6 +1,8 @@
 ---
 import BookFooterNav from '../../components/BookFooterNav.astro';
 import SourceLinkPanel from '../../components/SourceLinkPanel.astro';
+import RelatedLinks from '../../components/discovery/RelatedLinks.astro';
+import { buildGraphIndex } from '../../scripts/generate-local-indexes';
 import DefinitionBlock from '../../components/formal/DefinitionBlock.astro';
 import TheoremBlock from '../../components/formal/TheoremBlock.astro';
 import DerivationWalkthrough from '../../components/formal/DerivationWalkthrough.astro';
@@ -107,6 +109,7 @@ export function getStaticPaths() {
 
 const { entry, chapter, formalObjects, concepts } = Astro.props;
 const pageTitle = `${chapter.title} | Harness Architecture Book Wiki`;
+const graphNeighborhood = buildGraphIndex().neighborhoods.find((neighborhood) => neighborhood.id === `chapter:${entry.id}`);
 ---
 
 <html lang="en">
@@ -241,6 +244,15 @@ const pageTitle = `${chapter.title} | Harness Architecture Book Wiki`;
           })}
         </section>
 
+        <RelatedLinks source={{ family: 'chapter', id: entry.id }} headingId={`${entry.id}-related-links`} />
+        {graphNeighborhood && (
+          <section class="chapter-graph-context" aria-labelledby={`${entry.id}-graph-context`}>
+            <p class="chapter-graph-context__eyebrow">Graph context</p>
+            <h2 id={`${entry.id}-graph-context`}>Local graph context</h2>
+            <p>Nearby nodes show validated next readings and typed relationships generated from static metadata.</p>
+            <a class="graph-neighborhood__cta" href={`/graph/${graphNeighborhood.id}/`}>Open local context</a>
+          </section>
+        )}
         <SourceLinkPanel entry={entry} />
         <BookFooterNav currentId={entry.id} />
       </main>
