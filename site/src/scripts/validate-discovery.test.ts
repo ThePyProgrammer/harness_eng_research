@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { relationRecords, relationTypes } from '../data/relations';
-import type { RelationRecord, RelationTypeRecord } from '../data/discovery.schema';
+import type { DiscoverySearchRecord, RelationRecord, RelationTypeRecord } from '../data/discovery.schema';
+import { buildDiscoverySearchIndex } from './generate-local-indexes';
 import { formatDiscoveryError, validateDiscovery } from './validate-discovery';
 
 function cloneFixture(): {
   relationTypes: RelationTypeRecord[];
   relationRecords: RelationRecord[];
+  searchRecords: DiscoverySearchRecord[];
 } {
   return {
     relationTypes: structuredClone(relationTypes),
     relationRecords: structuredClone(relationRecords),
+    searchRecords: structuredClone(buildDiscoverySearchIndex().records),
   };
 }
 
@@ -51,8 +54,59 @@ describe('RelatedLinks source integration', () => {
 });
 
 describe('validateDiscovery', () => {
-  it('validates the real Phase 4 relation metadata', () => {
+  it('validates the real Phase 4 relation and representative search metadata', () => {
     expect(validateDiscovery()).toEqual({ ok: true, errors: [] });
+  });
+
+  it('validates representative search fixtures for every required result class', () => {
+    const result = validateDiscovery();
+
+    expect(result.ok).toBe(true);
+    expect(result.searchFixtures.map((fixture) => fixture.resultType)).toEqual(
+      expect.arrayContaining(['Pages', 'Formal Objects', 'Concepts', 'Citations', 'Reading Paths']),
+    );
+  });
+
+  it('asserts formal-object search fixtures against stable anchor fragments', () => {
+    const formalFixture = validateDiscovery().searchFixtures.find(
+      (fixture) => fixture.resultType === 'Formal Objects' && fixture.query === 'compound error sensitivity',
+    );
+
+    expect(formalFixture?.expectedHrefIncludes).toBe('#reliability.compound-error-bound');
+  });
+
+  it('rejects weak search fixtures that only require any non-empty result', () => {
+    const fixture = cloneFixture();
+
+    const result = validateDiscovery({
+      searchRecords: fixture.searchRecords,
+      searchFixtures: [
+        {
+          query: 'compound error',
+          resultType: 'Formal Objects',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Search fixture must assert an expected href or anchor')]),
+    );
+  });
+
+  it('fails when representative search fixtures miss expected pages or anchors', () => {
+    const fixture = cloneFixture();
+    fixture.searchRecords = fixture.searchRecords.filter((record) => record.stableId !== 'reliability.compound-error-bound');
+
+    const result = validateDiscovery({ searchRecords: fixture.searchRecords });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Missing expected search result for query'),
+        expect.stringContaining('#reliability.compound-error-bound'),
+      ]),
+    );
   });
 
   it('covers conceptual, source-provenance, and learning-path categories', () => {
