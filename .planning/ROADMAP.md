@@ -119,7 +119,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Render curated branching reading paths for the five required discovery themes.
+- [x] 04-01-PLAN.md — Render curated branching reading paths for the five required discovery themes.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -163,5 +163,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Site Foundation and Provenance Contract | 4/4 | Complete | 2026-05-15 |
 | 2. Book Shell and Formal Reading Interface | 3/3 | Complete   | 2026-05-19 |
 | 3. Curated Corpus Chapters and Formal Registry | 5/5 | Complete   | 2026-05-19 |
-| 4. Local Discovery and Cross-Corpus Exploration | 0/5 | Planned | - |
+| 4. Local Discovery and Cross-Corpus Exploration | 1/5 | In Progress|  |
 | 5. Release Quality and Static Publication Readiness | 0/TBD | Not started | - |
