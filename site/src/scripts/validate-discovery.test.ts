@@ -1,20 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import { relationRecords, relationTypes } from '../data/relations';
-import type { DiscoverySearchRecord, RelationRecord, RelationTypeRecord } from '../data/discovery.schema';
-import { buildDiscoverySearchIndex } from './generate-local-indexes';
+import type { DiscoverySearchRecord, GraphIndex, RelationRecord, RelationTypeRecord } from '../data/discovery.schema';
+import { buildDiscoverySearchIndex, buildGraphIndex } from './generate-local-indexes';
 import { formatDiscoveryError, validateDiscovery } from './validate-discovery';
 
 function cloneFixture(): {
   relationTypes: RelationTypeRecord[];
   relationRecords: RelationRecord[];
   searchRecords: DiscoverySearchRecord[];
+  graphIndex: GraphIndex;
 } {
   return {
     relationTypes: structuredClone(relationTypes),
     relationRecords: structuredClone(relationRecords),
     searchRecords: structuredClone(buildDiscoverySearchIndex().records),
+    graphIndex: structuredClone(buildGraphIndex()),
   };
 }
+
+describe('Graph source integration', () => {
+  it('renders the graph overview CTA and source-backed graph index data', async () => {
+    const source = await Bun.file(new URL('../pages/graph/index.astro', import.meta.url)).text();
+
+    expect(source).toContain('Open graph overview');
+    expect(source).toContain('buildGraphIndex');
+    expect(source).toContain('graph.overview.nodes');
+  });
+
+  it('renders local context copy and semantic graph node links', async () => {
+    const source = await Bun.file(new URL('../components/discovery/GraphNeighborhood.astro', import.meta.url)).text();
+
+    expect(source).toContain('Open local context');
+    expect(source).toContain('Nearby nodes show validated next readings and typed relationships generated from static metadata.');
+    expect(source).toContain('<a class="graph-node');
+    expect(source).toContain('node.href');
+  });
+
+  it('marks decorative graph connector SVGs as hidden and unfocusable', async () => {
+    const source = await Bun.file(new URL('../components/discovery/GraphNeighborhood.astro', import.meta.url)).text();
+
+    expect(source).toContain('aria-hidden="true"');
+    expect(source).toContain('focusable="false"');
+  });
+
+  it('uses getStaticPaths over generated graph neighborhoods', async () => {
+    const source = await Bun.file(new URL('../pages/graph/[id].astro', import.meta.url)).text();
+
+    expect(source).toContain('export function getStaticPaths()');
+    expect(source).toContain('buildGraphIndex().neighborhoods');
+  });
+});
 
 describe('RelatedLinks source integration', () => {
   it('renders the required related links heading and row fields', async () => {
@@ -220,6 +255,74 @@ describe('validateDiscovery', () => {
       expect.arrayContaining([
         expect.stringContaining('Invalid direction for relation type'),
         expect.stringContaining('Relation family is not allowed'),
+      ]),
+    );
+  });
+
+  it('fails graph nodes with missing labels and missing hrefs', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0].current = {
+      ...fixture.graphIndex.neighborhoods[0].current,
+      label: '',
+      href: '',
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Missing graph node label'),
+        expect.stringContaining('Missing graph node href'),
+      ]),
+    );
+  });
+
+  it('fails graph edges that point at missing node IDs', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0].edges[0] = {
+      ...fixture.graphIndex.neighborhoods[0].edges[0],
+      targetId: 'concept:not-renderable',
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Graph edge target is not renderable')]),
+    );
+  });
+
+  it('fails graph edges with invalid relation types', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0].edges[0] = {
+      ...fixture.graphIndex.neighborhoods[0].edges[0],
+      relationTypeId: 'not-registered',
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Graph edge relation type does not exist')]),
+    );
+  });
+
+  it('fails unrenderable neighborhood IDs and path membership references', () => {
+    const fixture = cloneFixture();
+    fixture.graphIndex.neighborhoods[0] = {
+      ...fixture.graphIndex.neighborhoods[0],
+      id: 'concept:not-renderable',
+      pathMemberships: [{ pathId: 'missing-path', pathTitle: 'Missing path', stopTitle: 'Missing stop', href: '/reading-paths/missing-path/' }],
+    };
+
+    const result = validateDiscovery(fixture);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.map(formatDiscoveryError)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Neighborhood ID does not match a renderable graph node'),
+        expect.stringContaining('Graph path membership does not reference a known reading path'),
       ]),
     );
   });

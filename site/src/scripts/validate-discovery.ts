@@ -5,6 +5,9 @@ import {
   relationRecordSchema,
   relationTypeRecordSchema,
   type DiscoverySearchRecord,
+  type GraphEdge,
+  type GraphIndex,
+  type GraphNode,
   type SearchResultType,
   type RelationRecord,
   type RelationTarget,
@@ -12,7 +15,7 @@ import {
 } from '../data/discovery.schema';
 import { readingPaths } from '../data/reading-paths';
 import { relationRecords as defaultRelationRecords, relationTypes as defaultRelationTypes } from '../data/relations';
-import { buildDiscoverySearchIndex } from './generate-local-indexes';
+import { buildDiscoverySearchIndex, buildGraphIndex } from './generate-local-indexes';
 
 export interface DiscoveryValidationError {
   entryId: string;
@@ -40,6 +43,7 @@ interface DiscoveryFixture {
   relationRecords?: RelationRecord[];
   searchRecords?: DiscoverySearchRecord[];
   searchFixtures?: DiscoverySearchFixture[];
+  graphIndex?: GraphIndex;
 }
 
 function addError(
@@ -65,6 +69,10 @@ function knownTargetIds(): Record<RelationTarget['family'], Set<string>> {
     citation: new Set(citations.map((citation) => citation.id)),
     'reading-path': new Set(readingPaths.map((path) => path.slug)),
   };
+}
+
+function targetToGraphId(target: RelationTarget): string {
+  return `${target.family}:${target.id}`;
 }
 
 function validateTypeDefinitions(types: RelationTypeRecord[], errors: DiscoveryValidationError[]): void {
@@ -197,6 +205,82 @@ function searchableText(record: DiscoverySearchRecord): string {
     .toLowerCase();
 }
 
+function validateGraphNode(node: GraphNode, errors: DiscoveryValidationError[]): void {
+  if (!node.id?.trim()) {
+    addError(errors, 'graph-node', 'graph.node.id', node.label ?? 'unknown', 'Missing graph node ID', 'Give every graph node a stable family-prefixed ID.');
+  }
+  if (!node.label?.trim()) {
+    addError(errors, node.id || 'graph-node', 'graph.node.label', node.id || 'unknown', 'Missing graph node label', 'Resolve node labels from the corpus, path, formal, concept, or citation registry.');
+  }
+  if (!node.href?.startsWith('/')) {
+    addError(errors, node.id || 'graph-node', 'graph.node.href', node.href || 'missing', 'Missing graph node href', 'Provide a static href for every graph node.');
+  }
+}
+
+function validateGraphEdge(
+  edge: GraphEdge,
+  nodeIds: Set<string>,
+  relationTypeIds: Set<string>,
+  errors: DiscoveryValidationError[],
+): void {
+  if (!nodeIds.has(edge.sourceId)) {
+    addError(errors, edge.id, 'graph.edge.sourceId', edge.sourceId, 'Graph edge source is not renderable', 'Point graph edges only at generated graph nodes.');
+  }
+  if (!nodeIds.has(edge.targetId)) {
+    addError(errors, edge.id, 'graph.edge.targetId', edge.targetId, 'Graph edge target is not renderable', 'Point graph edges only at generated graph nodes.');
+  }
+  if (!relationTypeIds.has(edge.relationTypeId)) {
+    addError(errors, edge.id, 'graph.edge.relationTypeId', edge.relationTypeId, 'Graph edge relation type does not exist', 'Use a registered relation type ID.');
+  }
+}
+
+function validateGraphIndex(
+  graphIndex: GraphIndex,
+  relationRecords: RelationRecord[],
+  relationTypes: RelationTypeRecord[],
+  errors: DiscoveryValidationError[],
+): void {
+  const registryNodeIds = new Set<string>();
+  const idsByFamily = knownTargetIds();
+  for (const family of Object.keys(idsByFamily) as RelationTarget['family'][]) {
+    for (const id of idsByFamily[family]) {
+      registryNodeIds.add(`${family}:${id}`);
+    }
+  }
+
+  const allNodes = [
+    ...graphIndex.overview.nodes,
+    ...graphIndex.neighborhoods.flatMap((neighborhood) => [neighborhood.current, ...neighborhood.nodes, ...neighborhood.nextHops]),
+  ];
+  const nodeIds = new Set(allNodes.map((node) => node.id));
+  const relationTypeIds = new Set(relationTypes.map((type) => type.id));
+
+  for (const node of allNodes) {
+    validateGraphNode(node, errors);
+  }
+
+  for (const relation of relationRecords) {
+    if (!nodeIds.has(targetToGraphId(relation.source)) || !nodeIds.has(targetToGraphId(relation.target))) {
+      addError(errors, relation.id, 'graph.relation.renderability', `${targetToGraphId(relation.source)}->${targetToGraphId(relation.target)}`, 'Relation record is not renderable in graph artifacts', 'Generate graph nodes for every validated relation endpoint.');
+    }
+  }
+
+  for (const edge of [...graphIndex.overview.edges, ...graphIndex.neighborhoods.flatMap((neighborhood) => neighborhood.edges)]) {
+    validateGraphEdge(edge, nodeIds, relationTypeIds, errors);
+  }
+
+  for (const neighborhood of graphIndex.neighborhoods) {
+    if (neighborhood.id !== neighborhood.current.id || !registryNodeIds.has(neighborhood.id)) {
+      addError(errors, neighborhood.id, 'graph.neighborhood.id', neighborhood.current.id, 'Neighborhood ID does not match a renderable graph node', 'Build local graph routes from generated current node IDs only.');
+    }
+    for (const membership of neighborhood.pathMemberships) {
+      if (!readingPaths.some((path) => path.slug === membership.pathId)) {
+        addError(errors, neighborhood.id, 'graph.pathMemberships.pathId', membership.pathId, 'Graph path membership does not reference a known reading path', 'Use only registered reading path slugs.');
+      }
+    }
+  }
+}
+
 function validateSearchFixtures(
   records: DiscoverySearchRecord[],
   fixtures: DiscoverySearchFixture[],
@@ -249,10 +333,12 @@ export function validateDiscovery(fixture: DiscoveryFixture = {}): DiscoveryVali
   const relationRecords = fixture.relationRecords ?? defaultRelationRecords;
   const searchRecords = fixture.searchRecords ?? buildDiscoverySearchIndex().records;
   const searchFixtures = fixture.searchFixtures ?? defaultSearchFixtures;
+  const graphIndex = fixture.graphIndex ?? buildGraphIndex();
 
   validateTypeDefinitions(relationTypes, errors);
   validateRecordSemantics(relationRecords, relationTypes, errors);
   validateSearchFixtures(searchRecords, searchFixtures, errors);
+  validateGraphIndex(graphIndex, relationRecords, relationTypes, errors);
 
   return { ok: errors.length === 0, errors, searchFixtures };
 }
