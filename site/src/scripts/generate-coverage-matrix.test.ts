@@ -105,7 +105,8 @@ describe('generate-coverage-matrix', () => {
     expect(outputPath.endsWith('coverage-matrix.json')).toBe(true);
     expect(payload.generatedBy).toBe('site/src/scripts/generate-coverage-matrix.ts');
     expect(payload.ownerCount).toBe(13);
-    expect(() => writeCoverageMatrix({ outputDir: '../dist' })).toThrow('Output directory must stay inside site/');
+    expect(() => writeCoverageMatrix({ outputDir: '../dist' })).toThrow('Output directory must stay inside site/dist/');
+    expect(() => writeCoverageMatrix({ outputDir: 'src' })).toThrow('Output directory must stay inside site/dist/');
   });
 
   it('writes all coverage artifacts in one bounded invocation', () => {

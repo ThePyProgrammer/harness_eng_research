@@ -124,6 +124,20 @@ describe('validate-output-shape', () => {
     });
   });
 
+  it('accepts extensionless local route hrefs with generated index pages', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="/glossary">Glossary</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.errors).not.toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.href',
+        reason: expect.stringContaining('/glossary'),
+      }));
+    });
+  });
+
   it('fails a local hash link pointing at a missing target anchor', () => {
     withFixture((distDir) => {
       writeHtml(join(distDir, 'index.html'), '<a href="/corpus/umbrella/#missing-anchor">Broken anchor</a>');

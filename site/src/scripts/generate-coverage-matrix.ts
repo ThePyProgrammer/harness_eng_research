@@ -102,12 +102,13 @@ function siteRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 }
 
-function assertInsideSite(outputDir: string, root: string): string {
+function assertInsideSiteDist(outputDir: string, root: string): string {
+  const distRoot = resolve(root, 'dist');
   const resolvedOutputDir = isAbsolute(outputDir) ? resolve(outputDir) : resolve(root, outputDir);
-  const relativePath = relative(root, resolvedOutputDir);
+  const relativePath = relative(distRoot, resolvedOutputDir);
 
   if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
-    throw new Error('Output directory must stay inside site/');
+    throw new Error('Output directory must stay inside site/dist/');
   }
 
   return resolvedOutputDir;
@@ -284,7 +285,7 @@ export function buildCoverageMatrix(options: BuildCoverageMatrixOptions = {}): C
 export function writeCoverageMatrix(options: WriteCoverageMatrixOptions = {}): string {
   const root = siteRoot();
   const outputDir = options.outputDir ?? 'dist';
-  const safeOutputDir = assertInsideSite(outputDir, root);
+  const safeOutputDir = assertInsideSiteDist(outputDir, root);
   const outputPath = resolve(safeOutputDir, outputFileName);
   const payload = `${JSON.stringify(buildCoverageMatrix(options), null, 2)}\n`;
 

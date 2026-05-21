@@ -297,7 +297,8 @@ function resolveHrefTarget(href: string, source: HtmlPage, distDir: string): str
     return null;
   }
 
-  const basePath = decodedPathPart.endsWith('/') ? `${decodedPathPart}index.html` : decodedPathPart;
+  const hasExtension = extname(decodedPathPart) !== '';
+  const basePath = decodedPathPart.endsWith('/') ? `${decodedPathPart}index.html` : hasExtension ? decodedPathPart : `${decodedPathPart}/index.html`;
   if (basePath.startsWith('/')) {
     return resolve(distDir, `.${basePath}`);
   }
