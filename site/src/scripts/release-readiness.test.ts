@@ -1,10 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
+  defaultReleaseGateOrder,
   formatReleaseDiagnostic,
   runReleaseReadiness,
   summarizeReleaseReadiness,
+  type ReleaseCommandRunner,
   type ReleaseGateRunner,
 } from './release-readiness';
+
+const expectedGateNames = [
+  'corpus',
+  'formal-registry',
+  'discovery',
+  'math-fixtures',
+  'astro-check',
+  'vitest',
+  'astro-build',
+  'local-indexes',
+  'coverage',
+  'accessibility-semantics',
+  'print-readiness',
+  'output-shape',
+];
+
+const successCopy = 'Release readiness passed. Static output, coverage evidence, source trails, citations, graph targets, math fixtures, accessibility checks, and print readiness are publishable.';
+const blockedCopy = 'Release readiness blocked. Fix the failing gates below before publishing.';
 
 const passingGate: ReleaseGateRunner = () => ({ ok: true, errors: [] });
 const failingGate: ReleaseGateRunner = () => ({
@@ -19,32 +39,43 @@ const failingGate: ReleaseGateRunner = () => ({
     },
   ],
 });
+const passingCommand: ReleaseCommandRunner = () => ({ ok: true, stdout: 'ok', stderr: '' });
+const failingCommand: ReleaseCommandRunner = (command) => ({
+  ok: false,
+  exitCode: 1,
+  stdout: '',
+  stderr: `${command} failed`,
+});
+
+const allPassingGates = Object.fromEntries(expectedGateNames.map((gate) => [gate, passingGate]));
+const allPassingCommands = {
+  'bun run check': passingCommand,
+  'bun test': passingCommand,
+  'bun run build:astro': passingCommand,
+  'bun run index': passingCommand,
+};
 
 describe('release readiness', () => {
-  it('returns ok when corpus, formal registry, and discovery validators pass', () => {
+  it('declares every final Phase 5 gate in the default gate order', () => {
+    expect(defaultReleaseGateOrder.map((gate) => gate.name)).toEqual(expectedGateNames);
+  });
+
+  it('returns ok when all validators, command gates, and generated-output gates pass', () => {
     const result = runReleaseReadiness({
-      gates: {
-        corpus: passingGate,
-        'formal-registry': passingGate,
-        discovery: passingGate,
-      },
+      gates: allPassingGates,
+      commands: allPassingCommands,
     });
 
     expect(result.ok).toBe(true);
     expect(result.diagnostics).toEqual([]);
-    expect(result.gates.map((gate) => gate.gate)).toEqual(
-      expect.arrayContaining(['corpus', 'formal-registry', 'discovery']),
-    );
-    expect(result.totals.pending).toBeGreaterThan(0);
+    expect(result.gates.map((gate) => gate.gate)).toEqual(expectedGateNames);
+    expect(result.totals).toMatchObject({ passed: expectedGateNames.length, failed: 0, pending: 0, diagnostics: 0 });
   });
 
-  it('preserves failed gate diagnostic evidence with the gate name', () => {
+  it('preserves failed validator diagnostic evidence with the gate name', () => {
     const result = runReleaseReadiness({
-      gates: {
-        corpus: failingGate,
-        'formal-registry': passingGate,
-        discovery: passingGate,
-      },
+      gates: { ...allPassingGates, corpus: failingGate },
+      commands: allPassingCommands,
     });
 
     expect(result.ok).toBe(false);
@@ -63,38 +94,52 @@ describe('release readiness', () => {
     );
   });
 
-  it('emits the required pass and blocked summary copy', () => {
-    const success = runReleaseReadiness({
-      gates: {
-        corpus: passingGate,
-        'formal-registry': passingGate,
-        discovery: passingGate,
-      },
-    });
-    const failure = runReleaseReadiness({
-      gates: {
-        corpus: failingGate,
-        'formal-registry': passingGate,
-        discovery: passingGate,
-      },
+  it('normalizes failed command gates into actionable diagnostics', () => {
+    const result = runReleaseReadiness({
+      gates: allPassingGates,
+      commands: { ...allPassingCommands, 'bun run check': failingCommand },
     });
 
-    expect(summarizeReleaseReadiness(success)).toContain('Release readiness passed.');
-    expect(summarizeReleaseReadiness(failure)).toContain('Release readiness blocked.');
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        gate: 'astro-check',
+        entryId: 'bun run check',
+        field: 'command.exitCode',
+        path: 'bun run check',
+        reason: expect.stringContaining('exit code 1'),
+        nextStep: 'Run `bun run check` to inspect the focused failure.',
+      }),
+    ]);
   });
 
-  it('groups plain output under existing gate headings', () => {
+  it('emits exact required pass and blocked summary copy with gate counts', () => {
+    const success = runReleaseReadiness({
+      gates: allPassingGates,
+      commands: allPassingCommands,
+    });
+    const failure = runReleaseReadiness({
+      gates: { ...allPassingGates, corpus: failingGate },
+      commands: allPassingCommands,
+    });
+    const successSummary = summarizeReleaseReadiness(success);
+    const failureSummary = summarizeReleaseReadiness(failure);
+
+    expect(successSummary).toContain(successCopy);
+    expect(failureSummary).toContain(blockedCopy);
+    expect(successSummary).toContain('Gate groups: provenance/source trails 3/3, math fixtures 1/1, clean-checkout/build 4/4, coverage 1/1, accessibility/semantics 1/1, print readiness 1/1, clean-checkout/output shape 1/1.');
+    expect(failureSummary).toContain('Gate groups: provenance/source trails 2/3, math fixtures 1/1, clean-checkout/build 4/4, coverage 1/1, accessibility/semantics 1/1, print readiness 1/1, clean-checkout/output shape 1/1.');
+  });
+
+  it('groups plain output under all final gate headings', () => {
     const result = runReleaseReadiness({
-      gates: {
-        corpus: failingGate,
-        'formal-registry': passingGate,
-        discovery: passingGate,
-      },
+      gates: { ...allPassingGates, corpus: failingGate },
+      commands: allPassingCommands,
     });
     const summary = summarizeReleaseReadiness(result);
 
-    expect(summary).toContain('corpus');
-    expect(summary).toContain('formal-registry');
-    expect(summary).toContain('discovery');
+    for (const gate of expectedGateNames) {
+      expect(summary).toContain(gate);
+    }
   });
 });
