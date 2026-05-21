@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { corpusEntries } from '../data/corpus';
 import { readingPaths } from '../data/reading-paths';
-import { buildCorpusIndex, buildDiscoverySearchIndex, buildGraphIndex, writeCorpusIndex, writeDiscoverySearchIndex, writeGraphIndex } from './generate-local-indexes';
+import { relationRecords, relationTypes } from '../data/relations';
+import { buildCorpusIndex, buildDiscoverySearchIndex, buildGraphIndex, buildReadingPathsIndex, buildRelationIndex, writeAllLocalIndexes, writeCorpusIndex, writeDiscoverySearchIndex, writeGraphIndex, writeReadingPathsIndex, writeRelationIndex } from './generate-local-indexes';
 
 const testSiteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -65,6 +66,44 @@ describe('SearchPanel source integration', () => {
 });
 
 describe('generate-local-indexes', () => {
+  it('writes all generated Phase 4 artifacts in a single bounded invocation', () => {
+    mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
+    const outputDir = mkdtempSync(join(testSiteRoot, 'dist', 'all-indexes-'));
+
+    const outputPaths = writeAllLocalIndexes({ outputDir });
+
+    expect(outputPaths.map((path) => path.split('/').at(-1))).toEqual([
+      'corpus-index.json',
+      'search-index.json',
+      'relation-index.json',
+      'reading-paths-index.json',
+      'graph-index.json',
+    ]);
+    for (const fileName of ['corpus-index.json', 'search-index.json', 'relation-index.json', 'reading-paths-index.json', 'graph-index.json']) {
+      expect(existsSync(join(outputDir, fileName)), fileName).toBe(true);
+    }
+  });
+
+  it('builds relation and reading path index sections from curated data', () => {
+    expect(buildRelationIndex()).toMatchObject({
+      typeCount: relationTypes.length,
+      recordCount: relationRecords.length,
+    });
+    expect(buildReadingPathsIndex()).toMatchObject({
+      pathCount: readingPaths.length,
+    });
+  });
+
+  it('writes relation and reading path indexes inside site/dist only', () => {
+    mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
+    const outputDir = mkdtempSync(join(testSiteRoot, 'dist', 'discovery-indexes-'));
+
+    expect(writeRelationIndex({ outputDir }).endsWith('relation-index.json')).toBe(true);
+    expect(writeReadingPathsIndex({ outputDir }).endsWith('reading-paths-index.json')).toBe(true);
+    expect(() => writeRelationIndex({ outputDir: '../dist' })).toThrow('Output directory must stay inside site/');
+    expect(() => writeReadingPathsIndex({ outputDir: '../dist' })).toThrow('Output directory must stay inside site/');
+  });
+
   it('writes corpus-index.json under the provided output directory with entryCount 13', () => {
     mkdirSync(join(testSiteRoot, 'dist'), { recursive: true });
     const outputDir = mkdtempSync(join(testSiteRoot, 'dist', 'corpus-index-'));

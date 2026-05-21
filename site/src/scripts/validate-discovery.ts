@@ -32,10 +32,21 @@ export interface DiscoverySearchFixture {
   expectedStableId?: string;
 }
 
+export interface DiscoveryValidationTotals {
+  paths: number;
+  relations: number;
+  relationTypes: number;
+  graphNodes: number;
+  graphNeighborhoods: number;
+  searchFixtures: number;
+  errors: number;
+}
+
 export interface DiscoveryValidationResult {
   ok: boolean;
   errors: DiscoveryValidationError[];
   searchFixtures: DiscoverySearchFixture[];
+  totals: DiscoveryValidationTotals;
 }
 
 interface DiscoveryFixture {
@@ -340,7 +351,21 @@ export function validateDiscovery(fixture: DiscoveryFixture = {}): DiscoveryVali
   validateSearchFixtures(searchRecords, searchFixtures, errors);
   validateGraphIndex(graphIndex, relationRecords, relationTypes, errors);
 
-  return { ok: errors.length === 0, errors, searchFixtures };
+  const graphNodeIds = new Set([
+    ...graphIndex.overview.nodes.map((node) => node.id),
+    ...graphIndex.neighborhoods.flatMap((neighborhood) => [neighborhood.current.id, ...neighborhood.nodes.map((node) => node.id), ...neighborhood.nextHops.map((node) => node.id)]),
+  ]);
+  const totals: DiscoveryValidationTotals = {
+    paths: readingPaths.length,
+    relations: relationRecords.length,
+    relationTypes: relationTypes.length,
+    graphNodes: graphNodeIds.size,
+    graphNeighborhoods: graphIndex.neighborhoods.length,
+    searchFixtures: searchFixtures.length,
+    errors: errors.length,
+  };
+
+  return { ok: errors.length === 0, errors, searchFixtures, totals };
 }
 
 export function formatDiscoveryError(error: DiscoveryValidationError): string {
@@ -354,10 +379,14 @@ function runCli(): number {
   if (json) {
     const payload = {
       ok: result.ok,
-      total_relation_types: defaultRelationTypes.length,
-      total_relation_records: defaultRelationRecords.length,
-      total_search_fixtures: result.searchFixtures.length,
-      total_errors: result.errors.length,
+      totals: result.totals,
+      total_paths: result.totals.paths,
+      total_relation_types: result.totals.relationTypes,
+      total_relation_records: result.totals.relations,
+      total_graph_nodes: result.totals.graphNodes,
+      total_graph_neighborhoods: result.totals.graphNeighborhoods,
+      total_search_fixtures: result.totals.searchFixtures,
+      total_errors: result.totals.errors,
       errors: result.errors,
     };
     const output = JSON.stringify(payload, null, 2);
@@ -367,7 +396,7 @@ function runCli(): number {
       console.error(output);
     }
   } else if (result.ok) {
-    console.log(`OK: ${defaultRelationTypes.length} relation types, ${defaultRelationRecords.length} relation records, and ${result.searchFixtures.length} search fixtures validated, 0 errors found.`);
+    console.log(`OK: ${result.totals.paths} reading paths, ${result.totals.relationTypes} relation types, ${result.totals.relations} relation records, ${result.totals.graphNodes} graph nodes, ${result.totals.graphNeighborhoods} graph neighborhoods, and ${result.totals.searchFixtures} search fixtures validated, 0 errors found.`);
   } else {
     console.error(`ERRORS: ${result.errors.length} discovery validation error(s):`);
     for (const error of result.errors) {
