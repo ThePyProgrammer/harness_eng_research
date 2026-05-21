@@ -74,7 +74,7 @@ const sourceTiers = Array.from(new Set(concept.sourceTrail.map((source) => sourc
         {concept.relatedConceptIds.length > 0
           ? concept.relatedConceptIds.map((conceptId) => {
             const related = conceptLookup[conceptId];
-            return <a href={`#${conceptId}`}>{related?.term ?? conceptId}</a>;
+            return <a href={`/glossary/#${conceptId}`}>{related?.term ?? conceptId}</a>;
           })
           : 'None registered'}
       </dd>

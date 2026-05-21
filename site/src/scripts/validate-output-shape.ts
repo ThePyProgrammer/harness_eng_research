@@ -278,13 +278,25 @@ function splitHref(value: string): { pathPart: string; fragment: string } {
   return { pathPart, fragment };
 }
 
+function safeDecodeUriComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 function resolveHrefTarget(href: string, source: HtmlPage, distDir: string): string | null {
   const { pathPart } = splitHref(href);
   if (!pathPart && href.startsWith('#')) {
     return source.absolutePath;
   }
 
-  const decodedPathPart = decodeURIComponent(pathPart);
+  const decodedPathPart = safeDecodeUriComponent(pathPart);
+  if (decodedPathPart === null) {
+    return null;
+  }
+
   const basePath = decodedPathPart.endsWith('/') ? `${decodedPathPart}index.html` : decodedPathPart;
   if (basePath.startsWith('/')) {
     return resolve(distDir, `.${basePath}`);
@@ -319,13 +331,26 @@ function validateHtmlLinks(distDir: string, pages: HtmlPage[], errors: OutputSha
       }
 
       linksChecked += 1;
-      const targetPath = resolveHrefTarget(href, page, distDir);
+      const { pathPart, fragment } = splitHref(href);
+      const malformedPath = pathPart ? safeDecodeUriComponent(pathPart) === null : false;
+      const targetPath = malformedPath ? null : resolveHrefTarget(href, page, distDir);
       const normalizedTarget = targetPath ? resolve(targetPath) : null;
       const targetPage = normalizedTarget ? pageByPath.get(normalizedTarget) : undefined;
-      const { pathPart, fragment } = splitHref(href);
+
+      if (malformedPath) {
+        addError(
+          errors,
+          page.relativePath,
+          'html.href',
+          displayPath(page.absolutePath, distDir),
+          `Local href ${href} contains malformed percent encoding`,
+          'Fix the link target percent encoding before publishing.',
+        );
+        continue;
+      }
 
       if (!normalizedTarget || !targetPage) {
-        if (normalizedTarget && isDeployableAssetPath(pathPart)) {
+        if (normalizedTarget && isDeployableAssetPath(pathPart) && existsSync(normalizedTarget)) {
           continue;
         }
 
@@ -344,9 +369,20 @@ function validateHtmlLinks(distDir: string, pages: HtmlPage[], errors: OutputSha
         continue;
       }
 
-      if (fragment && (!href.startsWith('#') || href.startsWith('#missing'))) {
+      if (fragment) {
         fragmentsChecked += 1;
-        const expectedId = decodeURIComponent(fragment);
+        const expectedId = safeDecodeUriComponent(fragment);
+        if (expectedId === null) {
+          addError(
+            errors,
+            page.relativePath,
+            'html.fragment',
+            displayPath(page.absolutePath, distDir),
+            `Local href ${href} contains malformed fragment percent encoding`,
+            'Fix the link fragment percent encoding before publishing.',
+          );
+          continue;
+        }
         if (!targetPage.ids.has(expectedId) && !targetPage.ids.has(`${expectedId}-heading`) && !Array.from(targetPage.ids).some((id) => id.endsWith(`-${expectedId}`)) && !isKnownGeneratedButUnanchoredFragment(expectedId)) {
           addError(
             errors,

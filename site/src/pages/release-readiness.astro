@@ -160,15 +160,18 @@ function diagnosticHref(owner: OwnerCoverage): string {
 
       <section class="release-readiness__diagnostics" aria-labelledby="diagnostics-heading">
         <h2 id="diagnostics-heading">Diagnostics</h2>
-        {diagnosticCount === 0 ? (
+        {diagnosticCount === 0 && (
           <article class="release-readiness__empty">
             <h3>No release diagnostics yet</h3>
             <p>Run the release-readiness command to generate coverage evidence, validation results, print checks, and deployable output diagnostics.</p>
           </article>
-        ) : (
-          matrix.owners.map((owner) => (
-            <article id={`${owner.ownerId}-diagnostics`} class="release-readiness__diagnostic-group">
-              <h3>{owner.ownerTitle}</h3>
+        )}
+        {matrix.owners.map((owner) => (
+          <article id={`${owner.ownerId}-diagnostics`} class="release-readiness__diagnostic-group">
+            <h3>{owner.ownerTitle}</h3>
+            {owner.diagnostics.length === 0 ? (
+              <p>No diagnostics for this owner.</p>
+            ) : (
               <ul>
                 {owner.diagnostics.map((diagnostic) => (
                   <li>
@@ -176,9 +179,9 @@ function diagnosticHref(owner: OwnerCoverage): string {
                   </li>
                 ))}
               </ul>
-            </article>
-          ))
-        )}
+            )}
+          </article>
+        ))}
       </section>
     </main>
   </body>

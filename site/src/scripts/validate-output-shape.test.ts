@@ -109,6 +109,21 @@ describe('validate-output-shape', () => {
     });
   });
 
+  it('fails a local href pointing at a missing deployable asset', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="/missing.css">Missing CSS</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.href',
+        path: 'site/dist/index.html',
+      }));
+    });
+  });
+
   it('fails a local hash link pointing at a missing target anchor', () => {
     withFixture((distDir) => {
       writeHtml(join(distDir, 'index.html'), '<a href="/corpus/umbrella/#missing-anchor">Broken anchor</a>');
@@ -120,6 +135,65 @@ describe('validate-output-shape', () => {
         entryId: 'index.html',
         field: 'html.fragment',
         path: 'site/dist/index.html',
+      }));
+    });
+  });
+
+  it('fails a same-page hash link pointing at a missing target anchor', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="#not-present">Broken same-page anchor</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.fragment',
+        path: 'site/dist/index.html',
+      }));
+    });
+  });
+
+  it('reports malformed percent-encoded href paths as structured diagnostics', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="/%E0%A4%A">Malformed path</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.href',
+        path: 'site/dist/index.html',
+      }));
+    });
+  });
+
+  it('reports malformed percent-encoded fragments as structured diagnostics', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="#%E0%A4%A">Malformed fragment</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.fragment',
+        path: 'site/dist/index.html',
+      }));
+    });
+  });
+
+  it('accepts existing deployable assets referenced from local hrefs', () => {
+    withFixture((distDir) => {
+      writeFileSync(join(distDir, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>');
+      writeHtml(join(distDir, 'index.html'), '<a href="/favicon.svg">Favicon</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.errors).not.toContainEqual(expect.objectContaining({
+        field: 'html.href',
+        reason: expect.stringContaining('/favicon.svg'),
       }));
     });
   });
