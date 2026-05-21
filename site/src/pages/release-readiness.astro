@@ -38,14 +38,14 @@ function diagnosticHref(owner: OwnerCoverage): string {
 
       <section class="release-readiness__summary" aria-labelledby="release-summary-heading">
         <div>
-          <p class="release-readiness__status-label">{diagnosticCount === 0 ? 'Passed' : 'Blocked'}</p>
+          <p class="release-readiness__status-label">{diagnosticCount === 0 ? 'Coverage readiness' : 'Coverage blocked'}</p>
           <h2 id="release-summary-heading">
-            {diagnosticCount === 0 ? 'Release readiness passed.' : 'Release readiness blocked.'}
+            {diagnosticCount === 0 ? 'Coverage evidence is complete.' : 'Coverage evidence needs fixes.'}
           </h2>
           <p>
             {diagnosticCount === 0
-              ? 'Release readiness passed. Static output, coverage evidence, source trails, citations, graph targets, math fixtures, accessibility checks, and print readiness are publishable.'
-              : 'Release readiness blocked. Fix the failing gates below before publishing.'}
+              ? 'Coverage evidence is complete. Run the unified release gate before publishing to evaluate builds, tests, indexes, accessibility, print readiness, and deployable output shape.'
+              : 'Coverage evidence has diagnostics. Fix the failing coverage rows below, then run the unified release gate before publishing.'}
           </p>
         </div>
         <dl class="release-readiness__proof-list" aria-label="Release proof totals">
@@ -67,7 +67,7 @@ function diagnosticHref(owner: OwnerCoverage): string {
           </div>
         </dl>
         <nav class="release-readiness__actions" aria-label="Release readiness actions">
-          <a class="release-readiness__primary-action" href="/coverage-matrix.json">Run Release Check</a>
+          <a class="release-readiness__primary-action" href="/coverage-matrix.json">Review coverage evidence</a>
           <a href="#coverage-matrix">Review Coverage Matrix</a>
           <a href="javascript:print()">Print research handout</a>
         </nav>

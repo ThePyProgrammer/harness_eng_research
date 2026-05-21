@@ -65,8 +65,21 @@ describe('validatePrintReadiness', () => {
     expect(result).toEqual({ ok: true, errors: [] });
   });
 
+  it('fails when static output is absent', () => {
+    const distRoot = resolve(siteRoot, 'dist', 'print-readiness-missing-output');
+
+    const result = validatePrintReadiness({ distRoot, cssText: completePrintCss });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual(expect.objectContaining({
+      entryId: 'dist',
+      field: 'distRoot',
+      path: 'site/dist',
+    }));
+  });
+
   it('fails when print media rules are missing', () => {
-    const result = validatePrintReadiness({ cssText: '.formal-source-trail { display: block; }' });
+    const result = validatePrintReadiness({ cssText: '.formal-source-trail { display: block; }', skipDistValidation: true });
 
     expect(result.ok).toBe(false);
     expect(result.errors).toEqual(

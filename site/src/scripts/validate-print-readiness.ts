@@ -19,6 +19,7 @@ export interface PrintReadinessOptions {
   siteRoot?: string;
   cssText?: string;
   distRoot?: string;
+  skipDistValidation?: boolean;
 }
 
 interface CssSignal {
@@ -178,8 +179,18 @@ function validateCss(cssText: string, errors: PrintReadinessError[]): void {
   }
 }
 
-function validateRepresentativePages(distRoot: string, errors: PrintReadinessError[]): void {
+function validateRepresentativePages(distRoot: string, errors: PrintReadinessError[], skipDistValidation = false): void {
   if (!existsSync(distRoot)) {
+    if (!skipDistValidation) {
+      addError(
+        errors,
+        'dist',
+        'distRoot',
+        'site/dist',
+        'Static output directory does not exist',
+        'Run bun run build:astro before validating generated accessibility or print readiness.',
+      );
+    }
     return;
   }
 
@@ -213,9 +224,7 @@ export function validatePrintReadiness(options: PrintReadinessOptions = {}): Pri
 
   validateCss(cssText, errors);
 
-  if (!options.cssText) {
-    validateRepresentativePages(distRoot, errors);
-  }
+  validateRepresentativePages(distRoot, errors, options.skipDistValidation);
 
   return { ok: errors.length === 0, errors };
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   defaultReleaseGateOrder,
@@ -129,6 +131,15 @@ describe('release readiness', () => {
     expect(failureSummary).toContain(blockedCopy);
     expect(successSummary).toContain('Gate groups: provenance/source trails 3/3, math fixtures 1/1, clean-checkout/build 4/4, coverage 1/1, accessibility/semantics 1/1, print readiness 1/1, clean-checkout/output shape 1/1.');
     expect(failureSummary).toContain('Gate groups: provenance/source trails 2/3, math fixtures 1/1, clean-checkout/build 4/4, coverage 1/1, accessibility/semantics 1/1, print readiness 1/1, clean-checkout/output shape 1/1.');
+  });
+
+  it('keeps the release readiness page from claiming unified release pass from coverage diagnostics alone', () => {
+    const pageSource = readFileSync(resolve(import.meta.dir, '../pages/release-readiness.astro'), 'utf8');
+
+    expect(pageSource).not.toContain("diagnosticCount === 0 ? 'Passed' : 'Blocked'");
+    expect(pageSource).not.toContain('Release readiness passed. Static output');
+    expect(pageSource).toContain('Coverage readiness');
+    expect(pageSource).toContain('Run the unified release gate');
   });
 
   it('groups plain output under all final gate headings', () => {

@@ -49,6 +49,19 @@ describe('validateAccessibilitySemantics', () => {
     });
   });
 
+  it('fails when static output is absent', () => {
+    const distRoot = resolve(siteRoot, 'dist', 'accessibility-semantics-missing-output');
+
+    const result = validateAccessibilitySemantics({ distRoot, cssText: completeCss });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual(expect.objectContaining({
+      entryId: 'dist',
+      field: 'distRoot',
+      path: 'site/dist',
+    }));
+  });
+
   it('fails missing main landmark with html.semantic-landmark diagnostics', () => {
     withDistFixture((distRoot) => {
       writePage(distRoot, 'index.html', completeHtml.replace('<main>', '<div>').replace('</main>', '</div>'));

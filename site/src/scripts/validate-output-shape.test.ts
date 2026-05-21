@@ -197,4 +197,20 @@ describe('validate-output-shape', () => {
       }));
     });
   });
+
+  it('fails local hrefs that resolve outside the generated dist directory', () => {
+    withFixture((distDir) => {
+      writeHtml(join(distDir, 'index.html'), '<a href="/../package.json">Escaped package file</a>');
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'index.html',
+        field: 'html.href',
+        path: 'site/dist/index.html',
+        reason: expect.stringContaining('outside the generated dist directory'),
+      }));
+    });
+  });
 });

@@ -123,7 +123,7 @@ describe('generate-coverage-matrix', () => {
 
     expect(source).toContain('Release readiness evidence');
     expect(source).toContain('Release readiness');
-    expect(source).toContain('Run Release Check');
+    expect(source).toContain('Review coverage evidence');
     expect(source).toContain('Review Coverage Matrix');
     expect(source).toContain('Print research handout');
     expect(source).toContain('Clean-checkout proof');

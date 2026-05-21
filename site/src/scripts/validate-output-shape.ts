@@ -311,6 +311,11 @@ function isDeployableAssetPath(path: string): boolean {
   return deployableAssetExtensions.has(extension) || normalizedPath === '/favicon.svg';
 }
 
+function isInsideDist(targetPath: string, distDir: string): boolean {
+  const relativeTarget = relative(distDir, targetPath);
+  return relativeTarget !== '..' && !relativeTarget.startsWith(`..${sep}`) && !isAbsolute(relativeTarget);
+}
+
 function isKnownGeneratedButUnanchoredFragment(fragment: string): boolean {
   return fragment.endsWith('.canonical-paper-citation') || /^[a-z-]+-paper$/u.test(fragment);
 }
@@ -345,6 +350,18 @@ function validateHtmlLinks(distDir: string, pages: HtmlPage[], errors: OutputSha
           displayPath(page.absolutePath, distDir),
           `Local href ${href} contains malformed percent encoding`,
           'Fix the link target percent encoding before publishing.',
+        );
+        continue;
+      }
+
+      if (normalizedTarget && !isInsideDist(normalizedTarget, distDir)) {
+        addError(
+          errors,
+          page.relativePath,
+          'html.href',
+          displayPath(page.absolutePath, distDir),
+          `Local href ${href} resolves outside the generated dist directory`,
+          'Keep local links inside site/dist or make the link external explicitly.',
         );
         continue;
       }

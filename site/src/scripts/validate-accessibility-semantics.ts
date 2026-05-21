@@ -19,6 +19,7 @@ export interface AccessibilitySemanticsOptions {
   siteRoot?: string;
   distRoot?: string;
   cssText?: string;
+  skipDistValidation?: boolean;
 }
 
 interface RepresentativePage {
@@ -179,10 +180,22 @@ export function validateAccessibilitySemantics(options: AccessibilitySemanticsOp
 
   validateFocusCss(cssText, errors);
 
-  if (existsSync(distRoot)) {
-    for (const page of representativePages) {
-      validatePage(page, distRoot, errors);
+  if (!existsSync(distRoot)) {
+    if (!options.skipDistValidation) {
+      addError(
+        errors,
+        'dist',
+        'distRoot',
+        displayDistPrefix,
+        'Static output directory does not exist',
+        'Run bun run build:astro before validating generated accessibility or print readiness.',
+      );
     }
+    return { ok: errors.length === 0, errors };
+  }
+
+  for (const page of representativePages) {
+    validatePage(page, distRoot, errors);
   }
 
   return { ok: errors.length === 0, errors };
