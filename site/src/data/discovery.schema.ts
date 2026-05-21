@@ -132,6 +132,65 @@ export const discoverySearchIndexSchema = z.object({
   records: z.array(discoverySearchRecordSchema),
 });
 
+export const graphNodeFamilySchema = z.enum([
+  'chapter',
+  'concept',
+  'formal-object',
+  'citation',
+  'reading-path',
+  'relation-category',
+]);
+
+export const graphNodeSchema = z.object({
+  id: nonEmptyStringSchema,
+  family: graphNodeFamilySchema,
+  label: nonEmptyStringSchema,
+  href: hrefSchema,
+  summary: nonEmptyStringSchema.optional(),
+  ownerId: ownerIdSchema.optional(),
+});
+
+export const graphEdgeSchema = z.object({
+  id: nonEmptyStringSchema,
+  sourceId: nonEmptyStringSchema,
+  targetId: nonEmptyStringSchema,
+  relationTypeId: relationTypeIdSchema,
+  label: nonEmptyStringSchema,
+  category: relationCategorySchema,
+  directed: z.boolean(),
+  rationale: nonEmptyStringSchema,
+});
+
+export const graphPathMembershipSchema = z.object({
+  pathId: slugIdSchema,
+  pathTitle: nonEmptyStringSchema,
+  stopTitle: nonEmptyStringSchema,
+  href: hrefSchema,
+});
+
+export const graphNeighborhoodSchema = z.object({
+  id: nonEmptyStringSchema,
+  title: nonEmptyStringSchema,
+  current: graphNodeSchema,
+  nodes: z.array(graphNodeSchema),
+  edges: z.array(graphEdgeSchema),
+  incoming: z.array(graphEdgeSchema),
+  outgoing: z.array(graphEdgeSchema),
+  pathMemberships: z.array(graphPathMembershipSchema),
+  nextHops: z.array(graphNodeSchema),
+});
+
+export const graphOverviewSchema = z.object({
+  nodes: z.array(graphNodeSchema),
+  edges: z.array(graphEdgeSchema),
+});
+
+export const graphIndexSchema = z.object({
+  generatedBy: nonEmptyStringSchema,
+  overview: graphOverviewSchema,
+  neighborhoods: z.array(graphNeighborhoodSchema),
+});
+
 export type DiscoveryTargetType = z.infer<typeof discoveryTargetTypeSchema>;
 export type DiscoveryTargetRef = z.infer<typeof discoveryTargetRefSchema>;
 export type ReadingPathStop = z.infer<typeof readingPathStopSchema>;
@@ -146,6 +205,13 @@ export type RelationRecord = z.infer<typeof relationRecordSchema>;
 export type SearchResultType = z.infer<typeof searchResultTypeSchema>;
 export type DiscoverySearchRecord = z.infer<typeof discoverySearchRecordSchema>;
 export type DiscoverySearchIndex = z.infer<typeof discoverySearchIndexSchema>;
+export type GraphNodeFamily = z.infer<typeof graphNodeFamilySchema>;
+export type GraphNode = z.infer<typeof graphNodeSchema>;
+export type GraphEdge = z.infer<typeof graphEdgeSchema>;
+export type GraphPathMembership = z.infer<typeof graphPathMembershipSchema>;
+export type GraphNeighborhood = z.infer<typeof graphNeighborhoodSchema>;
+export type GraphOverview = z.infer<typeof graphOverviewSchema>;
+export type GraphIndex = z.infer<typeof graphIndexSchema>;
 
 export function parseReadingPaths(paths: unknown): ReadingPath[] {
   return readingPathRegistrySchema.parse(paths);
@@ -161,4 +227,8 @@ export function parseRelationRecords(records: unknown): RelationRecord[] {
 
 export function parseDiscoverySearchIndex(index: unknown): DiscoverySearchIndex {
   return discoverySearchIndexSchema.parse(index);
+}
+
+export function parseGraphIndex(index: unknown): GraphIndex {
+  return graphIndexSchema.parse(index);
 }
