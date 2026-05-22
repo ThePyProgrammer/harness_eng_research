@@ -197,6 +197,14 @@ function validateRepresentativePages(distRoot: string, errors: PrintReadinessErr
   for (const page of representativePages) {
     const absolutePath = resolve(distRoot, page.path);
     if (!existsSync(absolutePath)) {
+      addError(
+        errors,
+        page.entryId,
+        'page.missing',
+        `site/dist/${page.path}`,
+        'Representative page does not exist in static output',
+        'Run the Astro build and ensure every representative route is generated before publishing.',
+      );
       continue;
     }
 
@@ -224,7 +232,9 @@ export function validatePrintReadiness(options: PrintReadinessOptions = {}): Pri
 
   validateCss(cssText, errors);
 
-  validateRepresentativePages(distRoot, errors, options.skipDistValidation);
+  if (!options.skipDistValidation) {
+    validateRepresentativePages(distRoot, errors);
+  }
 
   return { ok: errors.length === 0, errors };
 }

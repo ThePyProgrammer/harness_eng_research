@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { formatPrintReadinessError, validatePrintReadiness } from './validate-print-readiness';
@@ -17,6 +17,16 @@ const requiredPrintSignals = [
   '.formal-citation',
   '.release-readiness__',
 ];
+
+const representativePageFixtures: Record<string, string> = {
+  'index.html': '<h1>Home</h1><a href="/corpus/umbrella/">Umbrella</a>',
+  'corpus/umbrella/index.html': '<h1>Umbrella</h1><p class="formal-source-trail">Canonical .tex source Citation</p>',
+  'formal-registry/index.html': '<h1>Browse formal registry</h1><a>Anchor link</a>',
+  'glossary/index.html': '<h1>Glossary</h1><section>Concept cards</section>',
+  'reading-paths/index.html': '<h1>Reading paths</h1><a href="/corpus/umbrella/">Umbrella</a>',
+  'graph/index.html': '<h1>Graph overview</h1><a class="graph-neighborhood__cta">Explore</a>',
+  'release-readiness/index.html': '<h1>Release readiness</h1><table class="coverage-matrix__table"></table><button>Print research handout</button>',
+};
 
 const completePrintCss = `
 @media print {
@@ -53,9 +63,30 @@ const completePrintCss = `
 }
 `;
 
+function writePage(distRoot: string, pagePath: string, body: string): void {
+  const absolutePath = join(distRoot, pagePath);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, `<!doctype html><html><body><main>${body}</main></body></html>`);
+}
+
+function withDistFixture(run: (distRoot: string) => void): void {
+  mkdirSync(join(siteRoot, 'dist'), { recursive: true });
+  const distRoot = mkdtempSync(join(siteRoot, 'dist', 'print-readiness-'));
+
+  for (const [pagePath, body] of Object.entries(representativePageFixtures)) {
+    writePage(distRoot, pagePath, body);
+  }
+
+  try {
+    run(distRoot);
+  } finally {
+    rmSync(distRoot, { recursive: true, force: true });
+  }
+}
+
 describe('validatePrintReadiness', () => {
   it('validates the real atlas print contract', () => {
-    const result = validatePrintReadiness({ siteRoot });
+    const result = validatePrintReadiness({ siteRoot, skipDistValidation: true });
     const atlasCss = readFileSync(resolve(siteRoot, 'src/styles/atlas.css'), 'utf8');
 
     for (const signal of requiredPrintSignals) {
@@ -76,6 +107,21 @@ describe('validatePrintReadiness', () => {
       field: 'distRoot',
       path: 'site/dist',
     }));
+  });
+
+  it('fails when a representative page is missing from static output', () => {
+    withDistFixture((distRoot) => {
+      rmSync(join(distRoot, 'reading-paths'), { recursive: true, force: true });
+
+      const result = validatePrintReadiness({ distRoot, cssText: completePrintCss });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'reading-paths',
+        field: 'page.missing',
+        path: 'site/dist/reading-paths/index.html',
+      }));
+    });
   });
 
   it('fails when print media rules are missing', () => {

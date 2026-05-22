@@ -144,6 +144,14 @@ function validateInteractiveNames(entryId: string, displayPath: string, html: st
 function validatePage(page: RepresentativePage, distRoot: string, errors: AccessibilitySemanticsError[]): void {
   const absolutePath = resolve(distRoot, page.path);
   if (!existsSync(absolutePath)) {
+    addError(
+      errors,
+      page.entryId,
+      'page.missing',
+      `${displayDistPrefix}/${page.path}`,
+      'Representative page does not exist in static output',
+      'Run the Astro build and ensure every representative route is generated before publishing.',
+    );
     return;
   }
 
@@ -180,17 +188,19 @@ export function validateAccessibilitySemantics(options: AccessibilitySemanticsOp
 
   validateFocusCss(cssText, errors);
 
+  if (options.skipDistValidation) {
+    return { ok: errors.length === 0, errors };
+  }
+
   if (!existsSync(distRoot)) {
-    if (!options.skipDistValidation) {
-      addError(
-        errors,
-        'dist',
-        'distRoot',
-        displayDistPrefix,
-        'Static output directory does not exist',
-        'Run bun run build:astro before validating generated accessibility or print readiness.',
-      );
-    }
+    addError(
+      errors,
+      'dist',
+      'distRoot',
+      displayDistPrefix,
+      'Static output directory does not exist',
+      'Run bun run build:astro before validating generated accessibility or print readiness.',
+    );
     return { ok: errors.length === 0, errors };
   }
 

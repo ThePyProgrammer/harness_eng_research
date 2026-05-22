@@ -24,8 +24,17 @@ const completeHtml = `<!doctype html>
 function withDistFixture(run: (distRoot: string) => void): void {
   mkdirSync(join(siteRoot, 'dist'), { recursive: true });
   const distRoot = mkdtempSync(join(siteRoot, 'dist', 'accessibility-semantics-'));
-  writePage(distRoot, 'index.html', completeHtml);
-  writePage(distRoot, 'release-readiness/index.html', completeHtml);
+  for (const pagePath of [
+    'index.html',
+    'corpus/umbrella/index.html',
+    'formal-registry/index.html',
+    'glossary/index.html',
+    'reading-paths/index.html',
+    'graph/index.html',
+    'release-readiness/index.html',
+  ]) {
+    writePage(distRoot, pagePath, completeHtml);
+  }
 
   try {
     run(distRoot);
@@ -60,6 +69,21 @@ describe('validateAccessibilitySemantics', () => {
       field: 'distRoot',
       path: 'site/dist',
     }));
+  });
+
+  it('fails when a representative page is missing from static output', () => {
+    withDistFixture((distRoot) => {
+      rmSync(join(distRoot, 'reading-paths'), { recursive: true, force: true });
+
+      const result = validateAccessibilitySemantics({ distRoot, cssText: completeCss });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        entryId: 'reading-paths',
+        field: 'page.missing',
+        path: 'site/dist/reading-paths/index.html',
+      }));
+    });
   });
 
   it('fails missing main landmark with html.semantic-landmark diagnostics', () => {
