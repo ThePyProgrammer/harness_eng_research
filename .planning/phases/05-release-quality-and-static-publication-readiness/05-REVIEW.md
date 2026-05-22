@@ -20,10 +20,10 @@ files_reviewed_list:
   - site/src/scripts/validate-print-readiness.ts
   - site/src/styles/atlas.css
 findings:
-  critical: 2
+  critical: 0
   warning: 1
   info: 0
-  total: 3
+  total: 1
 status: issues_found
 ---
 
@@ -36,74 +36,41 @@ status: issues_found
 
 ## Summary
 
-Reviewed the release-readiness page, coverage matrix generation, release gate orchestration, static output validators, fixture validators, tests, package scripts, and atlas CSS. The main defects are false-negative paths in the output-shape release gate: same-page missing anchors are skipped, local asset links are accepted without existence checks, and malformed percent-encoded links can throw instead of producing structured diagnostics.
+Reviewed the release-readiness page, release gate orchestration, coverage matrix generator, accessibility/print/output/math validators, tests, package scripts, and atlas CSS. The earlier status-copy and output-link fixes appear present, but one robustness/security-quality defect remains in the static release page and the output-shape validator's allowlist.
 
-## Critical Issues
-
-### CR-01: Same-page broken hash links are skipped by output-shape validation
-
-**File:** `site/src/scripts/validate-output-shape.ts:347`
-
-**Issue:** Fragment validation only runs when the link is not same-page (`!href.startsWith('#')`) or when the same-page link literally starts with `#missing`. Any real same-page broken anchor such as `<a href="#release-diagnostics">` is counted as a local link but never checked unless it happens to use the test-only `#missing` prefix. This lets deployable pages pass the release gate with broken table-of-contents, diagnostic, and in-page navigation links.
-
-**Fix:** Validate every fragment once the target page is known; do not special-case same-page anchors by prefix.
-
-```ts
-if (fragment) {
-  fragmentsChecked += 1;
-  const expectedId = decodeURIComponent(fragment);
-  if (!targetPage.ids.has(expectedId) && !targetPage.ids.has(`${expectedId}-heading`) && !Array.from(targetPage.ids).some((id) => id.endsWith(`-${expectedId}`)) && !isKnownGeneratedButUnanchoredFragment(expectedId)) {
-    addError(
-      errors,
-      page.relativePath,
-      'html.fragment',
-      displayPath(page.absolutePath, distDir),
-      `Local href ${href} points to missing anchor #${expectedId}`,
-      'Add the target id to the generated page or update the link fragment.',
-    );
-  }
-}
-```
-
-Also add a regression test with `<a href="#not-present">Broken same-page anchor</a>` so this cannot regress back to the current test-only behavior.
-
-### CR-02: Local asset hrefs are considered valid without checking the file exists
-
-**File:** `site/src/scripts/validate-output-shape.ts:327-330`
-
-**Issue:** When a local link does not resolve to a generated HTML page, the validator silently accepts it if `isDeployableAssetPath(pathPart)` returns true. It never verifies that `/missing.css`, `/missing.js`, `/favicon.svg`, or another local deployable asset actually exists in `site/dist`. The release output-shape gate can therefore pass with broken stylesheet/script/image/download links, which violates the deployable-static-output contract.
-
-**Fix:** For deployable asset paths, require `existsSync(normalizedTarget)` before continuing; otherwise emit the same `html.href` diagnostic.
-
-```ts
-if (normalizedTarget && isDeployableAssetPath(pathPart) && existsSync(normalizedTarget)) {
-  continue;
-}
-```
-
-Add a regression test that writes `<a href="/missing.css">Missing CSS</a>` or a page asset reference and expects an `html.href` diagnostic.
+## Narrative Findings (AI reviewer)
 
 ## Warnings
 
-### WR-01: Malformed percent-encoded local hrefs can crash validation instead of producing diagnostics
+### WR-01: JavaScript URL bypasses static output link validation
 
-**File:** `site/src/scripts/validate-output-shape.ts:287,349`
+**File:** `site/src/pages/release-readiness.astro:72` and `site/src/scripts/validate-output-shape.ts:57`
 
-**Issue:** `decodeURIComponent(pathPart)` and `decodeURIComponent(fragment)` are called without handling `URIError`. A malformed local link such as `<a href="/%E0%A4%A">` or `<a href="#%E0%A4%A">` can throw out of `validateOutputShape()`. In direct CLI use this becomes a generic top-level failure; in `runReleaseReadiness()` the validator exception is not caught by `buildValidatorGateResult`, so the release readiness run can abort instead of returning a structured `output-shape` diagnostic with the failing page and field.
+**Issue:** The release-readiness page ships a `href="javascript:print()"` action, while the output-shape validator explicitly ignores `javascript:` hrefs as if they were safe external schemes. That means the deployable-output gate will not catch JavaScript URLs in generated HTML. This is the wrong contract for a static publication readiness gate: JavaScript URLs are unsafe link targets, are commonly blocked by CSP/static hosting hardening, and can regress into real XSS risk if future page data ever flows into href attributes. The current hardcoded print action should not require a JavaScript URL, and the validator should fail any static page containing one.
 
-**Fix:** Decode through a safe helper that records an `html.href` or `html.fragment` diagnostic and skips only the malformed link.
+**Fix:** Replace the JavaScript href with a real button or a non-JavaScript print instruction, and make the output-shape validator reject `javascript:` URLs instead of ignoring them. For example:
 
-```ts
-function safeDecodeUriComponent(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
-}
+```astro
+<button class="release-readiness__print-action" type="button" onclick="window.print()">Print research handout</button>
 ```
 
-Use this helper in `resolveHrefTarget()` and fragment validation, adding an `OutputShapeError` when decoding fails.
+and in the validator:
+
+```ts
+const ignoredHrefSchemes = /^(?:https?:|mailto:|tel:|data:)/iu;
+
+if (/^javascript:/iu.test(href)) {
+  addError(
+    errors,
+    page.relativePath,
+    'html.href',
+    displayPath(page.absolutePath, distDir),
+    `Local href ${href} uses a javascript: URL`,
+    'Replace JavaScript URLs with buttons or safe static links before publishing.',
+  );
+  continue;
+}
+```
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "created_at": "2026-05-21T07:02:36.454Z",
+  "created_at": "2026-05-22T06:43:32.999Z",
   "workflow": "gsd-pause-work",
   "phase": {
     "number": "05",
@@ -11,8 +11,12 @@
   },
   "repository": {
     "worktree": "/home/prannayag/harness_eng/.claude/worktrees/gsd-execute-5",
-    "latest_known_commit": "2d164c9 fix(05): resolve release output-shape review findings",
-    "status_at_pause": "clean_before_handoff_files"
+    "latest_known_commit": "fbdb648 fix(05): reject javascript static links",
+    "status_at_pause": "uncommitted_planning_files_present",
+    "uncommitted_files_at_pause": [
+      ".planning/STATE.md",
+      ".planning/phases/05-release-quality-and-static-publication-readiness/05-REVIEW.md"
+    ]
   },
   "completed_work": [
     "Executed all six Phase 05 plans across four waves.",
@@ -21,24 +25,31 @@
     "Added math fixture, print readiness, accessibility semantics, and output-shape validators with tests.",
     "Ran Phase 05 code review and recorded findings in 05-REVIEW.md.",
     "Fixed output-shape review findings for same-page fragments, deployable asset existence checks, and malformed percent encoding diagnostics.",
-    "Fixed newly exposed generated-output issues by linking related concepts to glossary anchors, adding favicon.svg, and rendering stable release diagnostic anchors."
+    "Fixed generated-output issues by linking related concepts to glossary anchors, adding favicon.svg, and rendering stable release diagnostic anchors.",
+    "Fixed follow-up release-readiness correctness gaps so coverage-only diagnostics no longer claim unified release readiness.",
+    "Hardened static artifact boundaries so coverage writes stay inside site/dist and local hrefs cannot resolve outside generated output.",
+    "Made standalone accessibility and print validators fail when generated static output is absent unless tests explicitly opt into CSS-only validation.",
+    "Accepted extensionless Astro route hrefs that resolve to generated index pages.",
+    "Replaced the release-readiness javascript print href with a button and made output-shape validation reject javascript: hrefs."
   ],
   "verification_observed": [
-    "bun test --cwd site passed with 152 tests after review fixes.",
-    "bun run --cwd site release:clean-proof passed with 12 gates passed, 0 failed, 0 pending, and 0 diagnostics after review fixes."
+    "bun test --cwd site src/scripts/release-readiness.test.ts src/scripts/validate-output-shape.test.ts passed with 20 tests after javascript href fixes.",
+    "bun test --cwd site passed with 158 tests after all Phase 05 review fixes.",
+    "bun run --cwd site release:clean-proof passed with 12 gates passed, 0 failed, 0 pending, and 0 diagnostics after all Phase 05 review fixes."
   ],
   "important_context": [
     "Use bun test --cwd site for Vitest in this project; bun run --cwd site test runs under Node and fails because tests use Bun globals.",
-    "The existing 05-REVIEW.md intentionally records the original review findings and still has status issues_found; review fixes were committed afterward in 2d164c9.",
+    "Current 05-REVIEW.md is modified and still reports WR-01 about javascript:print(); that warning is stale because fbdb648 already replaced the javascript href and updated output-shape validation to reject javascript: URLs.",
+    "Do not mark the review gate clean from the stale 05-REVIEW.md alone. Re-run or refresh the Phase 05 code review after fbdb648 if the GSD workflow requires a clean review artifact.",
     "Earlier agent worktrees were based on origin/main rather than the local phase branch, so direct merging could delete local Phase 05 planning files. Continue working in this current worktree unless intentionally creating a new correctly-based one.",
-    ".planning/STATE.md was restored before the review-fix commit and should not be assumed updated for final phase completion yet."
+    ".planning/STATE.md has only had Session Continuity refreshed for resume/pause context and should not be assumed updated for final phase completion yet."
   ],
   "remaining_work": [
-    "If resuming phase execution rather than only pause-work, re-run or record the code review status after fixes if the GSD workflow requires a clean review artifact.",
+    "Re-run or refresh the Phase 05 code review after fbdb648 so 05-REVIEW.md no longer records a fixed warning as current.",
     "Run remaining GSD post-execution gates: regression gate, schema drift gate if applicable, codebase drift gate if applicable, and phase verification.",
     "Create 05-VERIFICATION.md through the GSD verifier if phase verification passes.",
     "Update phase completion state and final tracking artifacts if verification passes.",
-    "Commit final phase completion artifacts."
+    "Commit final Phase 05 completion artifacts."
   ],
-  "resume_instruction": "Resume with /gsd:resume-work or continue Phase 05 post-execution gates from .planning/phases/05-release-quality-and-static-publication-readiness/.continue-here.md."
+  "resume_instruction": "Resume with /gsd:resume-work or continue Phase 05 post-execution gates from .planning/phases/05-release-quality-and-static-publication-readiness/.continue-here.md. Start by refreshing the stale Phase 05 review artifact after fbdb648."
 }
