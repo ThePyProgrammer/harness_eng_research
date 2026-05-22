@@ -34,10 +34,10 @@ function createCompleteDistFixture(): string {
 
   writeJson(join(distDir, 'corpus-index.json'), { generatedBy: 'fixture', entryCount: corpusEntries.length, entries: corpusEntries });
   writeJson(join(distDir, 'search-index.json'), { generatedBy: 'fixture', recordCount: 1, records: [{ href: '/corpus/umbrella/' }] });
-  writeJson(join(distDir, 'relation-index.json'), { generatedBy: 'fixture', typeCount: 1, recordCount: 1, types: [], records: [] });
-  writeJson(join(distDir, 'reading-paths-index.json'), { generatedBy: 'fixture', pathCount: 1, paths: [] });
+  writeJson(join(distDir, 'relation-index.json'), { generatedBy: 'fixture', typeCount: 1, recordCount: 1, types: [], records: [{ source: 'umbrella', target: 'coordination' }] });
+  writeJson(join(distDir, 'reading-paths-index.json'), { generatedBy: 'fixture', pathCount: 1, paths: [{ slug: 'building-a-harness' }] });
   writeJson(join(distDir, 'graph-index.json'), { generatedBy: 'fixture', overview: { nodes: [], edges: [] }, neighborhoods: [] });
-  writeJson(join(distDir, 'coverage-matrix.json'), { generatedBy: 'fixture', ownerCount: 13, owners: [], diagnostics: [] });
+  writeJson(join(distDir, 'coverage-matrix.json'), { generatedBy: 'fixture', ownerCount: corpusEntries.length, owners: corpusEntries.map((entry) => entry.id), diagnostics: [] });
   mkdirSync(join(distDir, 'pagefind'), { recursive: true });
   writeFileSync(join(distDir, 'pagefind', 'pagefind.js'), 'export default {};');
 
@@ -77,6 +77,52 @@ describe('validate-output-shape', () => {
         path: 'site/dist/coverage-matrix.json',
       }));
       expect(formatOutputShapeError(result.errors[0])).toContain(result.errors[0].nextStep);
+    });
+  });
+
+  it('fails JSON artifacts whose count fields do not match array lengths', () => {
+    withFixture((distDir) => {
+      writeJson(join(distDir, 'search-index.json'), { generatedBy: 'fixture', recordCount: 2, records: [{ href: '/corpus/umbrella/' }] });
+      writeJson(join(distDir, 'reading-paths-index.json'), { generatedBy: 'fixture', pathCount: 1, paths: [] });
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          field: 'artifact.search',
+          path: 'site/dist/search-index.json',
+          reason: expect.stringContaining('recordCount must match records length'),
+        }),
+        expect.objectContaining({
+          field: 'artifact.reading-paths',
+          path: 'site/dist/reading-paths-index.json',
+          reason: expect.stringContaining('pathCount must match paths length'),
+        }),
+      ]));
+    });
+  });
+
+  it('fails fixed corpus JSON artifacts with incomplete corpus-sized arrays', () => {
+    withFixture((distDir) => {
+      writeJson(join(distDir, 'corpus-index.json'), { generatedBy: 'fixture', entryCount: corpusEntries.length, entries: [] });
+      writeJson(join(distDir, 'coverage-matrix.json'), { generatedBy: 'fixture', ownerCount: corpusEntries.length, owners: [] });
+
+      const result = validateOutputShape({ distDir });
+
+      expect(result.ok).toBe(false);
+      expect(result.errors).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          field: 'artifact.index',
+          path: 'site/dist/corpus-index.json',
+          reason: expect.stringContaining(`${corpusEntries.length} entries`),
+        }),
+        expect.objectContaining({
+          field: 'artifact.coverage',
+          path: 'site/dist/coverage-matrix.json',
+          reason: expect.stringContaining(`${corpusEntries.length} owners`),
+        }),
+      ]));
     });
   });
 

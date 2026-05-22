@@ -129,30 +129,42 @@ function arrayPropertyPresent(payload: unknown, key: string): boolean {
   return hasObjectProperty(payload, key) && Array.isArray((payload as Record<string, unknown>)[key]);
 }
 
+function arrayLengthEquals(payload: unknown, key: string, expected: number): boolean {
+  return arrayPropertyPresent(payload, key) && ((payload as Record<string, unknown>)[key] as unknown[]).length === expected;
+}
+
+function countMatchesArrayLength(payload: unknown, countKey: string, arrayKey: string): boolean {
+  if (!numericPropertyPresent(payload, countKey) || !arrayPropertyPresent(payload, arrayKey)) {
+    return false;
+  }
+
+  return (payload as Record<string, unknown>)[countKey] === ((payload as Record<string, unknown>)[arrayKey] as unknown[]).length;
+}
+
 const requiredJsonArtifacts: RequiredJsonArtifact[] = [
   {
     path: 'corpus-index.json',
     field: 'artifact.index',
     entryId: 'corpus-index',
-    validate: (payload) => numericPropertyEquals(payload, 'entryCount', corpusEntries.length) && arrayPropertyPresent(payload, 'entries') ? null : 'corpus-index.json must contain entryCount 13 and entries array',
+    validate: (payload) => numericPropertyEquals(payload, 'entryCount', corpusEntries.length) && arrayLengthEquals(payload, 'entries', corpusEntries.length) ? null : `corpus-index.json must contain entryCount ${corpusEntries.length} and ${corpusEntries.length} entries`,
   },
   {
     path: 'search-index.json',
     field: 'artifact.search',
     entryId: 'search-index',
-    validate: (payload) => numericPropertyPresent(payload, 'recordCount') && arrayPropertyPresent(payload, 'records') ? null : 'search-index.json must contain recordCount and records array',
+    validate: (payload) => countMatchesArrayLength(payload, 'recordCount', 'records') ? null : 'search-index.json recordCount must match records length',
   },
   {
     path: 'relation-index.json',
     field: 'artifact.relation',
     entryId: 'relation-index',
-    validate: (payload) => numericPropertyPresent(payload, 'recordCount') && arrayPropertyPresent(payload, 'records') ? null : 'relation-index.json must contain recordCount and records array',
+    validate: (payload) => countMatchesArrayLength(payload, 'recordCount', 'records') ? null : 'relation-index.json recordCount must match records length',
   },
   {
     path: 'reading-paths-index.json',
     field: 'artifact.reading-paths',
     entryId: 'reading-paths-index',
-    validate: (payload) => numericPropertyPresent(payload, 'pathCount') && arrayPropertyPresent(payload, 'paths') ? null : 'reading-paths-index.json must contain pathCount and paths array',
+    validate: (payload) => countMatchesArrayLength(payload, 'pathCount', 'paths') ? null : 'reading-paths-index.json pathCount must match paths length',
   },
   {
     path: 'graph-index.json',
@@ -164,7 +176,7 @@ const requiredJsonArtifacts: RequiredJsonArtifact[] = [
     path: 'coverage-matrix.json',
     field: 'artifact.coverage',
     entryId: 'coverage-matrix',
-    validate: (payload) => numericPropertyEquals(payload, 'ownerCount', 13) && arrayPropertyPresent(payload, 'owners') ? null : 'coverage-matrix.json must contain ownerCount 13 and owners array',
+    validate: (payload) => numericPropertyEquals(payload, 'ownerCount', corpusEntries.length) && arrayLengthEquals(payload, 'owners', corpusEntries.length) ? null : `coverage-matrix.json must contain ownerCount ${corpusEntries.length} and ${corpusEntries.length} owners`,
   },
 ];
 
